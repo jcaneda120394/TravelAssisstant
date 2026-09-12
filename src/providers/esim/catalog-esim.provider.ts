@@ -115,15 +115,212 @@ const CATALOG: Record<
       },
     ],
   },
+  SG: {
+    countryName: 'Singapore',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 3,
+        validityDays: 30,
+        price: 9,
+        currency: 'USD',
+        network: 'Singtel / StarHub',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/singapore-esim',
+        bestFor: 'Short stopover',
+      },
+    ],
+  },
+  VN: {
+    countryName: 'Vietnam',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 3,
+        validityDays: 30,
+        price: 8.5,
+        currency: 'USD',
+        network: 'Viettel / Vinaphone',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/vietnam-esim',
+        bestFor: 'North–south travel',
+      },
+    ],
+  },
+  ID: {
+    countryName: 'Indonesia',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 3,
+        validityDays: 30,
+        price: 9,
+        currency: 'USD',
+        network: 'Telkomsel',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/indonesia-esim',
+        bestFor: 'Bali / Jakarta',
+      },
+    ],
+  },
+  MY: {
+    countryName: 'Malaysia',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 3,
+        validityDays: 30,
+        price: 9.5,
+        currency: 'USD',
+        network: 'Maxis / Digi',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/malaysia-esim',
+        bestFor: 'KL + islands',
+      },
+    ],
+  },
+  HK: {
+    countryName: 'Hong Kong',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 3,
+        validityDays: 30,
+        price: 8,
+        currency: 'USD',
+        network: 'CSL / 3HK',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/hong-kong-esim',
+        bestFor: 'City weekend',
+      },
+    ],
+  },
+  TW: {
+    countryName: 'Taiwan',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 3,
+        validityDays: 30,
+        price: 9,
+        currency: 'USD',
+        network: 'Chunghwa / FarEasTone',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/taiwan-esim',
+        bestFor: 'Taipei trip',
+      },
+    ],
+  },
+  FR: {
+    countryName: 'France',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 5,
+        validityDays: 30,
+        price: 16,
+        currency: 'USD',
+        network: 'Orange / SFR',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/france-esim',
+        bestFor: 'EU city hopping',
+      },
+    ],
+  },
+  GB: {
+    countryName: 'United Kingdom',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 5,
+        validityDays: 30,
+        price: 16,
+        currency: 'USD',
+        network: 'EE / O2',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/united-kingdom-esim',
+        bestFor: 'London + UK travel',
+      },
+    ],
+  },
+  AU: {
+    countryName: 'Australia',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 5,
+        validityDays: 30,
+        price: 18,
+        currency: 'USD',
+        network: 'Optus / Vodafone',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/australia-esim',
+        bestFor: 'East coast trip',
+      },
+    ],
+  },
+  DE: {
+    countryName: 'Germany',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 5,
+        validityDays: 30,
+        price: 15,
+        currency: 'USD',
+        network: 'Telekom / Vodafone',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/germany-esim',
+        bestFor: 'Rail travel',
+      },
+    ],
+  },
+  CA: {
+    countryName: 'Canada',
+    plans: [
+      {
+        provider: 'Airalo',
+        dataGb: 5,
+        validityDays: 30,
+        price: 18,
+        currency: 'USD',
+        network: 'Rogers / Bell',
+        supports5g: true,
+        hotspot: true,
+        purchaseUrl: 'https://www.airalo.com/canada-esim',
+        bestFor: 'City + road trip',
+      },
+    ],
+  },
 };
 
 function defaultPlans(code: string): EsimPlan[] {
+  const name =
+    (
+      {
+        CN: 'China',
+        ES: 'Spain',
+        IT: 'Italy',
+        NZ: 'New Zealand',
+      } as Record<string, string>
+    )[code] ?? code;
+
   return [
     {
       id: `catalog-${code}-1`,
       provider: 'Airalo',
       countryCode: code,
-      countryName: code,
+      countryName: name,
       dataGb: 3,
       validityDays: 30,
       price: 12,
@@ -131,7 +328,7 @@ function defaultPlans(code: string): EsimPlan[] {
       network: 'Local partner',
       supports5g: true,
       hotspot: true,
-      purchaseUrl: `https://www.airalo.com/`,
+      purchaseUrl: 'https://www.airalo.com/',
       bestFor: 'Starter plan',
       isMock: false,
     },

@@ -36,7 +36,7 @@ export async function fetchJson<T>(
     });
 
     if (!response.ok) {
-      const body = await response.text().catch(() => '');
+      const body = (await response.text().catch(() => '')) ?? '';
       throw new AppError(`Request failed (${response.status})`, {
         code: 'HTTP_ERROR',
         cause: body.slice(0, 300),

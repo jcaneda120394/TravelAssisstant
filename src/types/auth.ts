@@ -3,25 +3,37 @@ import { z } from 'zod';
 import {
   ACCESSIBILITY_OPTIONS,
   BUDGET_TIERS,
-  CURRENCIES,
   DIETARY_OPTIONS,
   TRANSPORT_PREFERENCES,
   TRAVEL_INTERESTS,
   TRAVEL_STYLES,
   WALKING_TOLERANCE,
 } from '@/constants/preferences';
+import { isFxCurrencyCode } from '@/constants/fx-currencies';
 
 export const profileSchema = z.object({
   id: z.string().uuid(),
   email: z.string().nullable(),
   full_name: z.string().nullable(),
   avatar_url: z.string().nullable(),
+  phone: z.string().nullable().optional(),
+  bio: z.string().nullable().optional(),
+  admin_notes: z.string().nullable().optional(),
   onboarding_completed: z.boolean(),
+  role: z.enum(['user', 'admin']).default('user'),
+  is_disabled: z.boolean().default(false),
   created_at: z.string(),
   updated_at: z.string(),
 });
 
 export type Profile = z.infer<typeof profileSchema>;
+
+const homeCurrencySchema = z
+  .string()
+  .min(3)
+  .max(3)
+  .transform((value) => value.toUpperCase())
+  .refine(isFxCurrencyCode, { message: 'Select a supported home currency' });
 
 export const userPreferencesSchema = z.object({
   id: z.string().uuid().optional(),
@@ -31,10 +43,14 @@ export const userPreferencesSchema = z.object({
   budget_tier: z.enum(BUDGET_TIERS).nullable().optional(),
   transport_preferences: z.array(z.enum(TRANSPORT_PREFERENCES)).default([]),
   home_country: z.string().nullable().optional(),
-  home_currency: z.enum(CURRENCIES).default('USD'),
+  home_currency: homeCurrencySchema.default('USD'),
   preferred_language: z.string().default('en'),
   adults: z.number().int().min(1).max(20).default(1),
   children: z.number().int().min(0).max(20).default(0),
+  traveling_with_kids: z.boolean().default(false),
+  kids_ages: z.array(z.number().int().min(0).max(17)).default([]),
+  traveling_with_elderly: z.boolean().default(false),
+  elderly_ages: z.array(z.number().int().min(55).max(120)).default([]),
   dietary_restrictions: z.array(z.enum(DIETARY_OPTIONS)).default([]),
   accessibility_requirements: z.array(z.enum(ACCESSIBILITY_OPTIONS)).default([]),
   walking_tolerance: z.enum(WALKING_TOLERANCE).nullable().optional(),
@@ -55,10 +71,14 @@ export const onboardingDraftSchema = z.object({
     .array(z.enum(TRANSPORT_PREFERENCES))
     .min(1, 'Select at least one transport preference'),
   home_country: z.string().min(2, 'Select your home country'),
-  home_currency: z.enum(CURRENCIES),
+  home_currency: homeCurrencySchema,
   preferred_language: z.string().min(2),
   adults: z.number().int().min(1).max(20),
   children: z.number().int().min(0).max(20),
+  traveling_with_kids: z.boolean().default(false),
+  kids_ages: z.array(z.number().int().min(0).max(17)).default([]),
+  traveling_with_elderly: z.boolean().default(false),
+  elderly_ages: z.array(z.number().int().min(55).max(120)).default([]),
   dietary_restrictions: z.array(z.enum(DIETARY_OPTIONS)),
   accessibility_requirements: z.array(z.enum(ACCESSIBILITY_OPTIONS)),
   walking_tolerance: z.enum(WALKING_TOLERANCE),

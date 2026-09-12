@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
+import { AuthBackToHomeBar, goToGuestHome } from '@/features/auth/auth-back-to-home';
 import { getErrorMessage, toAppError } from '@/lib/errors/app-error';
 import {
   signInWithApple,
@@ -93,10 +94,11 @@ export function LoginScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-16" contentContainerClassName="pb-10" testID="screen-login">
+      <AuthBackToHomeBar />
+      <ScrollView className="flex-1 px-5 pt-2" contentContainerClassName="pb-10" testID="screen-login">
         <SectionHeader
           title="Welcome back"
-          subtitle="Sign in to continue planning with TravelAssistant"
+          subtitle="Sign in to save trips — or go back home to keep browsing as a guest"
         />
 
         {!env.isSupabaseConfigured ? (
@@ -174,6 +176,12 @@ export function LoginScreen() {
               testID="login-apple"
             />
           ) : null}
+          <Button
+            label="Back to Home"
+            variant="secondary"
+            onPress={() => goToGuestHome(router)}
+            testID="login-browse-guest"
+          />
         </View>
 
         <View className="gap-3">

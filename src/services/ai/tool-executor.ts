@@ -72,12 +72,14 @@ function detectTools(message: string, mode?: string): string[] {
       text,
     ) ||
     mode === 'explore' ||
-    mode === 'planner' ||
-    mode === 'ask'
+    mode === 'planner'
   ) {
     tools.add('find_attractions');
   }
-  if (/restaurant|food|breakfast|lunch|dinner|eat|cafe|coffee/.test(text) || mode === 'explore') {
+  if (
+    /restaurant|food|breakfast|lunch|dinner|eat|cafe|coffee|afternoon|lunch|snack/.test(text) ||
+    mode === 'explore'
+  ) {
     tools.add('find_food');
   }
   if (/trip|itinerary|plan/.test(text) || mode === 'planner') {
@@ -319,7 +321,17 @@ export async function executeTravelTools(request: AIChatRequest): Promise<ToolRe
     if (!(TOOL_NAMES as readonly string[]).includes(name)) {
       continue;
     }
-    results.push({ name, result: await runTool(name, request) });
+    try {
+      results.push({ name, result: await runTool(name, request) });
+    } catch (error) {
+      results.push({
+        name,
+        result: {
+          error:
+            error instanceof Error ? error.message : 'Tool failed (network or provider unavailable)',
+        },
+      });
+    }
   }
 
   return results;

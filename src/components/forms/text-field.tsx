@@ -3,7 +3,7 @@ import { type TextInputProps } from 'react-native';
 import { AppText } from '@/components/ui/typography';
 import { TextInput, View } from '@/components/ui/primitives';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
-import { theme } from '@/config/theme';
+import { useCountryAppearance } from '@/hooks/use-country-appearance';
 
 type Props = TextInputProps & {
   label: string;
@@ -13,7 +13,7 @@ type Props = TextInputProps & {
 
 export function TextField({ label, error, testID, ...props }: Props) {
   const scheme = useAppColorScheme();
-  const colors = theme[scheme];
+  const { colors } = useCountryAppearance();
 
   return (
     <View className="mb-4">

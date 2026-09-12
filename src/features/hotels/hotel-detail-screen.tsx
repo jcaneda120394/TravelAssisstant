@@ -2,14 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Button } from '@/components/ui/button';
+import { DisplayPriceText } from '@/components/currency/display-price-text';
 import { EmptyState } from '@/components/feedback/states';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { ScrollView } from '@/components/ui/primitives';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { providers } from '@/providers/registry';
 
 export function HotelDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { currency } = useDisplayCurrency();
 
   const query = useQuery({
     queryKey: ['hotel', id],
@@ -19,7 +22,7 @@ export function HotelDetailScreen() {
 
   if (!query.data) {
     return (
-      <Screen className="px-5 pt-14">
+      <Screen className="px-5 pt-4">
         <EmptyState title="Hotel not found" description="Hotel listing unavailable." />
         <Button label="Back" onPress={() => router.back()} />
       </Screen>
@@ -30,14 +33,23 @@ export function HotelDetailScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10">
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10">
         <SectionHeader title={hotel.name} subtitle={hotel.address} />
         <Card className="mb-4">
           <AppText muted>
             {hotel.rating ? `${hotel.rating}★ (${hotel.reviewCount ?? 0} reviews)` : 'Unrated'}
           </AppText>
-          <AppText className="mt-2 font-sans-semibold text-xl">
-            {hotel.currency} {hotel.pricePerNight}/night
+          <DisplayPriceText
+            amount={hotel.pricePerNight}
+            sourceCurrency={hotel.currency ?? 'USD'}
+            suffix="/night"
+            className="mt-2 font-sans-semibold text-xl"
+          />
+          <AppText muted className="mt-1 text-xs">
+            Shown in {currency}
+            {hotel.currency && hotel.currency.toUpperCase() !== currency
+              ? ` (from ${hotel.currency})`
+              : ''}
           </AppText>
           <AppText muted className="mt-2">
             Amenities: {hotel.amenities?.join(', ') ?? '—'}
@@ -51,7 +63,11 @@ export function HotelDetailScreen() {
           onPress={() =>
             router.push({
               pathname: '/directions',
-              params: { destinationName: hotel.name },
+              params: {
+                destinationName: hotel.name,
+                destinationLat: String(hotel.latitude),
+                destinationLng: String(hotel.longitude),
+              },
             })
           }
         />

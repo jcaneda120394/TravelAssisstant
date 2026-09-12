@@ -59,8 +59,11 @@ Add redirect URLs:
 - `travelassistant://**`
 - `exp://127.0.0.1:8081/--/*` (local Expo)
 - `exp://localhost:8081/--/*`
+- `https://<your-vercel-app>.vercel.app`
+- `https://<your-vercel-app>.vercel.app/**`
+- `https://*.vercel.app/**` (preview deploys)
 
-Site URL can stay your dashboard or `travelassistant://`
+Site URL: use your Vercel production URL once deployed (or keep `travelassistant://` for native-first).
 
 ---
 

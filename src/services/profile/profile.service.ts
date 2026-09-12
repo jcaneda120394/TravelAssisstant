@@ -8,6 +8,7 @@ import {
   saveLocalProfile,
 } from '@/services/auth/local-auth';
 import type { OnboardingDraft, Profile, UserPreferences } from '@/types/auth';
+import { userPreferencesSchema } from '@/types/auth';
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   if (!env.isSupabaseConfigured) {
@@ -25,7 +26,16 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
     throw toAppError(error, 'Failed to load profile');
   }
 
-  return data as Profile | null;
+  return data
+    ? ({
+        ...data,
+        phone: data.phone ?? null,
+        bio: data.bio ?? null,
+        admin_notes: data.admin_notes ?? null,
+        role: data.role === 'admin' ? 'admin' : 'user',
+        is_disabled: Boolean(data.is_disabled),
+      } as Profile)
+    : null;
 }
 
 export async function ensureProfile(user: {
@@ -46,6 +56,8 @@ export async function ensureProfile(user: {
       full_name: user.fullName,
       avatar_url: null,
       onboarding_completed: false,
+      role: 'user',
+      is_disabled: false,
       created_at: now,
       updated_at: now,
     });
@@ -96,12 +108,24 @@ export async function ensureProfile(user: {
   // Ensure preferences row exists too (trigger may already have inserted it).
   await client.from('user_preferences').upsert({ user_id: user.id }, { onConflict: 'user_id' });
 
-  return data as Profile;
+  return {
+    ...data,
+    role: data.role === 'admin' ? 'admin' : 'user',
+    is_disabled: Boolean(data.is_disabled),
+  } as Profile;
 }
 
 export async function fetchPreferences(userId: string): Promise<UserPreferences | null> {
   if (!env.isSupabaseConfigured) {
-    return getLocalPreferences();
+    const local = await getLocalPreferences();
+    if (!local) return null;
+    return userPreferencesSchema.parse({
+      ...local,
+      traveling_with_kids: local.traveling_with_kids ?? false,
+      kids_ages: local.kids_ages ?? [],
+      traveling_with_elderly: local.traveling_with_elderly ?? false,
+      elderly_ages: local.elderly_ages ?? [],
+    });
   }
 
   const client = assertSupabase();
@@ -115,7 +139,17 @@ export async function fetchPreferences(userId: string): Promise<UserPreferences 
     throw toAppError(error, 'Failed to load preferences');
   }
 
-  return data as UserPreferences | null;
+  if (!data) {
+    return null;
+  }
+
+  return userPreferencesSchema.parse({
+    ...data,
+    traveling_with_kids: data.traveling_with_kids ?? false,
+    kids_ages: data.kids_ages ?? [],
+    traveling_with_elderly: data.traveling_with_elderly ?? false,
+    elderly_ages: data.elderly_ages ?? [],
+  });
 }
 
 export async function completeOnboarding(
@@ -134,7 +168,13 @@ export async function completeOnboarding(
     home_currency: draft.home_currency,
     preferred_language: draft.preferred_language,
     adults: draft.adults,
-    children: draft.children,
+    children: draft.traveling_with_kids
+      ? Math.max(draft.children, draft.kids_ages?.length || 1)
+      : draft.children,
+    traveling_with_kids: draft.traveling_with_kids ?? false,
+    kids_ages: draft.traveling_with_kids ? draft.kids_ages ?? [] : [],
+    traveling_with_elderly: draft.traveling_with_elderly ?? false,
+    elderly_ages: draft.traveling_with_elderly ? draft.elderly_ages ?? [] : [],
     dietary_restrictions: draft.dietary_restrictions.filter((item) => item !== 'none'),
     accessibility_requirements: draft.accessibility_requirements.filter(
       (item) => item !== 'none',
@@ -227,4 +267,45 @@ export async function updateProfileName(userId: string, fullName: string): Promi
   }
 
   return data as Profile;
+}
+
+export async function updateHomeCurrency(
+  userId: string,
+  currency: string,
+): Promise<UserPreferences> {
+  const existing = await fetchPreferences(userId);
+  if (!existing) {
+    throw new AppError('Preferences missing', { code: 'PREFS_MISSING' });
+  }
+
+  const updated_at = new Date().toISOString();
+  const next: UserPreferences = {
+    ...existing,
+    home_currency: currency,
+    updated_at,
+  };
+
+  if (!env.isSupabaseConfigured) {
+    return saveLocalPreferences(next);
+  }
+
+  const client = assertSupabase();
+  const { data, error } = await client
+    .from('user_preferences')
+    .update({ home_currency: currency, updated_at })
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw toAppError(error, 'Failed to update currency');
+  }
+
+  return userPreferencesSchema.parse({
+    ...data,
+    traveling_with_kids: data.traveling_with_kids ?? false,
+    kids_ages: data.kids_ages ?? [],
+    traveling_with_elderly: data.traveling_with_elderly ?? false,
+    elderly_ages: data.elderly_ages ?? [],
+  });
 }

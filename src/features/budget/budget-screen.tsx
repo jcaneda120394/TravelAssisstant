@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { ScrollView, View } from '@/components/ui/primitives';
 import { useAuth } from '@/hooks/use-auth';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import {
   addExpense,
   getBudget,
@@ -35,9 +36,9 @@ const CATEGORIES = [
 
 export function BudgetScreen() {
   const { tripId } = useLocalSearchParams<{ tripId?: string }>();
-  const { user, preferences } = useAuth();
+  const { user } = useAuth();
+  const { currency: homeCurrency } = useDisplayCurrency();
   const queryClient = useQueryClient();
-  const homeCurrency = preferences?.home_currency ?? 'USD';
   const [amount, setAmount] = useState('25');
   const [category, setCategory] = useState<ExpenseCategory>('food');
   const [budgetTotal, setBudgetTotal] = useState('2000');
@@ -89,7 +90,7 @@ export function BudgetScreen() {
 
   if (activeTripId === 'none') {
     return (
-      <Screen className="px-5 pt-14">
+      <Screen className="px-5 pt-4">
         <SectionHeader
           title="Budget"
           subtitle="Open a trip first, then manage budget from the trip dashboard."
@@ -102,7 +103,7 @@ export function BudgetScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-budget">
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-budget">
         <SectionHeader title="Trip budget" subtitle={`Home currency ${homeCurrency}`} />
         <Card className="mb-4">
           <AppText className="font-sans-semibold text-lg">

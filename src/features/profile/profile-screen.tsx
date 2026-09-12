@@ -1,13 +1,18 @@
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
+import { useState } from 'react';
 
+import { CurrencyPickerModal } from '@/components/currency/currency-picker-modal';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
+import { formatCurrencyWithSymbol, formatFxCurrencyName } from '@/constants/fx-currencies';
 import { labelize } from '@/constants/preferences';
 import { useAuth } from '@/hooks/use-auth';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
+import { useCountryAppearance } from '@/hooks/use-country-appearance';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { signOut } from '@/services/auth/auth.service';
 import { buildOfflinePack } from '@/services/offline/offline.service';
@@ -19,15 +24,20 @@ const THEME_OPTIONS: ThemePreference[] = ['system', 'light', 'dark'];
 export function ProfileScreen() {
   const router = useRouter();
   const scheme = useAppColorScheme();
-  const { user, profile, preferences } = useAuth();
+  const { user, profile, preferences, isAdmin } = useAuth();
+  const { currency, setCurrency } = useDisplayCurrency();
+  const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const preference = useThemeStore((state) => state.preference);
   const setPreference = useThemeStore((state) => state.setPreference);
+  const followCountryTheme = useThemeStore((state) => state.followCountryTheme);
+  const setFollowCountryTheme = useThemeStore((state) => state.setFollowCountryTheme);
+  const { countryTheme, locationLabel, colors, countryThemesSupported } = useCountryAppearance();
 
   const onSignOut = async () => {
     try {
       await signOut();
       useAuthStore.getState().reset();
-      router.replace('/(auth)/login');
+      router.replace('/(tabs)');
     } catch (error) {
       Alert.alert('Sign out failed', getErrorMessage(error));
     }
@@ -45,7 +55,7 @@ export function ProfileScreen() {
   return (
     <Screen>
       <ScrollView
-        className="flex-1 px-5 pt-14"
+        className="flex-1 px-5 pt-4"
         contentContainerClassName="pb-10"
         testID="screen-profile"
       >
@@ -53,17 +63,54 @@ export function ProfileScreen() {
 
         <Card className="mb-4">
           <AppText className="font-sans-semibold text-lg">
-            {profile?.full_name ?? user?.fullName ?? 'Traveler'}
+            {user
+              ? (profile?.full_name ?? user.fullName ?? 'Traveler')
+              : 'Browsing as guest'}
           </AppText>
           <AppText muted className="mt-1">
-            {user?.email ?? 'No email'}
+            {user?.email ?? 'Sign up to save trips and favorites'}
           </AppText>
           <AppText muted className="mt-2">
             Auth: {env.isSupabaseConfigured ? 'Supabase' : 'Local demo'}
           </AppText>
-          <View className="mt-4">
-            <Button label="Sign out" variant="secondary" onPress={() => void onSignOut()} />
+          <View className="mt-4 gap-2">
+            {user ? (
+              <>
+                {isAdmin ? (
+                  <Button
+                    label="Open admin dashboard"
+                    onPress={() => router.push('/admin')}
+                    testID="open-admin-dashboard"
+                  />
+                ) : null}
+                <Button label="Sign out" variant="secondary" onPress={() => void onSignOut()} />
+              </>
+            ) : (
+              <>
+                <Button label="Sign up" onPress={() => router.push('/(auth)/signup')} />
+                <Button
+                  label="Log in"
+                  variant="secondary"
+                  onPress={() => router.push('/(auth)/login')}
+                />
+              </>
+            )}
           </View>
+        </Card>
+
+        <Card className="mb-4">
+          <SectionHeader
+            title="Display currency"
+            subtitle="Used for hotels, restaurants, and attraction prices"
+          />
+          <AppText className="mb-3 font-sans-semibold text-lg">
+            {formatCurrencyWithSymbol(currency)} · {formatFxCurrencyName(currency)}
+          </AppText>
+          <Button
+            label="Change currency"
+            variant="secondary"
+            onPress={() => setCurrencyPickerOpen(true)}
+          />
         </Card>
 
         <Card className="mb-4">
@@ -80,12 +127,28 @@ export function ProfileScreen() {
                 Budget: {preferences.budget_tier ? labelize(preferences.budget_tier) : '—'}
               </AppText>
               <AppText muted>
-                Home: {preferences.home_country ?? '—'} · {preferences.home_currency} ·{' '}
+                Home: {preferences.home_country ?? '—'} · {currency} ·{' '}
                 {preferences.preferred_language}
               </AppText>
               <AppText muted>
                 Party: {preferences.adults} adult(s), {preferences.children} child(ren)
               </AppText>
+              {preferences.traveling_with_kids ? (
+                <AppText muted>
+                  Kids ages:{' '}
+                  {preferences.kids_ages?.length
+                    ? preferences.kids_ages.join(', ')
+                    : 'set in onboarding'}
+                </AppText>
+              ) : null}
+              {preferences.traveling_with_elderly ? (
+                <AppText muted>
+                  Elderly ages:{' '}
+                  {preferences.elderly_ages?.length
+                    ? preferences.elderly_ages.join(', ')
+                    : 'set in onboarding'}
+                </AppText>
+              ) : null}
             </View>
           ) : (
             <AppText muted>No preferences saved yet.</AppText>
@@ -110,6 +173,7 @@ export function ProfileScreen() {
         <Card className="mb-4">
           <SectionHeader title="Travel tools" />
           <View className="gap-2">
+            <Button label="Travel Guide" variant="secondary" onPress={() => router.push('/(tabs)/guide')} />
             <Button label="Favorites" variant="secondary" onPress={() => router.push('/favorites')} />
             <Button label="Currency" variant="secondary" onPress={() => router.push('/currency')} />
             <Button label="eSIM" variant="secondary" onPress={() => router.push('/esim')} />
@@ -121,17 +185,68 @@ export function ProfileScreen() {
         </Card>
 
         <Card className="mb-4">
-          <SectionHeader title="Appearance" subtitle={`Active scheme: ${scheme}`} />
-          <View className="gap-2">
-            {THEME_OPTIONS.map((option) => (
+          <SectionHeader
+            title="Appearance"
+            subtitle={
+              countryThemesSupported
+                ? `Active scheme: ${scheme}${
+                    followCountryTheme ? ` · ${countryTheme.label} theme` : ' · Casual theme'
+                  }`
+                : `Casual theme · ${scheme === 'dark' ? 'Dark' : 'Light'} mode`
+            }
+          />
+          <AppText muted className="mb-3 text-sm">
+            {countryThemesSupported
+              ? followCountryTheme
+                ? locationLabel
+                  ? `Colors follow your location (${locationLabel}).`
+                  : 'Choose a city on Home to apply that country’s theme.'
+                : 'Using the Casual TravelAssistant palette.'
+              : 'Web uses the Casual palette only. Switch between light (normal) and dark below.'}
+          </AppText>
+          <View
+            className="mb-4 h-3 overflow-hidden rounded-full"
+            style={{ backgroundColor: colors.primarySoft }}
+          >
+            <View className="h-full w-2/3 rounded-full" style={{ backgroundColor: colors.primary }} />
+          </View>
+          {countryThemesSupported ? (
+            <View className="mb-3 gap-2">
               <Button
-                key={option}
-                label={option}
-                variant={preference === option ? 'primary' : 'secondary'}
-                onPress={() => setPreference(option)}
-                testID={`theme-${option}`}
+                label={followCountryTheme ? 'Country theme: On' : 'Country theme: Off'}
+                variant={followCountryTheme ? 'primary' : 'secondary'}
+                onPress={() => setFollowCountryTheme(!followCountryTheme)}
+                testID="theme-follow-country"
               />
-            ))}
+              <AppText muted className="text-xs">
+                Example: Tokyo / Japan → Japan indigo & sakura accents.
+              </AppText>
+            </View>
+          ) : null}
+          <View className="gap-2">
+            {(countryThemesSupported
+              ? THEME_OPTIONS
+              : (['light', 'dark'] as ThemePreference[])
+            ).map((option) => {
+              const selected = countryThemesSupported
+                ? preference === option
+                : preference === option || (preference === 'system' && option === scheme);
+              return (
+                <Button
+                  key={option}
+                  label={
+                    option === 'light'
+                      ? 'Light (normal)'
+                      : option === 'dark'
+                        ? 'Dark'
+                        : option
+                  }
+                  variant={selected ? 'primary' : 'secondary'}
+                  onPress={() => setPreference(option)}
+                  testID={`theme-${option}`}
+                />
+              );
+            })}
           </View>
         </Card>
 
@@ -146,6 +261,15 @@ export function ProfileScreen() {
           </AppText>
         </Card>
       </ScrollView>
+
+      <CurrencyPickerModal
+        visible={currencyPickerOpen}
+        currency={currency}
+        onClose={() => setCurrencyPickerOpen(false)}
+        onSelect={(next) => {
+          void setCurrency(next);
+        }}
+      />
     </Screen>
   );
 }

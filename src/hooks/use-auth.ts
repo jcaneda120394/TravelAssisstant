@@ -9,6 +9,7 @@ import {
   fetchPreferences,
   fetchProfile,
 } from '@/services/profile/profile.service';
+import { syncDisplayCurrencyFromPreferences } from '@/stores/currency-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { analytics } from '@/lib/analytics';
 import { toAppError } from '@/lib/errors/app-error';
@@ -19,6 +20,7 @@ async function hydrateForUser(userId: string, email: string | null, fullName: st
     const preferences = await fetchPreferences(userId);
     useAuthStore.getState().setProfile(profile);
     useAuthStore.getState().setPreferences(preferences);
+    syncDisplayCurrencyFromPreferences(preferences?.home_currency);
     analytics.identify(userId, { email: email ?? undefined });
   } catch (error) {
     const appError = toAppError(error);
@@ -119,6 +121,7 @@ export function useAuth() {
     isLoading,
     isHydrated,
     isAuthenticated: Boolean(user),
+    isAdmin: Boolean(profile?.role === 'admin' && !profile.is_disabled),
     // Treat missing profile as incomplete so we don't bounce auth↔tabs while hydrating fails.
     needsOnboarding: Boolean(user && (!profile || !profile.onboarding_completed)),
   };

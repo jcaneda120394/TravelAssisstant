@@ -1,36 +1,47 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 
-import { theme } from '@/config/theme';
-import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
+import { AiAssistantFab } from '@/components/ai/ai-assistant-fab';
+import { WebSidebar } from '@/components/layout/web-sidebar';
+import { useCountryAppearance } from '@/hooks/use-country-appearance';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
 function TabIcon({ color, name }: { color: string; name: IconName }) {
-  return <Ionicons name={name} size={24} color={color} />;
+  return <Ionicons name={name} size={22} color={color} />;
 }
 
 export default function TabsLayout() {
-  const scheme = useAppColorScheme();
-  const colors = theme[scheme];
+  const { scheme, colors } = useCountryAppearance();
+  const { isDesktop, isWeb } = useResponsiveLayout();
 
-  return (
+  const tabs = (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.tabIconSelected,
         tabBarInactiveTintColor: colors.tabIconDefault,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          height: Platform.OS === 'ios' ? 88 : 64,
-          paddingTop: 6,
-        },
+        tabBarStyle: isDesktop
+          ? { display: 'none', height: 0 }
+          : {
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+              borderTopWidth: 1,
+              height: Platform.OS === 'ios' ? 88 : isWeb ? 72 : 66,
+              paddingTop: 8,
+              elevation: 8,
+              shadowColor: '#0A7C74',
+              shadowOpacity: scheme === 'dark' ? 0 : 0.08,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: -2 },
+            },
         tabBarLabelStyle: {
-          fontFamily: 'PlusJakartaSans_500Medium',
-          fontSize: 11,
+          fontFamily: 'PlusJakartaSans_600SemiBold',
+          fontSize: isWeb ? 11 : 9,
+          marginTop: 2,
         },
       }}
     >
@@ -56,6 +67,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="guide"
+        options={{
+          title: 'Guide',
+          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="book" />,
+        }}
+      />
+      <Tabs.Screen
         name="map"
         options={{
           title: 'Map',
@@ -77,5 +95,22 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+  );
+
+  if (isDesktop) {
+    return (
+      <View className="h-full flex-1 flex-row">
+        <WebSidebar />
+        <View className="h-full flex-1">{tabs}</View>
+        <AiAssistantFab />
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1">
+      {tabs}
+      <AiAssistantFab />
+    </View>
   );
 }

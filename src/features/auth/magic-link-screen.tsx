@@ -8,7 +8,8 @@ import { z } from 'zod';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView } from '@/components/ui/primitives';
+import { ScrollView, View } from '@/components/ui/primitives';
+import { AuthBackToHomeBar } from '@/features/auth/auth-back-to-home';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { sendMagicLink } from '@/services/auth/auth.service';
 import { magicLinkSchema } from '@/types/auth';
@@ -39,8 +40,9 @@ export function MagicLinkScreen() {
 
   return (
     <Screen>
+      <AuthBackToHomeBar />
       <ScrollView
-        className="flex-1 px-5 pt-16"
+        className="flex-1 px-5 pt-2"
         contentContainerClassName="pb-10"
         testID="screen-magic-link"
       >
@@ -79,7 +81,9 @@ export function MagicLinkScreen() {
           ) : null}
         </Card>
 
-        <Button label="Back to sign in" variant="ghost" onPress={() => router.push('/(auth)/login')} />
+        <View className="gap-2">
+          <Button label="Back to sign in" variant="ghost" onPress={() => router.push('/(auth)/login')} />
+        </View>
       </ScrollView>
     </Screen>
   );

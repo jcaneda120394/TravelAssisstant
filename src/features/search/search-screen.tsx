@@ -40,7 +40,7 @@ export function SearchScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-search">
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-search">
         <SectionHeader title="Search" subtitle="Places and saved trips" />
         <TextField
           label="Search"

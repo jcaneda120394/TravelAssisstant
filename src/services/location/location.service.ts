@@ -6,7 +6,15 @@ import type { GeoPoint } from '@/types/domain';
 import { AppError, toAppError } from '@/lib/errors/app-error';
 import type { DestinationSuggestion } from '@/services/geo/geocode.service';
 
-const FALLBACK: GeoPoint = { latitude: 14.7943, longitude: 120.8799 }; // Malolos, Bulacan
+/** Default travel area when Simulator GPS is Apple’s San Francisco stub. */
+export const HOME_LOCATION = {
+  coords: { latitude: 14.8433, longitude: 120.8114 } satisfies GeoPoint,
+  city: 'Malolos',
+  country: 'Philippines',
+  label: 'Malolos, Bulacan, Philippines',
+} as const;
+
+const FALLBACK: GeoPoint = HOME_LOCATION.coords;
 
 type NominatimReverse = {
   display_name?: string;
@@ -78,25 +86,59 @@ async function labelFromCoords(coords: GeoPoint): Promise<{
   }
 }
 
-/** Fresh GPS fix — ignores cached simulator/device location when possible. */
+/** Apply Malolos / Bulacan as the active planning location. */
+export async function applyHomeLocation(): Promise<GeoPoint> {
+  useLocationStore.getState().setManualLocation({
+    coords: HOME_LOCATION.coords,
+    city: HOME_LOCATION.city,
+    country: HOME_LOCATION.country,
+    label: HOME_LOCATION.label,
+  });
+  return HOME_LOCATION.coords;
+}
+
+/**
+ * If the store still has Apple Simulator’s San Francisco stub, replace it with Bulacan.
+ * Safe to call after hydration.
+ */
+export function replaceSimulatorSanFranciscoIfNeeded(): boolean {
+  const state = useLocationStore.getState();
+  if (!looksLikeSanFrancisco(state.coords)) {
+    return false;
+  }
+  state.setManualLocation({
+    coords: HOME_LOCATION.coords,
+    city: HOME_LOCATION.city,
+    country: HOME_LOCATION.country,
+    label: HOME_LOCATION.label,
+  });
+  return true;
+}
+
+/** Fresh GPS fix — Simulator SF is remapped to Bulacan so the app matches your area. */
 export async function getCurrentPosition(): Promise<GeoPoint> {
   try {
     const status = await requestForegroundLocation();
     if (status !== 'granted') {
-      throw new AppError('Location permission is required for live positioning.', {
-        code: 'LOCATION_DENIED',
-      });
+      // No GPS permission — still give a usable PH location instead of leaving the app empty.
+      await applyHomeLocation();
+      return HOME_LOCATION.coords;
     }
 
-    // Prefer a brand-new reading (important after changing Simulator → Location).
     const position = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.High,
     });
 
-    const coords = {
+    let coords = {
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
     };
+
+    // Apple Simulator default (and many Expo Go stubs) sit in downtown SF.
+    if (looksLikeSanFrancisco(coords)) {
+      await applyHomeLocation();
+      return HOME_LOCATION.coords;
+    }
 
     const labeled = await labelFromCoords(coords);
 
@@ -110,18 +152,29 @@ export async function getCurrentPosition(): Promise<GeoPoint> {
 
     return coords;
   } catch (error) {
-    throw toAppError(error, 'Unable to get current location');
+    // Last resort: Bulacan so Explore / AI still work offline of GPS.
+    try {
+      await applyHomeLocation();
+      return HOME_LOCATION.coords;
+    } catch {
+      throw toAppError(error, 'Unable to get current location');
+    }
   }
 }
 
-/** Pick a city/country from autocomplete (works when Simulator GPS is stuck on San Francisco). */
+/** Pick a city/country from autocomplete. */
 export async function setLocationFromSuggestion(
   suggestion: DestinationSuggestion,
 ): Promise<GeoPoint> {
-  const coords = {
-    latitude: suggestion.latitude,
-    longitude: suggestion.longitude,
-  };
+  const latitude = Number(suggestion.latitude);
+  const longitude = Number(suggestion.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new AppError('That place is missing coordinates. Try another result.', {
+      code: 'INVALID_COORDS',
+    });
+  }
+
+  const coords = { latitude, longitude };
 
   useLocationStore.getState().setManualLocation({
     coords,

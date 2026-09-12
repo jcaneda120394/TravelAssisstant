@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
 import { SaveTripModal } from '@/components/trips/save-trip-modal';
+import { DatePickerField } from '@/components/forms/date-picker-field';
 import { DestinationAutocomplete } from '@/components/forms/destination-autocomplete';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
@@ -11,12 +12,13 @@ import { EmptyState } from '@/components/feedback/states';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
 import { useAuth } from '@/hooks/use-auth';
 import { createTrip, deleteTrip, listTrips } from '@/services/trips/trips.service';
 import { analytics } from '@/lib/analytics';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
-import { defaultTripDates } from '@/utils/dates';
+import { defaultTripDates, formatTripDateRange } from '@/utils/dates';
 import { useLocationStore } from '@/stores/location-store';
 
 export function TripsScreen() {
@@ -74,23 +76,99 @@ export function TripsScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-trips">
-        <SectionHeader title="Trips" subtitle="Save destinations and build day-by-day plans" />
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-trips">
+        <SectionHeader
+          title="Trips"
+          subtitle={
+            user
+              ? 'Save destinations and build day-by-day plans'
+              : 'Browse suggestions anytime — sign in to save trips'
+          }
+        />
 
-        <View className="mb-3 flex-row gap-2">
-          <View className="flex-1">
-            <Button label="Save trip" onPress={() => setShowSaveModal(true)} />
-          </View>
-          <View className="flex-1">
-            <Button
-              label={showForm ? 'Close' : 'Quick form'}
-              variant="secondary"
-              onPress={() => setShowForm((value) => !value)}
-            />
-          </View>
+        {!user ? (
+          <Card className="mb-4">
+            <AppText muted className="leading-6">
+              Suggestions stay open for guests. Create trip and Save trip need an account.
+            </AppText>
+            <View className="mt-3 flex-row" style={{ gap: 8 }}>
+              <View className="flex-1">
+                <Button label="Sign up" onPress={() => router.push('/(auth)/signup')} />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label="Log in"
+                  variant="secondary"
+                  onPress={() => router.push('/(auth)/login')}
+                />
+              </View>
+            </View>
+          </Card>
+        ) : null}
+
+        <View className="mb-4" style={{ gap: 12 }}>
+          {user ? (
+            <>
+              <View className="flex-row" style={{ gap: 8 }}>
+                <View className="flex-1">
+                  <Button
+                    label="Create trip"
+                    onPress={() => {
+                      if (!requireAuthForTrips(router, 'create trips')) return;
+                      router.push('/create-trip');
+                    }}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Button
+                    label="Suggestions"
+                    variant="accent"
+                    onPress={() => router.push('/trip-suggestions')}
+                  />
+                </View>
+              </View>
+              <View className="flex-row" style={{ gap: 8 }}>
+                <View className="flex-1">
+                  <Button
+                    label="Save trip"
+                    variant="secondary"
+                    onPress={() => {
+                      if (!requireAuthToSave(router, { actionLabel: 'save trips' })) return;
+                      setShowSaveModal(true);
+                    }}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Button
+                    label="Live AI plan"
+                    variant="secondary"
+                    onPress={() => router.push('/trip-suggestion')}
+                  />
+                </View>
+              </View>
+              <Button
+                label={showForm ? 'Close quick form' : 'Quick form'}
+                variant="ghost"
+                onPress={() => setShowForm((value) => !value)}
+              />
+            </>
+          ) : (
+            <>
+              <Button
+                label="Suggestions"
+                variant="accent"
+                onPress={() => router.push('/trip-suggestions')}
+              />
+              <Button
+                label="Live AI plan"
+                variant="secondary"
+                onPress={() => router.push('/trip-suggestion')}
+              />
+            </>
+          )}
         </View>
 
-        {showForm ? (
+        {user && showForm ? (
           <Card className="mt-1 mb-4">
             <TextField label="Title" value={title} onChangeText={setTitle} autoCapitalize="words" />
             <DestinationAutocomplete
@@ -99,17 +177,34 @@ export function TripsScreen() {
               onChange={setDestinations}
               placeholder="Search city or country (e.g. Phi…)"
             />
-            <TextField label="Start date (YYYY-MM-DD)" value={startDate} onChangeText={setStartDate} />
-            <TextField label="End date (YYYY-MM-DD)" value={endDate} onChangeText={setEndDate} />
+            <DatePickerField
+              label="Start date"
+              value={startDate}
+              onChange={(next) => {
+                setStartDate(next);
+                if (endDate < next) {
+                  setEndDate(next);
+                }
+              }}
+            />
+            <DatePickerField
+              label="End date"
+              value={endDate}
+              minimumDate={new Date(`${startDate}T12:00:00`)}
+              onChange={setEndDate}
+            />
             <Button
               label="Save trip"
               loading={createMutation.isPending}
-              onPress={() => createMutation.mutate()}
+              onPress={() => {
+                if (!requireAuthToSave(router, { actionLabel: 'save trips' })) return;
+                createMutation.mutate();
+              }}
             />
           </Card>
         ) : null}
 
-        {tripsQuery.isLoading ? (
+        {user && tripsQuery.isLoading ? (
           <View className="mt-4 gap-3">
             <Skeleton height={88} />
             <Skeleton height={88} />
@@ -139,7 +234,8 @@ export function TripsScreen() {
             >
               <AppText className="font-sans-semibold text-lg">{trip.title}</AppText>
               <AppText muted className="mt-1">
-                {trip.startDate} → {trip.endDate}
+                {formatTripDateRange(trip.startDate, trip.endDate, trip.openEnded)}
+                {trip.source && trip.source !== 'manual' ? ` · ${trip.source.replace('_', ' ')}` : ''}
               </AppText>
               <AppText muted className="mt-1">{trip.destinations.join(' · ')}</AppText>
               <AppText muted className="mt-2 text-xs">
@@ -149,10 +245,17 @@ export function TripsScreen() {
           ))}
         </View>
 
-        {!tripsQuery.isLoading && (tripsQuery.data?.length ?? 0) === 0 ? (
+        {!user ? (
+          <EmptyState
+            title="My trips"
+            description="Sign in to see your saved trips here. Suggestions are available without an account."
+          />
+        ) : null}
+
+        {user && !tripsQuery.isLoading && (tripsQuery.data?.length ?? 0) === 0 ? (
           <EmptyState
             title="No saved trips yet"
-            description="Tap Save trip to keep a destination plan — it syncs when you’re signed in with Supabase."
+            description="Tap Create trip or Save trip to keep a destination plan."
           />
         ) : null}
       </ScrollView>

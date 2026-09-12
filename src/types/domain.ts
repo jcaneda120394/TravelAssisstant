@@ -7,6 +7,20 @@ export type PlaceCategory =
   | 'restaurant'
   | 'attraction'
   | 'hotel'
+  | 'shopping'
+  | 'mall'
+  | 'park'
+  | 'museum'
+  | 'temple'
+  | 'market'
+  | 'viewpoint'
+  | 'zoo'
+  | 'cafe'
+  | 'bakery'
+  | 'gym'
+  | 'nightlife'
+  | 'beach'
+  | 'spa'
   | 'hospital'
   | 'clinic'
   | 'pharmacy'
@@ -16,16 +30,29 @@ export type PlaceCategory =
   | 'atm'
   | 'bank'
   | 'convenience'
+  | 'souvenir'
   | 'coworking'
   | 'transit_station'
   | 'airport'
+  | 'laundry'
+  | 'fuel'
+  | 'parking'
+  | 'toilet'
+  | 'tourist_info'
+  | 'post_office'
+  | 'bicycle_rental'
   | 'other';
 
 export type Place = {
   id: string;
   provider: string;
   providerPlaceId: string;
+  /** Display name — may include "Original (English Translation)". */
   name: string;
+  /** Local / original-language name when available. */
+  nameOriginal?: string;
+  /** English translation when available. */
+  nameEnglish?: string;
   category: PlaceCategory;
   latitude: number;
   longitude: number;
@@ -37,6 +64,9 @@ export type Place = {
   photos?: string[];
   phone?: string;
   website?: string;
+  /** OSM/menu URL when tagged */
+  menuUrl?: string;
+  cuisine?: string;
   distanceMeters?: number;
   description?: string;
   priceRange?: string;
@@ -56,6 +86,7 @@ export type TransportMode =
   | 'taxi'
   | 'rideshare'
   | 'driving'
+  | 'flight'
   | 'other';
 
 export type RouteSegment = {
@@ -86,6 +117,8 @@ export type Route = {
   arrivalAt?: string;
   estimatedCost?: number;
   currency?: string;
+  /** Ordered path coordinates for map polylines (lat/lng). */
+  geometry?: GeoPoint[];
   segments: RouteSegment[];
   warnings?: string[];
   comparisonTag?:
@@ -97,7 +130,10 @@ export type Route = {
     | 'most_accessible'
     | 'best_with_luggage'
     | 'best_for_families'
-    | 'taxi_rideshare';
+    | 'taxi_rideshare'
+    | 'bus'
+    | 'train'
+    | 'flight';
   isMock?: boolean;
 };
 
@@ -122,7 +158,13 @@ export type Hotel = {
 
 export type WeatherSnapshot = {
   locationName: string;
+  /** ISO calendar date (YYYY-MM-DD) when this is a daily forecast row. */
+  date?: string;
   temperatureC: number;
+  /** High for the day when available. */
+  temperatureMaxC?: number;
+  /** Low for the day when available. */
+  temperatureMinC?: number;
   condition: string;
   humidityPercent?: number;
   windKph?: number;
@@ -181,20 +223,209 @@ export type AIChatResponse = {
   isMock?: boolean;
 };
 
+export type TripStatus = 'draft' | 'planned' | 'active' | 'completed' | 'cancelled';
+export type TripSource = 'manual' | 'ai_suggestion' | 'template' | 'imported';
+export type TripPace = 'relaxed' | 'balanced' | 'packed';
+export type TripBudgetLevel = 'budget' | 'mid_range' | 'premium' | 'luxury';
+export type TripPlanningMode = 'ai' | 'suggestion' | 'manual' | 'import';
+
+export type TripTravelerProfile = {
+  adults: number;
+  children: number;
+  infants?: number;
+  travelStyle?: string;
+  pace?: TripPace;
+  budgetLevel?: TripBudgetLevel;
+  interests?: string[];
+  transportPreferences?: string[];
+  walkingTolerance?: 'low' | 'medium' | 'high';
+  dietaryPreferences?: string[];
+  accessibilityNeeds?: string[];
+  kidsAges?: number[];
+  elderlyAges?: number[];
+  travelingWithKids?: boolean;
+  travelingWithElderly?: boolean;
+};
+
 export type Trip = {
   id: string;
   ownerId: string;
   title: string;
+  /** Optional longer description (stored in notes prefix or notes). */
+  description?: string;
   startDate: string;
-  endDate: string;
+  /** Null when open-ended travel. */
+  endDate: string | null;
+  openEnded?: boolean;
+  status: TripStatus;
+  source: TripSource;
   destinations: string[];
   adults: number;
   children: number;
+  travelerProfile?: TripTravelerProfile;
+  pace?: TripPace;
+  travelStyle?: string;
+  budgetLevel?: TripBudgetLevel;
+  interests?: string[];
+  transportPreferences?: string[];
+  walkingTolerance?: 'low' | 'medium' | 'high';
+  planningMode?: TripPlanningMode;
+  homeCurrency?: string;
   notes?: string;
+  /** When true, guests can browse this trip in Travel Guide. */
+  isPublic?: boolean;
+  publicSummary?: string;
   createdAt: string;
   updatedAt: string;
   memberIds: string[];
 };
+
+export type PlaceCheckIn = {
+  id: string;
+  userId: string;
+  placeId: string;
+  placeName: string;
+  latitude?: number;
+  longitude?: number;
+  place: Place;
+  visitedAt: string;
+  createdAt: string;
+};
+
+export type PlaceReview = {
+  id: string;
+  userId: string;
+  placeId: string;
+  placeName: string;
+  latitude?: number;
+  longitude?: number;
+  place?: Place;
+  rating: number;
+  body: string;
+  tripId?: string;
+  isPublic: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** Attached community photos when loaded with feed/place queries. */
+  photos?: PlaceUserPhoto[];
+};
+
+export type PlaceUserPhoto = {
+  id: string;
+  userId: string;
+  placeId: string;
+  placeName: string;
+  reviewId?: string;
+  storagePath: string;
+  publicUrl: string;
+  caption: string;
+  isPublic: boolean;
+  createdAt: string;
+};
+
+export type TripAccommodation = {
+  id: string;
+  tripId: string;
+  name: string;
+  address?: string;
+  city?: string;
+  checkIn?: string;
+  checkOut?: string;
+  reservationNumber?: string;
+  notes?: string;
+  placeId?: string;
+  latitude?: number;
+  longitude?: number;
+  estimatedCost?: number;
+  currency?: string;
+  order: number;
+};
+
+/**
+ * Canonical persistence mapping (see also materialize-trip.service):
+ * - Trip → public.trips (+ destinations string[] mirrored from trip_destinations labels)
+ * - TripDestination → public.trip_destinations (ordered geo/label rows)
+ * - ItineraryDay → public.itinerary_days (metadata) + virtual calendar day
+ * - Activity → public.itinerary_items (item_kind = kind)
+ * - TransportSegment → public.transport_segments (A→B; selected_route jsonb = Route)
+ * - Stay → public.trip_accommodations
+ * - Budget → public.budgets
+ */
+export type TripDestination = {
+  id: string;
+  tripId: string;
+  label: string;
+  city?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  order: number;
+  arrivalDay?: string;
+  departureDay?: string;
+};
+
+export type ItineraryDayMeta = {
+  id: string;
+  tripId: string;
+  day: string;
+  dayNumber: number;
+  title?: string;
+  city?: string;
+  country?: string;
+  summary?: string;
+};
+
+export type TransportSegmentStatus =
+  | 'pending'
+  | 'live_data_required'
+  | 'ready'
+  | 'failed'
+  | 'skipped';
+
+/** Trip-scoped leg between activities — distinct from directions RouteSegment. */
+export type TransportSegment = {
+  id: string;
+  tripId: string;
+  day: string;
+  fromItemId?: string;
+  toItemId?: string;
+  status: TransportSegmentStatus;
+  summary?: string;
+  mode?: TransportMode;
+  durationSeconds?: number;
+  distanceMeters?: number;
+  estimatedCost?: number;
+  currency?: string;
+  provider?: string;
+  selectedRoute?: Route;
+  alternatives?: Route[];
+  fetchedAt?: string;
+  order: number;
+};
+
+export type ItineraryItemKind =
+  | 'hotel'
+  | 'breakfast'
+  | 'lunch'
+  | 'dinner'
+  | 'attraction'
+  | 'shopping'
+  | 'transport'
+  | 'flight'
+  | 'train'
+  | 'bus'
+  | 'ferry'
+  | 'tour'
+  | 'rest'
+  | 'free_time'
+  | 'coworking'
+  | 'airport'
+  | 'check_in'
+  | 'check_out'
+  | 'nightlife'
+  | 'logistics'
+  | 'restaurant'
+  | 'custom';
 
 export type TripMemberRole = 'owner' | 'editor' | 'viewer';
 
@@ -214,6 +445,11 @@ export type ItineraryItem = {
   startTime: string;
   endTime: string;
   title: string;
+  kind?: ItineraryItemKind;
+  priority?: 'must_do' | 'recommended' | 'optional';
+  flexibility?: 'fixed' | 'flexible';
+  itemStatus?: 'planned' | 'confirmed' | 'in_progress' | 'completed' | 'skipped' | 'cancelled';
+  dataConfidence?: 'verified' | 'cached' | 'suggested' | 'live_data_required';
   placeId?: string;
   placeName?: string;
   latitude?: number;

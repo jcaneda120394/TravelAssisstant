@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getCurrentPosition } from '@/services/location/location.service';
+import {
+  getCurrentPosition,
+  replaceSimulatorSanFranciscoIfNeeded,
+} from '@/services/location/location.service';
 import { useLocationStore } from '@/stores/location-store';
 import { getErrorMessage } from '@/lib/errors/app-error';
 
@@ -8,13 +11,19 @@ type LocateStatus = 'idle' | 'loading' | 'ready' | 'denied' | 'error';
 
 /**
  * Asks for location permission and refreshes current coordinates.
- * Waits for persisted location hydration before auto-asking.
+ * Remaps Apple Simulator San Francisco → Malolos, Bulacan automatically.
+ *
+ * By default, every mount refreshes GPS (unless the traveler set a manual city),
+ * so maps always show the actual “where am I” position.
  */
-export function useEnsureLocation(options?: { auto?: boolean }) {
+export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean }) {
   const auto = options?.auto ?? true;
+  const refresh = options?.refresh ?? true;
   const hasHydrated = useLocationStore((state) => state.hasHydrated);
   const coords = useLocationStore((state) => state.coords);
   const label = useLocationStore((state) => state.label);
+  const country = useLocationStore((state) => state.country);
+  const mode = useLocationStore((state) => state.mode);
   const permissionStatus = useLocationStore((state) => state.permissionStatus);
   const [status, setStatus] = useState<LocateStatus>(coords ? 'ready' : 'idle');
   const [error, setError] = useState<string | null>(null);
@@ -55,14 +64,32 @@ export function useEnsureLocation(options?: { auto?: boolean }) {
       return;
     }
     didAutoAsk.current = true;
-    // Always refresh GPS once after hydration so stale saved cities (e.g. SF)
-    // don't keep the map stuck away from the device.
-    void locate();
-  }, [auto, hasHydrated, locate]);
+
+    // Wipe any persisted Simulator SF stub immediately after hydration.
+    if (replaceSimulatorSanFranciscoIfNeeded()) {
+      setStatus('ready');
+    }
+
+    const state = useLocationStore.getState();
+    if (state.mode === 'manual' && state.coords) {
+      setStatus('ready');
+      return;
+    }
+
+    // Always refresh GPS so maps reflect the traveler's actual position.
+    if (refresh || !state.coords) {
+      void locate();
+      return;
+    }
+
+    setStatus('ready');
+  }, [auto, hasHydrated, locate, refresh]);
 
   return {
     coords,
     label,
+    country,
+    mode,
     permissionStatus,
     status,
     error,

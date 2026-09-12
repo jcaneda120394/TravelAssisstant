@@ -1,24 +1,49 @@
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator } from 'react-native';
 
+import { PlaceCard } from '@/components/cards/place-card';
+import { MapLayersControl } from '@/components/maps/map-layers-control';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { providers } from '@/providers/registry';
 import { theme } from '@/config/theme';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
+import { rememberPlace } from '@/services/places/place-cache';
+
+const ZOOM_MIN = 5;
+const ZOOM_MAX = 20;
+const ZOOM_STEP = 1.5;
+const DEFAULT_ZOOM = 14;
+const MAP_ATTRACTIONS_LIMIT = 20;
 
 export function MapScreen() {
   const router = useRouter();
   const scheme = useAppColorScheme();
-  const { coords, label, hasLocation, hasHydrated, locate, isLocating, error } = useEnsureLocation({
+  const { isDesktop, isWeb } = useResponsiveLayout();
+  const { coords, label, hasLocation, hasHydrated, locate, error, mode } = useEnsureLocation({
     auto: true,
+    refresh: true,
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const MapView = providers.maps.MapView;
+  const mapHeight = isDesktop ? 560 : isWeb ? 420 : 360;
+
+  // Re-check GPS whenever the Map tab is focused (skip manual city overrides).
+  useFocusEffect(
+    useCallback(() => {
+      if (mode === 'manual') {
+        return;
+      }
+      void locate();
+    }, [locate, mode]),
+  );
 
   const placesQuery = useQuery({
     queryKey: ['map-places', coords?.latitude, coords?.longitude],
@@ -29,11 +54,40 @@ export function MapScreen() {
         location: coords!,
         radiusMeters: 4000,
         category: 'attraction',
-        limit: 20,
+        limit: MAP_ATTRACTIONS_LIMIT,
       }),
   });
 
-  const markers = providers.maps.markersFromPlaces(placesQuery.data ?? []);
+  const attractions = useMemo(
+    () => (placesQuery.data ?? []).slice(0, MAP_ATTRACTIONS_LIMIT),
+    [placesQuery.data],
+  );
+  const markers = providers.maps.markersFromPlaces(attractions);
+
+  const zoomIn = () => setZoom((value) => Math.min(ZOOM_MAX, value + ZOOM_STEP));
+  const zoomOut = () => setZoom((value) => Math.max(ZOOM_MIN, value - ZOOM_STEP));
+
+  const zoomBtnClass = (disabled: boolean) =>
+    `h-11 w-11 items-center justify-center rounded-2xl border ${
+      scheme === 'dark'
+        ? 'border-brand-700 bg-surface-cardDark'
+        : 'border-brand-200 bg-white'
+    } ${disabled ? 'opacity-40' : ''}`;
+
+  const openAttraction = (placeId: string) => {
+    const place = attractions.find((item) => item.id === placeId);
+    if (place) {
+      rememberPlace(place);
+    }
+    setSelectedId(placeId);
+    router.push({
+      pathname: '/place/[id]',
+      params: {
+        id: placeId,
+        ...(place ? { snapshot: JSON.stringify(place) } : {}),
+      },
+    });
+  };
 
   if (!hasHydrated) {
     return (
@@ -48,7 +102,7 @@ export function MapScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-map">
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-map">
         <SectionHeader
           title="Map"
           subtitle={
@@ -58,17 +112,27 @@ export function MapScreen() {
           }
         />
 
-        <View className="mb-4 flex-row gap-2">
-          <View className="flex-1">
-            <Button
-              label={isLocating ? 'Locating…' : hasLocation ? 'Refresh location' : 'Use my location'}
-              loading={isLocating}
-              onPress={() => void locate()}
-            />
-          </View>
-          <View className="flex-1">
-            <Button label="Directions" variant="secondary" onPress={() => router.push('/directions')} />
-          </View>
+        <View className="mb-4">
+          <Button
+            label="Directions"
+            variant="secondary"
+            onPress={() => {
+              const place = attractions.find((item) => item.id === selectedId);
+              if (place) {
+                router.push({
+                  pathname: '/directions',
+                  params: {
+                    destinationId: place.id,
+                    destinationName: place.name,
+                    destinationLat: String(place.latitude),
+                    destinationLng: String(place.longitude),
+                  },
+                });
+                return;
+              }
+              router.push('/directions');
+            }}
+          />
         </View>
 
         {error ? (
@@ -83,22 +147,52 @@ export function MapScreen() {
         {!hasLocation ? (
           <Card className="mb-4">
             <AppText muted>
-              Tap Use my location so we can show attractions near you on the map.
+              Allow location so we can show attractions near you on the map.
             </AppText>
           </Card>
         ) : null}
 
         {coords ? (
-          <MapView
-            key={`map-${coords.latitude.toFixed(4)}-${coords.longitude.toFixed(4)}`}
-            camera={{ center: coords, zoom: 14 }}
-            markers={markers}
-            selectedMarkerId={selectedId}
-            onMarkerPress={(id) => {
-              setSelectedId(id);
-              router.push(`/place/${id}`);
-            }}
-          />
+          <View className="relative">
+            <MapView
+              key={`map-${coords.latitude.toFixed(4)}-${coords.longitude.toFixed(4)}`}
+              camera={{ center: coords, zoom }}
+              markers={markers}
+              userLocation={coords}
+              showUserLocation
+              followUserLocation
+              selectedMarkerId={selectedId}
+              onMarkerPress={(id) => openAttraction(id)}
+              mapHeight={mapHeight}
+            />
+            <MapLayersControl testID="map-layers-control" />
+            <View pointerEvents="box-none" className="absolute bottom-4 right-4 gap-2">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Zoom in"
+                testID="map-zoom-in"
+                onPress={zoomIn}
+                disabled={zoom >= ZOOM_MAX}
+                className={zoomBtnClass(zoom >= ZOOM_MAX)}
+              >
+                <AppText className="font-sans-bold text-2xl leading-7 text-brand-700 dark:text-brand-200">
+                  +
+                </AppText>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Zoom out"
+                testID="map-zoom-out"
+                onPress={zoomOut}
+                disabled={zoom <= ZOOM_MIN}
+                className={zoomBtnClass(zoom <= ZOOM_MIN)}
+              >
+                <AppText className="font-sans-bold text-2xl leading-7 text-brand-700 dark:text-brand-200">
+                  −
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
         ) : (
           <Card className="mb-4 items-center py-10">
             <ActivityIndicator color={theme[scheme].primary} />
@@ -108,21 +202,60 @@ export function MapScreen() {
           </Card>
         )}
 
-        <Card className="mt-4">
-          <AppText className="font-sans-semibold">Nearby attractions</AppText>
-          <AppText muted className="mt-1">
-            {coords
-              ? placesQuery.isLoading
-                ? 'Loading sights…'
-                : `${placesQuery.data?.length ?? 0} sights pinned near you`
-              : 'Waiting for location…'}
-          </AppText>
-          {coords ? (
-            <AppText muted className="mt-1 text-xs">
-              {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
+        <View className="mt-5">
+          <SectionHeader
+            eyebrow="Near you"
+            title="Attractions near me"
+            subtitle={
+              coords
+                ? placesQuery.isLoading
+                  ? 'Loading up to 20 attractions…'
+                  : `${attractions.length} of ${MAP_ATTRACTIONS_LIMIT} attractions near you`
+                : 'Enable location to load attractions'
+            }
+          />
+        </View>
+
+        {coords && placesQuery.isLoading && attractions.length === 0 ? (
+          <View className="mb-4 gap-3">
+            <Skeleton height={84} />
+            <Skeleton height={84} />
+            <Skeleton height={84} />
+          </View>
+        ) : null}
+
+        {coords && !placesQuery.isLoading && attractions.length === 0 ? (
+          <Card className="mb-4">
+            <AppText muted>
+              No attractions found nearby. Try Explore with a wider distance.
             </AppText>
-          ) : null}
-        </Card>
+          </Card>
+        ) : null}
+
+        {attractions.map((place) => (
+          <PlaceCard key={place.id} place={place} />
+        ))}
+
+        {coords && attractions.length > 0 ? (
+          <View className="mt-2 mb-2">
+            <Button
+              label="See more nearby"
+              variant="secondary"
+              onPress={() => {
+                router.replace({
+                  pathname: '/(tabs)/explore',
+                  params: { category: 'attraction' },
+                });
+              }}
+            />
+          </View>
+        ) : null}
+
+        {coords ? (
+          <AppText muted className="mt-2 text-center text-xs">
+            {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
+          </AppText>
+        ) : null}
       </ScrollView>
     </Screen>
   );

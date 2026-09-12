@@ -44,7 +44,7 @@ export function ChipSelect<T extends string>({
             onPress={() => toggle(option)}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            className={`rounded-full px-3 py-2 border ${
+            className={`rounded-2xl px-3.5 py-2.5 border ${
               selected
                 ? 'bg-brand-600 border-brand-600'
                 : scheme === 'dark'
@@ -54,7 +54,7 @@ export function ChipSelect<T extends string>({
           >
             <AppText
               inverse={selected}
-              className={`text-sm font-sans-medium ${selected ? '' : ''}`}
+              className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
             >
               {labels?.[option] ?? labelize(option)}
             </AppText>

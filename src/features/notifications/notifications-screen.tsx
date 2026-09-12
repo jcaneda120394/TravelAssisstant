@@ -20,7 +20,7 @@ export function NotificationsScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-notifications">
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-notifications">
         <SectionHeader
           title="Notifications"
           subtitle="Proactive alerts after permission — mock samples for now"

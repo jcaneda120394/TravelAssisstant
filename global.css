@@ -1,3 +1,68 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Default TravelAssistant palette — overridden at runtime by country theme vars. */
+:root {
+  --color-brand-50: #e6f8f6;
+  --color-brand-100: #c5efeb;
+  --color-brand-200: #96dfd8;
+  --color-brand-300: #5bc9bf;
+  --color-brand-400: #2fcfc2;
+  --color-brand-500: #12a89c;
+  --color-brand-600: #0a7c74;
+  --color-brand-700: #08635d;
+  --color-brand-800: #0a4a46;
+  --color-brand-900: #073834;
+  --color-accent-300: #ff9b82;
+  --color-accent-400: #ff8a6a;
+  --color-accent-500: #ff6b4a;
+  --color-accent-600: #e85433;
+  --color-accent-soft: #ffe6df;
+  --color-surface-light: #eef6f4;
+  --color-surface-dark: #071412;
+  --color-surface-cardLight: #ffffff;
+  --color-surface-cardDark: #12201e;
+  --color-surface-mist: #dff3ef;
+  --color-ink-light: #0c2422;
+  --color-ink-dark: #e8f5f2;
+  --color-ink-mutedLight: #4f6b67;
+  --color-ink-mutedDark: #9bb5b0;
+}
+
+/* Web: keep scrollbars from painting over cards / grids. */
+html {
+  scrollbar-gutter: stable;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Prefer a thin classic scrollbar (takes layout space) over overlay thumbs. */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+  }
+}
+
+/* Chromium / Safari: force non-overlay-looking scrollbars where possible. */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: rgba(11, 114, 106, 0.35);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

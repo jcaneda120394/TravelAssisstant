@@ -32,7 +32,7 @@ export function FavoritesScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-favorites">
+      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-favorites">
         <SectionHeader title="Favorites" subtitle="Saved places and collections" />
 
         <Card className="mb-4">

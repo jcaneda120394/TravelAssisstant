@@ -1,10 +1,17 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
-import { useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { useMemo, useState } from 'react';
+import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PlaceCard } from '@/components/cards/place-card';
+import { PlaceGrid } from '@/components/cards/place-grid';
+import { CurrencyPickerModal } from '@/components/currency/currency-picker-modal';
 import { LocationPickerModal } from '@/components/location/location-picker-modal';
+import { PageContainer } from '@/components/layout/page-container';
 import { SaveTripModal } from '@/components/trips/save-trip-modal';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/feedback/skeleton';
@@ -12,13 +19,22 @@ import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
 import { QUICK_ACTIONS } from '@/constants/app';
+import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
+import { labelize } from '@/constants/preferences';
+import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
 import { useAuth } from '@/hooks/use-auth';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { providers } from '@/providers/registry';
+import { getHomeNearbyPlaces } from '@/services/places/home-nearby.service';
 import { listTrips } from '@/services/trips/trips.service';
 import { seedProactiveNotifications } from '@/services/notifications/notifications.service';
 import { looksLikeSanFrancisco } from '@/services/location/location.service';
+import { getDestinationTravelGradient } from '@/utils/destination-theme';
+
+const HOME_NEARBY_LIMIT = 10;
 
 function greetingForNow(): string {
   const hour = new Date().getHours();
@@ -29,24 +45,51 @@ function greetingForNow(): string {
 
 const HOME_ACTIONS = [
   ...QUICK_ACTIONS,
+  { id: 'suggest', label: 'Suggest', href: '/trip-suggestion' },
   { id: 'trips', label: 'Trips', href: '/trips' },
+  { id: 'spots', label: 'Travel Guide', href: '/(tabs)/guide' },
   { id: 'search', label: 'Search', href: '/search' },
   { id: 'weather', label: 'Weather', href: '/weather' },
   { id: 'favorites', label: 'Saved', href: '/favorites' },
 ] as const;
 
+/** Expo Go floating menu sits top-right — keep hero copy clear of it (native only). */
+const EXPO_MENU_GUTTER_IOS = 56;
+const EXPO_MENU_GUTTER_ANDROID = 24;
+
 export function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const scheme = useAppColorScheme();
+  const { isDesktop, isWeb } = useResponsiveLayout();
   const queryClient = useQueryClient();
   const { profile, preferences, user } = useAuth();
-  const { coords, label, hasLocation, locate, isLocating, status, error } = useEnsureLocation({
-    auto: true,
-  });
-  const heroBg = scheme === 'dark' ? 'bg-brand-900' : 'bg-brand-600';
+  const { currency, setCurrency } = useDisplayCurrency();
+  const { coords, label, country, mode, hasLocation, locate, isLocating, status, error } =
+    useEnsureLocation({
+      auto: true,
+    });
   const [saveOpen, setSaveOpen] = useState(false);
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
-  const stuckOnSf = looksLikeSanFrancisco(coords);
+  const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
+  const stuckOnSf = looksLikeSanFrancisco(coords) && mode !== 'manual';
+  const topPad = isDesktop
+    ? 40
+    : Math.max(insets.top || 0, Platform.OS === 'ios' ? 58 : 24) + 8;
+  const expoMenuGutter = isDesktop
+    ? 0
+    : Platform.OS === 'ios'
+      ? EXPO_MENU_GUTTER_IOS
+      : isWeb
+        ? 0
+        : EXPO_MENU_GUTTER_ANDROID;
+  const destinationHint = country || label || '';
+  const gradient = useMemo(
+    () =>
+      // Web always uses the casual (default) hero gradient.
+      getDestinationTravelGradient(scheme, isWeb ? null : destinationHint, isWeb ? null : label),
+    [scheme, isWeb, destinationHint, label],
+  );
 
   const refreshNearby = () => {
     void queryClient.invalidateQueries({ queryKey: ['home-weather'] });
@@ -60,37 +103,73 @@ export function HomeScreen() {
     queryKey: ['home-weather', coords?.latitude, coords?.longitude, label],
     enabled: hasLocation,
     queryFn: () =>
-      providers.weather.getCurrentWeather(
-        coords ?? label ?? 'Current location',
-      ),
+      providers.weather.getCurrentWeather(coords ?? label ?? 'Current location'),
     staleTime: 10 * 60_000,
   });
 
   const attractionsQuery = useQuery({
-    queryKey: ['home-attractions', coords?.latitude, coords?.longitude],
+    queryKey: [
+      'home-attractions',
+      coords?.latitude,
+      coords?.longitude,
+      label,
+      preferences?.traveling_with_kids,
+      preferences?.kids_ages?.join(','),
+      preferences?.traveling_with_elderly,
+      preferences?.elderly_ages?.join(','),
+    ],
     enabled: hasLocation && Boolean(coords),
     queryFn: () =>
-      providers.places.getNearbyPlaces({
+      getHomeNearbyPlaces({
         location: coords!,
-        radiusMeters: 3000,
         category: 'attraction',
-        limit: 6,
+        cityLabel: label,
+        radiusMeters: 15_000,
+        limit: HOME_NEARBY_LIMIT,
+        companions: preferences,
       }),
     staleTime: 5 * 60_000,
   });
 
   const foodQuery = useQuery({
-    queryKey: ['home-food', coords?.latitude, coords?.longitude],
+    queryKey: [
+      'home-food',
+      coords?.latitude,
+      coords?.longitude,
+      label,
+      preferences?.traveling_with_kids,
+      preferences?.kids_ages?.join(','),
+      preferences?.traveling_with_elderly,
+      preferences?.elderly_ages?.join(','),
+    ],
     enabled: hasLocation && Boolean(coords),
     queryFn: () =>
-      providers.places.getNearbyPlaces({
+      getHomeNearbyPlaces({
         location: coords!,
-        radiusMeters: 1500,
         category: 'restaurant',
-        limit: 4,
+        cityLabel: label,
+        radiusMeters: 10_000,
+        limit: HOME_NEARBY_LIMIT,
+        companions: preferences,
       }),
     staleTime: 5 * 60_000,
   });
+
+  const attractions = useMemo(
+    () => (attractionsQuery.data ?? []).slice(0, HOME_NEARBY_LIMIT),
+    [attractionsQuery.data],
+  );
+  const foodPlaces = useMemo(
+    () => (foodQuery.data ?? []).slice(0, HOME_NEARBY_LIMIT),
+    [foodQuery.data],
+  );
+
+  const openExplore = (category: 'attraction' | 'restaurant') => {
+    router.replace({
+      pathname: '/(tabs)/explore',
+      params: { category },
+    });
+  };
 
   const tripsQuery = useQuery({
     queryKey: ['trips', user?.id],
@@ -106,54 +185,102 @@ export function HomeScreen() {
   });
 
   const nextTrip = tripsQuery.data?.[0];
+  const firstName = profile?.full_name?.split(' ')[0];
   const locationLine = hasLocation
-    ? `${label ?? 'Current location'} · ${weatherQuery.data?.temperatureC ?? '—'}°C`
+    ? `${label ?? 'Current location'}${
+        weatherQuery.data?.temperatureC != null ? ` · ${weatherQuery.data.temperatureC}°C` : ''
+      }`
     : isLocating
       ? 'Getting your location…'
-      : 'Location needed for nearby places';
+      : 'Choose a city to personalize nearby places';
 
   return (
-    <Screen testID="screen-home">
-      <ScrollView className="flex-1" contentContainerClassName="pb-10">
-        <View className={`${heroBg} px-5 pb-8 pt-14`}>
-          <AppText inverse className="font-sans-medium text-sm uppercase tracking-widest text-brand-100">
-            {env.appName}
-          </AppText>
-          <AppText inverse className="mt-3 font-sans-bold text-3xl">
-            {greetingForNow()}
-            {profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}
-          </AppText>
-          <AppText inverse className="mt-2 text-brand-100">
-            {locationLine}
-          </AppText>
-          {coords ? (
-            <AppText inverse className="mt-1 text-xs text-brand-100">
-              {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
+    <Screen testID="screen-home" unsafe>
+      <StatusBar style="light" />
+      <ScrollView className="flex-1" contentContainerClassName="pb-12">
+        <LinearGradient
+          colors={[...gradient]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{
+            paddingTop: topPad,
+            paddingBottom: 36,
+            paddingLeft: isDesktop ? 0 : 20,
+            paddingRight: isDesktop ? 0 : 20 + expoMenuGutter,
+          }}
+        >
+          <PageContainer>
+            <AppText
+              inverse
+              className="font-sans-semibold text-xs uppercase tracking-[0.2em] text-white/85"
+            >
+              {env.appName}
             </AppText>
-          ) : null}
-          <AppText inverse className="mt-1 text-brand-100">
-            Budget style: {preferences?.budget_tier ?? 'not set'} ·{' '}
-            {providers.usingMocks ? 'Mock' : 'Live'} data
-          </AppText>
-          <View className="mt-4 gap-2">
-            <Button
-              label={hasLocation ? 'Refresh GPS' : 'Use my location'}
-              variant="secondary"
-              loading={isLocating}
-              onPress={() => void locate().then(refreshNearby)}
-            />
-            <Button
-              label="Choose city (Bulacan, Manila…)"
-              variant="secondary"
-              onPress={() => setLocationPickerOpen(true)}
-            />
-          </View>
-        </View>
+            <AppText inverse className="mt-3 font-display-bold text-[34px] leading-10">
+              {greetingForNow()}
+              {firstName ? `, ${firstName}` : ''}
+            </AppText>
+            <AppText inverse className="mt-2 text-base leading-6 text-white/90">
+              Where to next? Discover places around you.
+            </AppText>
 
-        <View className="mt-[-20px] px-5">
+            <AppText inverse className="mt-4 text-sm font-sans-medium leading-5 text-white">
+              {locationLine}
+            </AppText>
+            <Pressable
+              onPress={() => setCurrencyPickerOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Change display currency"
+              className={`mt-3 rounded-2xl border border-white/25 bg-white/16 px-3.5 py-3 ${
+                isDesktop ? 'max-w-xl' : 'self-stretch'
+              }`}
+              testID="home-change-currency"
+            >
+              <View className="flex-row items-center justify-between gap-3">
+                <View className="flex-1">
+                  <AppText inverse className="text-xs font-sans-semibold uppercase tracking-wide text-white/75">
+                    Display currency
+                  </AppText>
+                  <AppText inverse className="mt-1 text-base font-sans-semibold text-white">
+                    {formatCurrencyWithSymbol(currency)}
+                    {preferences?.budget_tier ? ` · ${labelize(preferences.budget_tier)}` : ''}
+                  </AppText>
+                  <AppText inverse className="mt-0.5 text-xs text-white/70">
+                    Prices for hotels, food, and places use this currency
+                  </AppText>
+                </View>
+                <View className="rounded-xl bg-accent-500 px-3 py-2">
+                  <AppText inverse className="text-sm font-sans-semibold text-white">
+                    Change
+                  </AppText>
+                </View>
+              </View>
+            </Pressable>
+
+            <AppText inverse className="mt-2 text-xs text-white/65">
+              {providers.usingMocks ? 'Mock' : 'Live'} data
+            </AppText>
+
+            <View
+              className={`mt-5 gap-2 ${isDesktop ? 'max-w-md flex-row' : ''}`}
+              style={expoMenuGutter ? { marginRight: -expoMenuGutter } : undefined}
+            >
+              <View className={isDesktop ? 'flex-1' : undefined}>
+                <Button
+                  label="Choose city"
+                  variant="secondary"
+                  onPress={() => setLocationPickerOpen(true)}
+                />
+              </View>
+            </View>
+          </PageContainer>
+        </LinearGradient>
+
+        <PageContainer className={isDesktop ? 'mt-[-20px]' : 'mt-[-20px] px-5'}>
           {!hasLocation && !stuckOnSf ? (
             <Card className="mb-5">
               <SectionHeader
+                eyebrow="Get started"
                 title="Share your location"
                 subtitle="We’ll show attractions and places near you"
               />
@@ -165,7 +292,11 @@ export function HomeScreen() {
               </AppText>
               <Button label="Get my location" loading={isLocating} onPress={() => void locate()} />
               <View className="mt-2">
-                <Button label="Choose city" variant="ghost" onPress={() => setLocationPickerOpen(true)} />
+                <Button
+                  label="Choose city"
+                  variant="ghost"
+                  onPress={() => setLocationPickerOpen(true)}
+                />
               </View>
             </Card>
           ) : null}
@@ -173,113 +304,266 @@ export function HomeScreen() {
           {stuckOnSf ? (
             <Card className="mb-5">
               <SectionHeader
-                title="Simulator GPS is San Francisco"
+                eyebrow="Simulator"
+                title="GPS is San Francisco"
                 subtitle="Your device GPS isn’t Bulacan yet"
               />
               <AppText muted className="mb-3">
-                iOS Simulator defaults to San Francisco. Tap Choose city and pick Malolos / Bulacan,
-                or in the Simulator menu set Features → Location → Custom Location
-                (14.7943, 120.8799).
+                Tap Choose city and pick Malolos / Bulacan, or set a custom simulator location.
               </AppText>
               <Button label="Choose Bulacan / city" onPress={() => setLocationPickerOpen(true)} />
             </Card>
           ) : null}
 
           <Card className="mb-5">
-            <SectionHeader title="Your trips" subtitle="Save a plan and open it anytime" />
+            <SectionHeader
+              eyebrow="Plan"
+              title="Your trips"
+              subtitle={
+                user
+                  ? 'Save a plan and open it anytime'
+                  : 'Browse suggestions anytime — sign in to create or save trips'
+              }
+            />
             <AppText muted>
-              {nextTrip
-                ? `Next: ${nextTrip.title} · ${nextTrip.startDate}`
-                : 'No saved trips yet — create one in a few taps.'}
+              {user
+                ? nextTrip
+                  ? `Next: ${nextTrip.title} · ${nextTrip.startDate}`
+                  : 'No saved trips yet — create one in a few taps.'
+                : 'Suggestions stay open for guests.'}
             </AppText>
-            <View className="mt-3 flex-row gap-2">
-              <View className="flex-1">
-                <Button label="Save trip" onPress={() => setSaveOpen(true)} />
-              </View>
-              <View className="flex-1">
-                <Button
-                  label="My trips"
-                  variant="secondary"
-                  onPress={() => router.push('/(tabs)/trips')}
-                />
-              </View>
+
+            <View className="mt-4" style={{ gap: 12 }}>
+              {user ? (
+                <>
+                  <View className="flex-row" style={{ gap: 8 }}>
+                    <View className="flex-1">
+                      <Button
+                        label="Create trip"
+                        onPress={() => {
+                          if (!requireAuthForTrips(router, 'create trips')) return;
+                          router.push('/create-trip');
+                        }}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Button
+                        label="Suggestions"
+                        variant="accent"
+                        onPress={() => router.push('/trip-suggestions')}
+                      />
+                    </View>
+                  </View>
+                  <View className="flex-row" style={{ gap: 8 }}>
+                    <View className="flex-1">
+                      <Button
+                        label="Save trip"
+                        variant="secondary"
+                        onPress={() => {
+                          if (!requireAuthToSave(router, { actionLabel: 'save trips' })) return;
+                          setSaveOpen(true);
+                        }}
+                      />
+                    </View>
+                    <View className="flex-1">
+                      <Button
+                        label="My trips"
+                        variant="secondary"
+                        onPress={() => router.push('/(tabs)/trips')}
+                      />
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Button
+                    label="Suggestions"
+                    variant="accent"
+                    onPress={() => router.push('/trip-suggestions')}
+                  />
+                  <View className="flex-row" style={{ gap: 8 }}>
+                    <View className="flex-1">
+                      <Button label="Sign up" onPress={() => router.push('/(auth)/signup')} />
+                    </View>
+                    <View className="flex-1">
+                      <Button
+                        label="Log in"
+                        variant="secondary"
+                        onPress={() => router.push('/(auth)/login')}
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
             </View>
           </Card>
 
           {hasLocation ? (
             <Card className="mb-5">
-              <SectionHeader title="Today" subtitle={label ?? 'Near you'} />
-              <AppText muted>
-                Weather: {weatherQuery.data?.condition ?? (weatherQuery.isLoading ? 'Loading…' : '—')}
-              </AppText>
-              <AppText muted className="mt-2">
-                Alert: {alertsQuery.data?.[0]?.title ?? 'No alerts'}
-              </AppText>
+              <SectionHeader eyebrow="Now" title="Today" subtitle={label ?? 'Near you'} />
+              <View className="flex-row gap-3">
+                <View
+                  className={`flex-1 rounded-2xl px-3 py-3 ${
+                    scheme === 'dark' ? 'bg-brand-800' : 'bg-surface-mist'
+                  }`}
+                >
+                  <AppText
+                    className={`text-xs font-sans-semibold uppercase tracking-wide ${
+                      scheme === 'dark' ? 'text-brand-200' : 'text-brand-600'
+                    }`}
+                  >
+                    Weather
+                  </AppText>
+                  <AppText className="mt-1 font-sans-semibold">
+                    {weatherQuery.data?.condition ??
+                      (weatherQuery.isLoading ? 'Loading…' : '—')}
+                    {weatherQuery.data?.temperatureC != null
+                      ? ` · ${weatherQuery.data.temperatureC}°C`
+                      : ''}
+                  </AppText>
+                </View>
+                <View
+                  className={`flex-1 rounded-2xl px-3 py-3 ${
+                    scheme === 'dark' ? 'bg-brand-800' : 'bg-accent-soft'
+                  }`}
+                >
+                  <AppText
+                    className={`text-xs font-sans-semibold uppercase tracking-wide ${
+                      scheme === 'dark' ? 'text-accent-400' : 'text-accent-600'
+                    }`}
+                  >
+                    Alert
+                  </AppText>
+                  <AppText className="mt-1 font-sans-semibold">
+                    {alertsQuery.data?.[0]?.title ?? 'No alerts'}
+                  </AppText>
+                </View>
+              </View>
             </Card>
           ) : null}
 
           <SectionHeader
+            eyebrow="Discover"
             title="Things to do near you"
-            subtitle={hasLocation ? 'Attractions & sights nearby' : 'Enable location to load this'}
+            subtitle={
+              !hasLocation
+                ? 'Enable location to load this'
+                : preferences?.traveling_with_kids || preferences?.traveling_with_elderly
+                  ? [
+                      preferences.traveling_with_kids
+                        ? `Kids${preferences.kids_ages?.length ? ` (${preferences.kids_ages.join(', ')})` : ''}`
+                        : null,
+                      preferences.traveling_with_elderly
+                        ? `Elderly${preferences.elderly_ages?.length ? ` (${preferences.elderly_ages.join(', ')})` : ''}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') + ' — matched nearby'
+                  : 'Popular attractions near your location'
+            }
           />
-          {hasLocation && attractionsQuery.isLoading ? (
+          {hasLocation && attractionsQuery.isLoading && attractions.length === 0 ? (
             <View className="mb-4 gap-3">
+              <Skeleton height={84} />
               <Skeleton height={84} />
               <Skeleton height={84} />
             </View>
           ) : null}
           {hasLocation
-            ? attractionsQuery.data?.map((place) => <PlaceCard key={place.id} place={place} />)
+            ? (
+                <PlaceGrid>
+                  {attractions.map((place) => (
+                    <PlaceCard key={place.id} place={place} className="mb-0" />
+                  ))}
+                </PlaceGrid>
+              )
             : null}
-          {hasLocation && !attractionsQuery.isLoading && (attractionsQuery.data?.length ?? 0) === 0 ? (
+          {hasLocation && !attractionsQuery.isLoading && attractions.length === 0 ? (
             <AppText muted className="mb-4">
-              No attractions found within 3 km. Try Explore for a wider search.
+              No attractions found nearby. Try Explore with a wider distance.
             </AppText>
           ) : null}
-          {hasLocation ? (
-            <View className="mb-4">
+          {hasLocation && attractions.length > 0 ? (
+            <View className="mb-5">
               <Button
                 label="See more nearby"
                 variant="secondary"
-                onPress={() => router.push('/(tabs)/explore')}
+                onPress={() => openExplore('attraction')}
               />
             </View>
           ) : null}
 
           <SectionHeader
-            title="Eat nearby"
-            subtitle={hasLocation ? 'Restaurants & cafes' : undefined}
+            eyebrow="Taste"
+            title="Restaurant Near Me"
+            subtitle={
+              !hasLocation
+                ? undefined
+                : preferences?.traveling_with_kids || preferences?.traveling_with_elderly
+                  ? 'Family-friendly dining matched to your companions'
+                  : 'Popular restaurants & cafes near your location'
+            }
           />
-          {hasLocation && foodQuery.isLoading ? (
+          {hasLocation && foodQuery.isLoading && foodPlaces.length === 0 ? (
             <View className="mb-4 gap-3">
+              <Skeleton height={84} />
+              <Skeleton height={84} />
               <Skeleton height={84} />
             </View>
           ) : null}
           {hasLocation
-            ? foodQuery.data?.map((place) => <PlaceCard key={place.id} place={place} />)
+            ? (
+                <PlaceGrid>
+                  {foodPlaces.map((place) => (
+                    <PlaceCard key={place.id} place={place} className="mb-0" />
+                  ))}
+                </PlaceGrid>
+              )
             : null}
+          {hasLocation && !foodQuery.isLoading && foodPlaces.length === 0 ? (
+            <AppText muted className="mb-4">
+              No restaurants found nearby. Try Explore for a wider search.
+            </AppText>
+          ) : null}
+          {hasLocation && foodPlaces.length > 0 ? (
+            <View className="mb-5">
+              <Button
+                label="See more nearby"
+                variant="secondary"
+                onPress={() => openExplore('restaurant')}
+              />
+            </View>
+          ) : null}
 
-          <SectionHeader title="Quick actions" />
-          <View className="mb-6 flex-row flex-wrap gap-3">
+          <SectionHeader eyebrow="Shortcuts" title="Quick actions" />
+          <View className="mb-6 flex-row flex-wrap gap-2.5">
             {HOME_ACTIONS.map((action) => (
               <Pressable
                 key={action.id}
                 testID={`quick-action-${action.id}`}
-                onPress={() => router.push(action.href as Href)}
-                className={`rounded-2xl px-4 py-3 ${
-                  scheme === 'dark' ? 'bg-surface-cardDark' : 'bg-white'
-                } border ${scheme === 'dark' ? 'border-brand-800' : 'border-brand-100'}`}
+                onPress={() => {
+                  if ('category' in action && action.category) {
+                    router.replace({
+                      pathname: '/(tabs)/explore',
+                      params: { category: action.category },
+                    });
+                    return;
+                  }
+                  router.push(action.href as Href);
+                }}
+                className={`rounded-2xl border px-4 py-3 ${
+                  scheme === 'dark'
+                    ? 'border-brand-800 bg-surface-cardDark'
+                    : 'border-brand-100 bg-white'
+                }`}
               >
-                <AppText className="font-sans-medium">{action.label}</AppText>
+                <AppText className="font-sans-semibold text-brand-700 dark:text-brand-200">
+                  {action.label}
+                </AppText>
               </Pressable>
             ))}
           </View>
-
-          <Card>
-            <SectionHeader title="Ask TravelAssistant AI" subtitle="Tool-calling assistant" />
-            <Button label="Open AI Assistant" onPress={() => router.push('/assistant')} />
-          </Card>
-        </View>
+        </PageContainer>
       </ScrollView>
 
       <SaveTripModal
@@ -293,6 +577,15 @@ export function HomeScreen() {
         visible={locationPickerOpen}
         onClose={() => setLocationPickerOpen(false)}
         onChanged={refreshNearby}
+      />
+
+      <CurrencyPickerModal
+        visible={currencyPickerOpen}
+        currency={currency}
+        onClose={() => setCurrencyPickerOpen(false)}
+        onSelect={(next) => {
+          void setCurrency(next);
+        }}
       />
     </Screen>
   );

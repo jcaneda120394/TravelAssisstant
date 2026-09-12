@@ -10,6 +10,9 @@ import { theme } from '@/config/theme';
 /**
  * Route protection without render-time <Redirect />, which can loop when
  * Expo Router segments are still settling after auth state changes.
+ *
+ * Guests may browse the app (home, explore, place details, etc.).
+ * Persist actions (save trip / favorite) prompt sign-up at the button layer.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   useAuthBootstrap();
@@ -32,13 +35,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const root = segments[0];
     const inAuth = root === '(auth)';
     const inOnboarding = root === '(onboarding)';
+    const inAdmin = root === 'admin';
 
     let target: string | null = null;
-    if (!isAuthenticated && !inAuth) {
-      target = '/(auth)/login';
-    } else if (isAuthenticated && needsOnboarding && !inOnboarding) {
+    if (inAdmin) {
+      // Admin stack handles its own auth / role redirects.
+      target = null;
+    } else if (!isAuthenticated) {
+      // Guests land on Home — never force login. Leave onboarding if stranded there.
+      if (inOnboarding) {
+        target = '/(tabs)';
+      }
+    } else if (needsOnboarding && !inOnboarding) {
       target = '/(onboarding)';
-    } else if (isAuthenticated && !needsOnboarding && (inAuth || inOnboarding)) {
+    } else if (!needsOnboarding && (inAuth || inOnboarding)) {
       target = '/(tabs)';
     }
 

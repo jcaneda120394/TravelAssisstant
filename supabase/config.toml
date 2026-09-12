@@ -8,3 +8,6 @@ major_version = 15
 
 [functions.ai-chat]
 verify_jwt = false
+
+[functions.admin-update-user]
+verify_jwt = true

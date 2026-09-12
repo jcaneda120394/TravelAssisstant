@@ -1,7 +1,6 @@
 import { env } from '@/config/env';
 import { MockAIProvider } from '@/providers/ai/ai.provider';
 import { LiveAIProvider } from '@/providers/ai/live-ai.provider';
-import { MockCurrencyProvider } from '@/providers/currency/currency.provider';
 import { FrankfurterCurrencyProvider } from '@/providers/currency/frankfurter.provider';
 import { MockEsimProvider } from '@/providers/esim/esim.provider';
 import { CatalogEsimProvider } from '@/providers/esim/catalog-esim.provider';
@@ -42,7 +41,8 @@ function createMockRegistry(): ProviderRegistry {
     transport: new MockTransportProvider(),
     hotels: new MockHotelProvider(),
     weather: new MockWeatherProvider(),
-    currency: new MockCurrencyProvider(),
+    // Always live FX so travelers see updated rates even in demo mode.
+    currency: new FrankfurterCurrencyProvider(),
     esim: new MockEsimProvider(),
     ai: new MockAIProvider(),
     maps: new MockMapsProvider(),

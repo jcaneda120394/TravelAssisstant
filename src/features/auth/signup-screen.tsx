@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
+import { AuthBackToHomeBar, goToGuestHome } from '@/features/auth/auth-back-to-home';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { signUpWithEmail } from '@/services/auth/auth.service';
 import { ensureProfile, fetchPreferences } from '@/services/profile/profile.service';
@@ -63,7 +64,8 @@ export function SignupScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-16" contentContainerClassName="pb-10" testID="screen-signup">
+      <AuthBackToHomeBar />
+      <ScrollView className="flex-1 px-5 pt-2" contentContainerClassName="pb-10" testID="screen-signup">
         <SectionHeader
           title="Create account"
           subtitle="Save trips, preferences, and your AI travel context"
@@ -127,6 +129,11 @@ export function SignupScreen() {
         </Card>
 
         <View className="gap-2">
+          <Button
+            label="Back to Home"
+            variant="secondary"
+            onPress={() => goToGuestHome(router)}
+          />
           <AppText muted className="text-center">
             Already have an account?
           </AppText>

@@ -8,11 +8,15 @@ import { AppText, Card, SectionHeader } from '@/components/ui/typography';
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
-import { searchDestinations } from '@/services/geo/geocode.service';
+import {
+  searchDestinations,
+  type DestinationSuggestion,
+} from '@/services/geo/geocode.service';
 import {
   clearSavedLocation,
   getCurrentPosition,
   setLocationFromSuggestion,
+  applyHomeLocation,
 } from '@/services/location/location.service';
 import { getErrorMessage } from '@/lib/errors/app-error';
 
@@ -22,17 +26,147 @@ type Props = {
   onChanged?: () => void;
 };
 
-const QUICK_PICKS = [
-  'Malolos, Bulacan, Philippines',
-  'Manila, Philippines',
-  'Quezon City, Philippines',
-  'Cebu City, Philippines',
-  'Davao City, Philippines',
-] as const;
+const QUICK_PICKS: DestinationSuggestion[] = [
+  {
+    id: 'quick-sjdm',
+    label: 'San Jose del Monte, Bulacan, Philippines',
+    shortName: 'San Jose del Monte',
+    kind: 'city',
+    latitude: 14.8139,
+    longitude: 121.0453,
+    countryCode: 'PH',
+  },
+  {
+    id: 'quick-malolos',
+    label: 'Malolos, Bulacan, Philippines',
+    shortName: 'Malolos',
+    kind: 'city',
+    latitude: 14.8433,
+    longitude: 120.8114,
+    countryCode: 'PH',
+  },
+  {
+    id: 'quick-manila',
+    label: 'Manila, Metro Manila, Philippines',
+    shortName: 'Manila',
+    kind: 'city',
+    latitude: 14.5995,
+    longitude: 120.9842,
+    countryCode: 'PH',
+  },
+  {
+    id: 'quick-qc',
+    label: 'Quezon City, Metro Manila, Philippines',
+    shortName: 'Quezon City',
+    kind: 'city',
+    latitude: 14.676,
+    longitude: 121.0437,
+    countryCode: 'PH',
+  },
+  {
+    id: 'quick-tokyo',
+    label: 'Tokyo, Japan',
+    shortName: 'Tokyo',
+    kind: 'city',
+    latitude: 35.6762,
+    longitude: 139.6503,
+    countryCode: 'JP',
+  },
+  {
+    id: 'quick-osaka',
+    label: 'Osaka, Japan',
+    shortName: 'Osaka',
+    kind: 'city',
+    latitude: 34.6937,
+    longitude: 135.5023,
+    countryCode: 'JP',
+  },
+  {
+    id: 'quick-seoul',
+    label: 'Seoul, South Korea',
+    shortName: 'Seoul',
+    kind: 'city',
+    latitude: 37.5665,
+    longitude: 126.978,
+    countryCode: 'KR',
+  },
+  {
+    id: 'quick-bangkok',
+    label: 'Bangkok, Thailand',
+    shortName: 'Bangkok',
+    kind: 'city',
+    latitude: 13.7563,
+    longitude: 100.5018,
+    countryCode: 'TH',
+  },
+  {
+    id: 'quick-singapore',
+    label: 'Singapore',
+    shortName: 'Singapore',
+    kind: 'city',
+    latitude: 1.3521,
+    longitude: 103.8198,
+    countryCode: 'SG',
+  },
+  {
+    id: 'quick-hk',
+    label: 'Hong Kong',
+    shortName: 'Hong Kong',
+    kind: 'city',
+    latitude: 22.3193,
+    longitude: 114.1694,
+    countryCode: 'HK',
+  },
+  {
+    id: 'quick-paris',
+    label: 'Paris, France',
+    shortName: 'Paris',
+    kind: 'city',
+    latitude: 48.8566,
+    longitude: 2.3522,
+    countryCode: 'FR',
+  },
+  {
+    id: 'quick-london',
+    label: 'London, United Kingdom',
+    shortName: 'London',
+    kind: 'city',
+    latitude: 51.5074,
+    longitude: -0.1278,
+    countryCode: 'GB',
+  },
+  {
+    id: 'quick-nyc',
+    label: 'New York, United States',
+    shortName: 'New York',
+    kind: 'city',
+    latitude: 40.7128,
+    longitude: -74.006,
+    countryCode: 'US',
+  },
+  {
+    id: 'quick-cebu',
+    label: 'Cebu City, Cebu, Philippines',
+    shortName: 'Cebu City',
+    kind: 'city',
+    latitude: 10.3157,
+    longitude: 123.8854,
+    countryCode: 'PH',
+  },
+  {
+    id: 'quick-davao',
+    label: 'Davao City, Davao del Sur, Philippines',
+    shortName: 'Davao City',
+    kind: 'city',
+    latitude: 7.1907,
+    longitude: 125.4553,
+    countryCode: 'PH',
+  },
+];
 
 export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
   const scheme = useAppColorScheme();
-  const [query, setQuery] = useState('Bulacan');
+  const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounced = useDebouncedValue(query, 350);
@@ -44,11 +178,29 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     staleTime: 60_000,
   });
 
-  const applyGps = async () => {
+  const applySuggestion = async (item: DestinationSuggestion) => {
+    if (busy) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await getCurrentPosition();
+      await setLocationFromSuggestion(item);
+      onChanged?.();
+      setQuery('');
+      onClose();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyHome = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await applyHomeLocation();
       onChanged?.();
       onClose();
     } catch (err) {
@@ -58,16 +210,12 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     }
   };
 
-  const applySuggestionLabel = async (label: string) => {
+  const applyGps = async () => {
     setBusy(true);
     setError(null);
     try {
-      const results = await searchDestinations(label);
-      const first = results[0];
-      if (!first) {
-        throw new Error(`Could not find “${label}”`);
-      }
-      await setLocationFromSuggestion(first);
+      // Remaps Simulator San Francisco → Bulacan automatically.
+      await getCurrentPosition();
       onChanged?.();
       onClose();
     } catch (err) {
@@ -91,13 +239,29 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
             <Card className="mb-4">
               <AppText muted className="mb-3 text-sm">
-                On iOS Simulator, GPS often stays on San Francisco. Set Features → Location → Custom
-                Location, or pick your city below.
+                iOS Simulator GPS defaults to San Francisco. This app remaps that to Malolos,
+                Bulacan (your area). On a real phone, GPS uses your true coordinates.
               </AppText>
-              <Button label="Use device GPS" loading={busy} onPress={() => void applyGps()} />
+              <Button
+                label="Use my location (Malolos, Bulacan)"
+                loading={busy}
+                onPress={() => void applyHome()}
+              />
+              <View className="mt-2">
+                <Button
+                  label="Read device GPS"
+                  variant="secondary"
+                  loading={busy}
+                  onPress={() => void applyGps()}
+                />
+              </View>
               <View className="mt-2">
                 <Button
                   label="Clear saved location"
@@ -114,16 +278,16 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
             <View className="mb-4 flex-row flex-wrap gap-2">
               {QUICK_PICKS.map((pick) => (
                 <Pressable
-                  key={pick}
+                  key={pick.id}
                   disabled={busy}
-                  onPress={() => void applySuggestionLabel(pick)}
+                  onPress={() => void applySuggestion(pick)}
                   className={`rounded-full border px-3 py-2 ${
                     scheme === 'dark'
                       ? 'border-brand-700 bg-brand-900'
                       : 'border-brand-200 bg-brand-50'
                   }`}
                 >
-                  <AppText className="text-sm">{pick.split(',')[0]}</AppText>
+                  <AppText className="text-sm">{pick.shortName}</AppText>
                 </Pressable>
               ))}
             </View>
@@ -134,6 +298,8 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
               onChangeText={setQuery}
               autoCapitalize="words"
               placeholder="e.g. Bulacan, Philippines"
+              returnKeyType="search"
+              blurOnSubmit
             />
 
             {error ? (
@@ -154,20 +320,7 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
                 <Pressable
                   key={item.id}
                   disabled={busy}
-                  onPress={() => {
-                    void (async () => {
-                      setBusy(true);
-                      try {
-                        await setLocationFromSuggestion(item);
-                        onChanged?.();
-                        onClose();
-                      } catch (err) {
-                        setError(getErrorMessage(err));
-                      } finally {
-                        setBusy(false);
-                      }
-                    })();
-                  }}
+                  onPress={() => void applySuggestion(item)}
                   className={`border-t px-4 py-3 ${
                     scheme === 'dark' ? 'border-brand-800' : 'border-brand-50'
                   }`}
@@ -178,6 +331,15 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
                   </AppText>
                 </Pressable>
               ))}
+              {!suggestionsQuery.isFetching &&
+              debounced.trim().length >= 2 &&
+              (suggestionsQuery.data?.length ?? 0) === 0 ? (
+                <View className="px-4 py-3">
+                  <AppText muted className="text-sm">
+                    No matches. Try a quick pick above.
+                  </AppText>
+                </View>
+              ) : null}
             </View>
           </ScrollView>
         </View>

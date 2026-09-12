@@ -28,7 +28,7 @@ Help travelers understand **exactly how** to travel between A and B:
 
 ## Comparison modes
 
-Recommended · Fastest · Cheapest · Least Walking · Fewest Transfers · Most Accessible · Best With Luggage · Best For Families · Taxi/Rideshare
+Recommended · Fastest · Cheapest · Least Walking · Fewest Transfers · Most Accessible · Best With Luggage · Best For Families · Taxi/Rideshare · Bus · Train
 
 ## Data integrity
 

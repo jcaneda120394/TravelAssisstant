@@ -1,5 +1,48 @@
 # Deployment
 
+## Web (Vercel)
+
+Expo web SPA export. Config: `vercel.json`.
+
+```bash
+npm run build:web   # outputs to dist/
+npx vercel          # preview
+npx vercel --prod   # production
+```
+
+### Required Vercel environment variables (Production + Preview)
+
+Set in [Vercel → Project → Settings → Environment Variables](https://vercel.com/dashboard):
+
+| Variable | Value |
+|----------|--------|
+| `EXPO_PUBLIC_APP_ENV` | `production` |
+| `EXPO_PUBLIC_APP_NAME` | `TravelAssistant` |
+| `EXPO_PUBLIC_SUPABASE_URL` | `https://viyzvgdvnxhddtobpyys.supabase.co` |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key |
+| `EXPO_PUBLIC_USE_MOCK_PROVIDERS` | `false` |
+
+Optional: `EXPO_PUBLIC_POSTHOG_*`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`.
+
+Rebuild after changing env vars (`EXPO_PUBLIC_*` are inlined at build time).
+
+### Supabase Auth redirects for Vercel
+
+[Auth → URL Configuration](https://supabase.com/dashboard/project/viyzvgdvnxhddtobpyys/auth/url-configuration)
+
+Add your Vercel URLs, for example:
+
+- `https://<your-project>.vercel.app`
+- `https://<your-project>.vercel.app/**`
+- `https://*.vercel.app/**` (preview deployments)
+
+Also keep:
+
+- `travelassistant://`
+- `travelassistant://**`
+- `exp://127.0.0.1:8081/--/*`
+- `exp://localhost:8081/--/*`
+
 ## Mobile
 
 - **EAS Build** for iOS and Android
@@ -17,6 +60,11 @@ GitHub Actions:
 5. Build (preview)
 6. E2E (later)
 
-## Phase 1
+## Supabase Edge Function secrets (optional)
 
-Local `npx expo start` only. No production deploy yet.
+```bash
+npx supabase secrets set GROQ_API_KEY=gsk_...
+# or GEMINI_API_KEY / OPENAI_API_KEY
+```
+
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are provided automatically to Edge Functions.

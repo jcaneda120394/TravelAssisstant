@@ -33,7 +33,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -45,6 +45,14 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow TravelAssistant to use your location for nearby places and directions."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TravelAssistant uses your photos so you can share travel spot pictures with other travelers.",
+          "cameraPermission": "TravelAssistant uses your camera so you can add photos of places you’ve visited.",
+          "microphonePermission": false
         }
       ],
       [
@@ -63,7 +71,15 @@
         }
       ],
       "expo-web-browser",
-      "expo-sharing"
+      "expo-sharing",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow TravelAssistant to use the microphone for voice travel questions.",
+          "speechRecognitionPermission": "Allow TravelAssistant to turn your speech into travel questions."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

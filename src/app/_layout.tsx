@@ -74,7 +74,9 @@ function RootNavigator() {
 
   useEffect(() => {
     setColorScheme(resolved);
-  }, [resolved, setColorScheme]);
+    // NativeWind's setColorScheme identity can change every render — omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, [resolved]);
 
   const navTheme =
     resolved === 'dark'

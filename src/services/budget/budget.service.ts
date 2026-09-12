@@ -1,11 +1,58 @@
 import { createId, dbGet, dbSet } from '@/lib/storage/local-db';
+import { isUuid, useCloudStorage } from '@/lib/storage/cloud';
+import { supabase } from '@/lib/supabase/client';
 import { providers } from '@/providers/registry';
 import type { Budget, Expense, ExpenseCategory } from '@/types/domain';
 
 const BUDGET_KEY = 'budgets';
 const EXPENSE_KEY = 'expenses';
 
+type BudgetRow = {
+  id: string;
+  trip_id: string;
+  total: number;
+  currency: string;
+  categories: Partial<Record<ExpenseCategory, number>>;
+};
+
+type ExpenseRow = {
+  id: string;
+  trip_id: string;
+  user_id: string;
+  amount: number;
+  currency: string;
+  amount_home: number;
+  home_currency: string;
+  category: ExpenseCategory;
+  expense_date: string;
+  location: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
 export async function getBudget(tripId: string): Promise<Budget | null> {
+  if (useCloudStorage() && isUuid(tripId) && supabase) {
+    const { data, error } = await supabase
+      .from('budgets')
+      .select('*')
+      .eq('trip_id', tripId)
+      .maybeSingle();
+    if (error) {
+      throw error;
+    }
+    if (!data) {
+      return null;
+    }
+    const row = data as BudgetRow;
+    return {
+      id: row.id,
+      tripId: row.trip_id,
+      total: Number(row.total),
+      currency: row.currency,
+      categories: row.categories ?? {},
+    };
+  }
+
   const budgets = await dbGet<Budget[]>(BUDGET_KEY, []);
   return budgets.find((budget) => budget.tripId === tripId) ?? null;
 }
@@ -15,6 +62,34 @@ export async function upsertBudget(input: {
   total: number;
   currency: string;
 }): Promise<Budget> {
+  if (useCloudStorage() && isUuid(input.tripId) && supabase) {
+    const { data, error } = await supabase
+      .from('budgets')
+      .upsert(
+        {
+          trip_id: input.tripId,
+          total: input.total,
+          currency: input.currency,
+          categories: {},
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'trip_id' },
+      )
+      .select('*')
+      .single();
+    if (error) {
+      throw error;
+    }
+    const row = data as BudgetRow;
+    return {
+      id: row.id,
+      tripId: row.trip_id,
+      total: Number(row.total),
+      currency: row.currency,
+      categories: row.categories ?? {},
+    };
+  }
+
   const budgets = await dbGet<Budget[]>(BUDGET_KEY, []);
   const existing = budgets.find((budget) => budget.tripId === input.tripId);
   if (existing) {
@@ -37,6 +112,31 @@ export async function upsertBudget(input: {
 }
 
 export async function listExpenses(tripId: string): Promise<Expense[]> {
+  if (useCloudStorage() && isUuid(tripId) && supabase) {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('trip_id', tripId)
+      .order('expense_date', { ascending: false });
+    if (error) {
+      throw error;
+    }
+    return (data as ExpenseRow[]).map((row) => ({
+      id: row.id,
+      tripId: row.trip_id,
+      userId: row.user_id,
+      amount: Number(row.amount),
+      currency: row.currency,
+      amountHome: Number(row.amount_home),
+      homeCurrency: row.home_currency,
+      category: row.category,
+      date: row.expense_date,
+      location: row.location ?? undefined,
+      notes: row.notes ?? undefined,
+      createdAt: row.created_at,
+    }));
+  }
+
   const expenses = await dbGet<Expense[]>(EXPENSE_KEY, []);
   return expenses
     .filter((expense) => expense.tripId === tripId)
@@ -59,6 +159,44 @@ export async function addExpense(input: {
     input.currency,
     input.homeCurrency,
   );
+
+  if (useCloudStorage(input.userId) && isUuid(input.tripId) && supabase) {
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert({
+        trip_id: input.tripId,
+        user_id: input.userId,
+        amount: input.amount,
+        currency: input.currency,
+        amount_home: conversion.result,
+        home_currency: input.homeCurrency,
+        category: input.category,
+        expense_date: input.date,
+        location: input.location ?? null,
+        notes: input.notes ?? null,
+      })
+      .select('*')
+      .single();
+    if (error) {
+      throw error;
+    }
+    const row = data as ExpenseRow;
+    return {
+      id: row.id,
+      tripId: row.trip_id,
+      userId: row.user_id,
+      amount: Number(row.amount),
+      currency: row.currency,
+      amountHome: Number(row.amount_home),
+      homeCurrency: row.home_currency,
+      category: row.category,
+      date: row.expense_date,
+      location: row.location ?? undefined,
+      notes: row.notes ?? undefined,
+      createdAt: row.created_at,
+    };
+  }
+
   const expense: Expense = {
     id: createId('exp'),
     tripId: input.tripId,

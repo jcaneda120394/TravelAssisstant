@@ -37,7 +37,7 @@ export function HotelsScreen() {
   return (
     <Screen>
       <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-hotels">
-        <SectionHeader title="Hotels" subtitle="AccommodationProvider (mock rates — never invented live prices in AI)" />
+        <SectionHeader title="Hotels" subtitle="Live OSM hotel listings — partner rates optional" />
         <Card className="mb-4">
           <TextField label="City" value={city} onChangeText={setCity} autoCapitalize="words" />
           <TextField label="Check-in" value={checkIn} onChangeText={setCheckIn} />

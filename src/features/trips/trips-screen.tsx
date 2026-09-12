@@ -1,34 +1,45 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
+import { SaveTripModal } from '@/components/trips/save-trip-modal';
+import { DestinationAutocomplete } from '@/components/forms/destination-autocomplete';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
+import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { useAuth } from '@/hooks/use-auth';
-import { createTrip, listTrips } from '@/services/trips/trips.service';
+import { createTrip, deleteTrip, listTrips } from '@/services/trips/trips.service';
 import { analytics } from '@/lib/analytics';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
+import { defaultTripDates } from '@/utils/dates';
+import { useLocationStore } from '@/stores/location-store';
 
 export function TripsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, preferences } = useAuth();
   const scheme = useAppColorScheme();
   const queryClient = useQueryClient();
+  const label = useLocationStore((state) => state.label);
   const [showForm, setShowForm] = useState(false);
-  const [title, setTitle] = useState('Japan 2027');
-  const [destinations, setDestinations] = useState('Tokyo, Kyoto, Osaka');
-  const [startDate, setStartDate] = useState('2027-03-10');
-  const [endDate, setEndDate] = useState('2027-03-22');
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const defaults = useMemo(() => defaultTripDates(), []);
+  const [title, setTitle] = useState('Weekend getaway');
+  const [destinations, setDestinations] = useState<string[]>(
+    label?.split(',')[0] ? [label.split(',')[0]!] : [],
+  );
+  const [startDate, setStartDate] = useState(defaults.startDate);
+  const [endDate, setEndDate] = useState(defaults.endDate);
 
   const tripsQuery = useQuery({
     queryKey: ['trips', user?.id],
     enabled: Boolean(user?.id),
     queryFn: () => listTrips(user!.id),
+    staleTime: 30_000,
   });
 
   const createMutation = useMutation({
@@ -41,9 +52,9 @@ export function TripsScreen() {
         title,
         startDate,
         endDate,
-        destinations: destinations.split(',').map((item) => item.trim()).filter(Boolean),
-        adults: 2,
-        children: 0,
+        destinations: destinations.map((item) => item.trim()).filter(Boolean),
+        adults: preferences?.adults ?? 2,
+        children: preferences?.children ?? 0,
       });
     },
     onSuccess: (trip) => {
@@ -52,24 +63,41 @@ export function TripsScreen() {
       setShowForm(false);
       router.push(`/trip/${trip.id}`);
     },
-    onError: (error) => Alert.alert('Could not create trip', getErrorMessage(error)),
+    onError: (error) => Alert.alert('Could not save trip', getErrorMessage(error)),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (tripId: string) => deleteTrip(tripId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['trips'] }),
+    onError: (error) => Alert.alert('Could not delete trip', getErrorMessage(error)),
   });
 
   return (
     <Screen>
       <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-trips">
-        <SectionHeader title="Trips" subtitle="Plan destinations, travelers, and itineraries" />
+        <SectionHeader title="Trips" subtitle="Save destinations and build day-by-day plans" />
 
-        <Button label={showForm ? 'Close form' : 'Create trip'} onPress={() => setShowForm((v) => !v)} />
+        <View className="mb-3 flex-row gap-2">
+          <View className="flex-1">
+            <Button label="Save trip" onPress={() => setShowSaveModal(true)} />
+          </View>
+          <View className="flex-1">
+            <Button
+              label={showForm ? 'Close' : 'Quick form'}
+              variant="secondary"
+              onPress={() => setShowForm((value) => !value)}
+            />
+          </View>
+        </View>
 
         {showForm ? (
-          <Card className="mt-4">
+          <Card className="mt-1 mb-4">
             <TextField label="Title" value={title} onChangeText={setTitle} autoCapitalize="words" />
-            <TextField
-              label="Destinations (comma separated)"
-              value={destinations}
-              onChangeText={setDestinations}
-              autoCapitalize="words"
+            <DestinationAutocomplete
+              label="Destinations"
+              values={destinations}
+              onChange={setDestinations}
+              placeholder="Search city or country (e.g. Phi…)"
             />
             <TextField label="Start date (YYYY-MM-DD)" value={startDate} onChangeText={setStartDate} />
             <TextField label="End date (YYYY-MM-DD)" value={endDate} onChangeText={setEndDate} />
@@ -81,11 +109,28 @@ export function TripsScreen() {
           </Card>
         ) : null}
 
+        {tripsQuery.isLoading ? (
+          <View className="mt-4 gap-3">
+            <Skeleton height={88} />
+            <Skeleton height={88} />
+          </View>
+        ) : null}
+
         <View className="mt-4">
           {tripsQuery.data?.map((trip) => (
             <Pressable
               key={trip.id}
               onPress={() => router.push(`/trip/${trip.id}`)}
+              onLongPress={() =>
+                Alert.alert('Delete trip?', trip.title, [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => removeMutation.mutate(trip.id),
+                  },
+                ])
+              }
               className={`mb-3 rounded-2xl border p-4 ${
                 scheme === 'dark'
                   ? 'border-brand-800 bg-surface-cardDark'
@@ -97,17 +142,27 @@ export function TripsScreen() {
                 {trip.startDate} → {trip.endDate}
               </AppText>
               <AppText muted className="mt-1">{trip.destinations.join(' · ')}</AppText>
+              <AppText muted className="mt-2 text-xs">
+                Tap to open · long-press to delete
+              </AppText>
             </Pressable>
           ))}
         </View>
 
         {!tripsQuery.isLoading && (tripsQuery.data?.length ?? 0) === 0 ? (
           <EmptyState
-            title="No trips yet"
-            description="Create a trip to unlock itinerary, budget, and collaboration."
+            title="No saved trips yet"
+            description="Tap Save trip to keep a destination plan — it syncs when you’re signed in with Supabase."
           />
         ) : null}
       </ScrollView>
+
+      <SaveTripModal
+        visible={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        destinationHint={label?.split(',')[0] ?? destinations[0] ?? ''}
+        onSaved={(tripId) => router.push(`/trip/${tripId}`)}
+      />
     </Screen>
   );
 }

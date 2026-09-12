@@ -20,7 +20,7 @@ export function HotelDetailScreen() {
   if (!query.data) {
     return (
       <Screen className="px-5 pt-14">
-        <EmptyState title="Hotel not found" description="Mock hotel unavailable." />
+        <EmptyState title="Hotel not found" description="Hotel listing unavailable." />
         <Button label="Back" onPress={() => router.back()} />
       </Screen>
     );
@@ -43,7 +43,7 @@ export function HotelDetailScreen() {
             Amenities: {hotel.amenities?.join(', ') ?? '—'}
           </AppText>
           <AppText muted className="mt-2">
-            Mock listing only — booking requires a real AccommodationProvider / affiliate link.
+            Live OSM listing — bookable rates need a hotel partner API (Amadeus/Expedia).
           </AppText>
         </Card>
         <Button

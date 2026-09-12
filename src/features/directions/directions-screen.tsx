@@ -67,7 +67,7 @@ export function DirectionsScreen() {
       <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-directions">
         <SectionHeader
           title="Directions"
-          subtitle={`To ${params.destinationName ?? 'selected destination'} · mock transit engine`}
+          subtitle={`To ${params.destinationName ?? 'selected destination'} · live routing`}
         />
 
         <AppText className="mb-2 font-sans-medium">Compare</AppText>
@@ -110,7 +110,14 @@ export function DirectionsScreen() {
 
         {selected ? (
           <Card className="mt-4">
-            <SectionHeader title="Step by step" subtitle="Mock provider data — not live schedules" />
+            <SectionHeader
+              title="Step by step"
+              subtitle={
+                selected.isMock
+                  ? 'Mock provider data — not live schedules'
+                  : 'Live OSRM routing — verify transit boards on site'
+              }
+            />
             {selected.segments.map((segment, index) => (
               <View key={segment.id} className="mb-3">
                 <AppText className="font-sans-semibold">

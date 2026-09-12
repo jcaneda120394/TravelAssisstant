@@ -10,11 +10,12 @@ import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
-import { getErrorMessage } from '@/lib/errors/app-error';
+import { getErrorMessage, toAppError } from '@/lib/errors/app-error';
 import {
   signInWithApple,
   signInWithEmail,
   signInWithGoogle,
+  signOut,
 } from '@/services/auth/auth.service';
 import { ensureProfile, fetchPreferences } from '@/services/profile/profile.service';
 import { useAuthStore } from '@/stores/auth-store';
@@ -27,11 +28,18 @@ async function hydrateAfterAuth(user: {
   email: string | null;
   fullName: string | null;
 }) {
-  useAuthStore.getState().setUser(user);
-  const profile = await ensureProfile(user);
-  const preferences = await fetchPreferences(user.id);
-  useAuthStore.getState().setProfile(profile);
-  useAuthStore.getState().setPreferences(preferences);
+  try {
+    const profile = await ensureProfile(user);
+    const preferences = await fetchPreferences(user.id);
+    useAuthStore.getState().setUser(user);
+    useAuthStore.getState().setProfile(profile);
+    useAuthStore.getState().setPreferences(preferences);
+  } catch (error) {
+    const appError = toAppError(error);
+    await signOut().catch(() => undefined);
+    useAuthStore.getState().reset();
+    throw appError;
+  }
 }
 
 export function LoginScreen() {

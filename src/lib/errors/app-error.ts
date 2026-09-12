@@ -41,20 +41,40 @@ export function toAppError(error: unknown, fallbackMessage = 'Unexpected error')
       hint?: unknown;
       error_description?: unknown;
     };
-    const message =
+    const rawMessage =
       (typeof record.message === 'string' && record.message) ||
       (typeof record.error_description === 'string' && record.error_description) ||
       fallbackMessage;
+    const code = typeof record.code === 'string' ? record.code : '';
+    const combined = `${rawMessage} ${code} ${String(record.details ?? '')}`;
+
+    if (
+      code === 'PGRST303' ||
+      /jwt issued at future/i.test(combined) ||
+      /issued at future/i.test(combined)
+    ) {
+      return new AppError(
+        'Your device clock is ahead of the server. On the simulator/Mac, set Date & Time to automatic, wait a few seconds, then sign in again.',
+        { code: 'PGRST303', cause: error },
+      );
+    }
+
     const detailParts = [record.details, record.hint, record.code]
       .filter((part) => typeof part === 'string' && part.length > 0)
       .join(' · ');
-    return new AppError(detailParts ? `${message} (${detailParts})` : message, {
-      code: typeof record.code === 'string' ? record.code : 'UNKNOWN_ERROR',
+    return new AppError(detailParts ? `${rawMessage} (${detailParts})` : rawMessage, {
+      code: code || 'UNKNOWN_ERROR',
       cause: error,
     });
   }
 
   if (error instanceof Error) {
+    if (/jwt issued at future/i.test(error.message)) {
+      return new AppError(
+        'Your device clock is ahead of the server. On the simulator/Mac, set Date & Time to automatic, wait a few seconds, then sign in again.',
+        { code: 'PGRST303', cause: error },
+      );
+    }
     return new AppError(error.message || fallbackMessage, {
       code: 'UNKNOWN_ERROR',
       cause: error,

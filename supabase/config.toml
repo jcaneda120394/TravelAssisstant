@@ -1,0 +1,10 @@
+project_id = "viyzvgdvnxhddtobpyys"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
+
+[functions.ai-chat]
+verify_jwt = false

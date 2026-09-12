@@ -1,7 +1,7 @@
-import { TextInput as RNTextInput, type TextInputProps } from 'react-native';
+import { type TextInputProps } from 'react-native';
 
 import { AppText } from '@/components/ui/typography';
-import { View } from '@/components/ui/primitives';
+import { TextInput, View } from '@/components/ui/primitives';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { theme } from '@/config/theme';
 
@@ -18,7 +18,7 @@ export function TextField({ label, error, testID, ...props }: Props) {
   return (
     <View className="mb-4">
       <AppText className="mb-2 font-sans-medium text-sm">{label}</AppText>
-      <RNTextInput
+      <TextInput
         testID={testID}
         placeholderTextColor={colors.textMuted}
         autoCapitalize="none"

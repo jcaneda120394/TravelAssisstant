@@ -7,12 +7,14 @@ import type { GeoPoint } from '@/types/domain';
 export type LocationMode = 'none' | 'approximate' | 'precise' | 'manual';
 
 type LocationState = {
+  hasHydrated: boolean;
   mode: LocationMode;
   permissionStatus: 'unknown' | 'granted' | 'denied' | 'undetermined';
   coords: GeoPoint | null;
   city: string | null;
   country: string | null;
   label: string | null;
+  setHasHydrated: (value: boolean) => void;
   setPermissionStatus: (status: LocationState['permissionStatus']) => void;
   setCurrentLocation: (payload: {
     coords: GeoPoint;
@@ -33,12 +35,14 @@ type LocationState = {
 export const useLocationStore = create<LocationState>()(
   persist(
     (set) => ({
+      hasHydrated: false,
       mode: 'none',
       permissionStatus: 'unknown',
       coords: null,
       city: null,
       country: null,
       label: null,
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
       setPermissionStatus: (permissionStatus) => set({ permissionStatus }),
       setCurrentLocation: ({ coords, city = null, country = null, label = null, mode = 'precise' }) =>
         set({ coords, city, country, label, mode }),
@@ -59,13 +63,14 @@ export const useLocationStore = create<LocationState>()(
       partialize: (state) => ({
         mode: state.mode === 'precise' ? 'approximate' : state.mode,
         permissionStatus: state.permissionStatus,
-        // Persist city-level context, not a long precise history trail.
-        coords:
-          state.mode === 'manual' || state.mode === 'approximate' ? state.coords : state.coords,
+        coords: state.coords,
         city: state.city,
         country: state.country,
         label: state.label,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

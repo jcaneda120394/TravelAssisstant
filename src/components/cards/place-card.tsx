@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useRouter } from 'expo-router';
 
 import { AppText } from '@/components/ui/typography';
@@ -6,7 +7,7 @@ import type { Place } from '@/types/domain';
 import { formatDistanceMeters } from '@/utils/format';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 
-export function PlaceCard({ place }: { place: Place }) {
+function PlaceCardComponent({ place }: { place: Place }) {
   const router = useRouter();
   const scheme = useAppColorScheme();
 
@@ -39,3 +40,5 @@ export function PlaceCard({ place }: { place: Place }) {
     </Pressable>
   );
 }
+
+export const PlaceCard = memo(PlaceCardComponent);

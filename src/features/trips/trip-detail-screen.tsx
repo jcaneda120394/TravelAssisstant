@@ -18,7 +18,7 @@ import {
 import { getTrip, inviteTripMember } from '@/services/trips/trips.service';
 import { getBudget, listExpenses, summarizeExpenses, upsertBudget } from '@/services/budget/budget.service';
 import { getErrorMessage } from '@/lib/errors/app-error';
-import { providers } from '@/providers/registry';
+import { Skeleton } from '@/components/feedback/skeleton';
 
 export function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -52,23 +52,17 @@ export function TripDetailScreen() {
   });
 
   const addItem = useMutation({
-    mutationFn: async () => {
-      const routes = await providers.transport.getRoutes({
-        origin: { latitude: 35.6595, longitude: 139.7005 },
-        destination: { latitude: 35.68, longitude: 139.76 },
-      });
-      return addItineraryItem({
+    mutationFn: async () =>
+      addItineraryItem({
         tripId: String(id),
         day,
         startTime: '10:00',
         endTime: '12:00',
         title: activityTitle,
-        transportSummary: routes[0]?.summary,
         estimatedCost: 20,
         currency: preferences?.home_currency ?? 'USD',
         notes: 'Added from trip dashboard',
-      });
-    },
+      }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['itinerary', id] }),
     onError: (error) => Alert.alert('Failed', getErrorMessage(error)),
   });
@@ -106,6 +100,14 @@ export function TripDetailScreen() {
       }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['budget', id] }),
   });
+
+  if (tripQuery.isLoading) {
+    return (
+      <Screen className="px-5 pt-14">
+        <Skeleton height={160} />
+      </Screen>
+    );
+  }
 
   if (!tripQuery.data) {
     return (
@@ -199,7 +201,7 @@ export function TripDetailScreen() {
           </AppText>
           <View className="mt-3">
             <Button
-              label="Set mock $2000 budget"
+              label="Set $2000 budget"
               variant="secondary"
               loading={ensureBudget.isPending}
               onPress={() => ensureBudget.mutate()}

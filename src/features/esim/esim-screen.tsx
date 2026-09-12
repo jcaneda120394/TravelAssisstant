@@ -25,7 +25,7 @@ export function EsimScreen() {
   return (
     <Screen>
       <ScrollView className="flex-1 px-5 pt-14" contentContainerClassName="pb-10" testID="screen-esim">
-        <SectionHeader title="eSIM finder" subtitle="Mock plans — never hardcode live prices" />
+        <SectionHeader title="eSIM finder" subtitle="Live catalog plans with partner purchase links" />
         <ChipSelect
           options={COUNTRIES}
           values={[country]}

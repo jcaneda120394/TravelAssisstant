@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Alert, Linking } from 'react-native';
 
+import { SaveTripModal } from '@/components/trips/save-trip-modal';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { Skeleton } from '@/components/feedback/skeleton';
@@ -12,17 +14,20 @@ import { providers } from '@/providers/registry';
 import { savePlace } from '@/services/favorites/favorites.service';
 import { formatDistanceMeters } from '@/utils/format';
 import { analytics } from '@/lib/analytics';
+import { getErrorMessage } from '@/lib/errors/app-error';
 
 export function PlaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [saveTripOpen, setSaveTripOpen] = useState(false);
 
   const query = useQuery({
     queryKey: ['place', id],
     enabled: Boolean(id),
     queryFn: () => providers.places.getPlaceDetails(String(id)),
+    staleTime: 5 * 60_000,
   });
 
   const saveMutation = useMutation({
@@ -37,7 +42,7 @@ export function PlaceDetailScreen() {
       void queryClient.invalidateQueries({ queryKey: ['favorites'] });
       Alert.alert('Saved', 'Place added to favorites.');
     },
-    onError: (error) => Alert.alert('Save failed', String(error)),
+    onError: (error) => Alert.alert('Save failed', getErrorMessage(error)),
   });
 
   if (query.isLoading) {
@@ -51,14 +56,13 @@ export function PlaceDetailScreen() {
   if (!query.data) {
     return (
       <Screen className="px-5 pt-14">
-        <EmptyState title="Place not found" description="This mock place id is unavailable." />
+        <EmptyState title="Place not found" description="This place id is unavailable." />
         <Button label="Back" onPress={() => router.back()} />
       </Screen>
     );
   }
 
   const place = query.data;
-  analytics.track('place_viewed', { placeId: place.id, category: place.category });
 
   return (
     <Screen>
@@ -83,12 +87,19 @@ export function PlaceDetailScreen() {
         </Card>
 
         <View className="gap-3">
-          <Button label="Directions" onPress={() => router.push({
-            pathname: '/directions',
-            params: { destinationId: place.id, destinationName: place.name },
-          })} />
+          <Button label="Save to trip" onPress={() => setSaveTripOpen(true)} />
           <Button
-            label="Save"
+            label="Directions"
+            variant="secondary"
+            onPress={() =>
+              router.push({
+                pathname: '/directions',
+                params: { destinationId: place.id, destinationName: place.name },
+              })
+            }
+          />
+          <Button
+            label="Save favorite"
             variant="secondary"
             loading={saveMutation.isPending}
             onPress={() => saveMutation.mutate()}
@@ -96,7 +107,7 @@ export function PlaceDetailScreen() {
           {place.phone ? (
             <Button
               label="Call"
-              variant="secondary"
+              variant="ghost"
               onPress={() => void Linking.openURL(`tel:${place.phone}`)}
             />
           ) : null}
@@ -109,6 +120,14 @@ export function PlaceDetailScreen() {
           ) : null}
         </View>
       </ScrollView>
+
+      <SaveTripModal
+        visible={saveTripOpen}
+        onClose={() => setSaveTripOpen(false)}
+        place={place}
+        destinationHint={place.name}
+        onSaved={(tripId) => router.push(`/trip/${tripId}`)}
+      />
     </Screen>
   );
 }

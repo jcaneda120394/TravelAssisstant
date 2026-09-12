@@ -6,36 +6,38 @@ All external data sources are accessed through **provider interfaces**. UI and f
 
 `src/providers/registry.ts` resolves implementations based on env flags:
 
-| Flag | Default (Phase 1) |
-|------|-------------------|
-| `EXPO_PUBLIC_USE_MOCK_PROVIDERS` | `true` |
+| Flag | Live (`false`) | Mock (`true`) |
+|------|----------------|---------------|
+| `EXPO_PUBLIC_USE_MOCK_PROVIDERS` | Free public APIs + native maps | Offline fixtures |
 
-## Interfaces (Phase 1)
+Default in `.env.example` is **live** (`false`).
 
-| Provider | Responsibility |
-|----------|----------------|
-| `PlacesProvider` | Search, nearby, details, photos |
-| `TransportProvider` | Routes, transit, fares, alerts |
-| `HotelProvider` | Search, rates, rooms, photos |
-| `WeatherProvider` | Current + forecast |
-| `CurrencyProvider` | FX rates + conversion |
-| `EsimProvider` | Plans by country |
-| `AIProvider` | Chat + tool-calling orchestration |
+## Live adapters (no paid keys required)
+
+| Provider | Implementation | Source |
+|----------|----------------|--------|
+| Places | `OsmPlacesProvider` | Nominatim + Overpass (OpenStreetMap) |
+| Transport | `OsrmTransportProvider` | OSRM public router + OSM stops |
+| Hotels | `OsmHotelProvider` | OSM hotel POIs (rates need a partner API) |
+| Weather | `OpenMeteoWeatherProvider` | Open-Meteo |
+| Currency | `FrankfurterCurrencyProvider` | Frankfurter.app ECB rates |
+| Maps | `NativeMapsProvider` | `react-native-maps` (Apple Maps on iOS Expo Go) |
+| eSIM | `CatalogEsimProvider` | Curated public plan catalog + purchase URLs |
+| AI | `LiveAIProvider` | Live tools + optional `ai-chat` Edge Function |
+
+## Optional paid upgrades
+
+| Capability | How |
+|------------|-----|
+| LLM chat quality | Deploy `supabase/functions/ai-chat` + set `OPENAI_API_KEY` secret |
+| Hotel rates / booking | Add Amadeus / Expedia Rapid adapter behind Edge Function |
+| Google transit / Places | Add Google adapters + restricted server keys via Edge Functions |
+| eSIM checkout | Airalo / Nomad partner API |
 
 ## Rules
 
 1. Return **normalized domain types** (`Place`, `Route`, `Hotel`, …).
 2. Never invent live operational data in providers or AI.
 3. If unavailable → typed error / empty result with clear reason.
-4. Expensive calls should eventually go through **Supabase Edge Functions**.
-5. Swap mock → real adapter without changing feature code.
-
-## Future adapters
-
-- Places: Google Places, Foursquare, HERE
-- Transport: Google Routes, Mapbox, HERE, GTFS-RT
-- Hotels: Amadeus, Expedia Rapid, Hotelbeds
-- Weather: OpenWeather, WeatherAPI
-- Currency: Open Exchange Rates, frankfurter
-- eSIM: Airalo, Nomad affiliate APIs
-- AI: OpenAI, Anthropic, Google via Edge Function gateway
+4. Secrets stay in Edge Functions / server env — never in `EXPO_PUBLIC_*`.
+5. Swap mock → live without changing feature screens.

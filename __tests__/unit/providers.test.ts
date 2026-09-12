@@ -1,10 +1,15 @@
 import { providers } from '@/providers/registry';
 
 describe('provider registry', () => {
-  it('resolves mock providers in phase 1', () => {
-    expect(providers.usingMocks).toBe(true);
-    expect(providers.places.name).toContain('mock');
-    expect(providers.transport.name).toContain('mock');
-    expect(providers.ai.name).toContain('mock');
+  it('exposes all required providers', () => {
+    expect(providers.places.name).toBeTruthy();
+    expect(providers.transport.name).toBeTruthy();
+    expect(providers.hotels.name).toBeTruthy();
+    expect(providers.weather.name).toBeTruthy();
+    expect(providers.currency.name).toBeTruthy();
+    expect(providers.esim.name).toBeTruthy();
+    expect(providers.ai.name).toBeTruthy();
+    expect(providers.maps.name).toBeTruthy();
+    expect(typeof providers.usingMocks).toBe('boolean');
   });
 });

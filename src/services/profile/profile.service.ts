@@ -70,15 +70,24 @@ export async function ensureProfile(user: {
     return afterWait;
   }
 
-  const { data, error } = await client
-    .from('profiles')
-    .upsert({
-      id: user.id,
-      email: user.email,
-      full_name: user.fullName,
-    })
-    .select('*')
-    .single();
+  const upsertProfile = async () =>
+    client
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        email: user.email,
+        full_name: user.fullName,
+      })
+      .select('*')
+      .single();
+
+  let { data, error } = await upsertProfile();
+
+  // Brief clock-skew / eventual consistency retry for PGRST303.
+  if (error && /PGRST303|issued at future/i.test(`${error.message} ${error.code}`)) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    ({ data, error } = await upsertProfile());
+  }
 
   if (error) {
     throw toAppError(error, 'Failed to create profile');

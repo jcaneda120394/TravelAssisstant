@@ -11,13 +11,24 @@ import {
 } from '@/services/profile/profile.service';
 import { useAuthStore } from '@/stores/auth-store';
 import { analytics } from '@/lib/analytics';
+import { toAppError } from '@/lib/errors/app-error';
 
 async function hydrateForUser(userId: string, email: string | null, fullName: string | null) {
-  const profile = await ensureProfile({ id: userId, email, fullName });
-  const preferences = await fetchPreferences(userId);
-  useAuthStore.getState().setProfile(profile);
-  useAuthStore.getState().setPreferences(preferences);
-  analytics.identify(userId, { email: email ?? undefined });
+  try {
+    const profile = await ensureProfile({ id: userId, email, fullName });
+    const preferences = await fetchPreferences(userId);
+    useAuthStore.getState().setProfile(profile);
+    useAuthStore.getState().setPreferences(preferences);
+    analytics.identify(userId, { email: email ?? undefined });
+  } catch (error) {
+    const appError = toAppError(error);
+    if (appError.code === 'PGRST303') {
+      const { signOut } = await import('@/services/auth/auth.service');
+      await signOut().catch(() => undefined);
+      useAuthStore.getState().reset();
+    }
+    throw appError;
+  }
 }
 
 export function useAuthBootstrap() {
@@ -36,10 +47,13 @@ export function useAuthBootstrap() {
         if (!active) {
           return;
         }
-        setUser(user);
         if (user) {
           await hydrateForUser(user.id, user.email, user.fullName);
+          if (active) {
+            setUser(user);
+          }
         } else {
+          useAuthStore.getState().setUser(null);
           useAuthStore.getState().setProfile(null);
           useAuthStore.getState().setPreferences(null);
         }
@@ -60,13 +74,26 @@ export function useAuthBootstrap() {
 
     const unsubscribe = subscribeToAuthChanges((user) => {
       void (async () => {
-        setUser(user);
-        if (user) {
-          await hydrateForUser(user.id, user.email, user.fullName);
-        } else {
+        if (!user) {
+          useAuthStore.getState().setUser(null);
           useAuthStore.getState().setProfile(null);
           useAuthStore.getState().setPreferences(null);
           analytics.reset();
+          return;
+        }
+
+        try {
+          await hydrateForUser(user.id, user.email, user.fullName);
+          if (active) {
+            setUser(user);
+          }
+        } catch (error) {
+          console.warn('[auth] session hydrate failed', error);
+          if (active) {
+            useAuthStore.getState().setUser(null);
+            useAuthStore.getState().setProfile(null);
+            useAuthStore.getState().setPreferences(null);
+          }
         }
       })();
     });
@@ -92,7 +119,8 @@ export function useAuth() {
     isLoading,
     isHydrated,
     isAuthenticated: Boolean(user),
-    needsOnboarding: Boolean(user && profile && !profile.onboarding_completed),
+    // Treat missing profile as incomplete so we don't bounce auth↔tabs while hydrating fails.
+    needsOnboarding: Boolean(user && (!profile || !profile.onboarding_completed)),
   };
 }
 

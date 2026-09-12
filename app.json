@@ -12,8 +12,11 @@
       "bundleIdentifier": "com.travelassistant.app",
       "usesAppleSignIn": true,
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "TravelAssistant uses your location to show nearby places, directions, and emergency services when you ask.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "TravelAssistant can use location for transit reminders after you opt in."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "TravelAssistant can use location for transit reminders after you opt in.",
+        "NSSpeechRecognitionUsageDescription": "Allow TravelAssistant to turn your speech into travel questions.",
+        "NSMicrophoneUsageDescription": "Allow TravelAssistant to use the microphone for voice travel questions."
       }
     },
     "android": {
@@ -25,9 +28,10 @@
       },
       "package": "com.travelassistant.app",
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -83,6 +87,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e5773b14-3e1e-4a77-92a0-06a7b0efcf55"
+      }
+    },
+    "owner": "jcaneda03"
   }
 }

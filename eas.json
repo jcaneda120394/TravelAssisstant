@@ -7,22 +7,36 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_APP_ENV": "development",
-        "EXPO_PUBLIC_USE_MOCK_PROVIDERS": "true"
+        "EXPO_PUBLIC_USE_MOCK_PROVIDERS": "false"
       }
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_APP_ENV": "staging",
-        "EXPO_PUBLIC_USE_MOCK_PROVIDERS": "true"
+        "EXPO_PUBLIC_APP_NAME": "TravelAssistant",
+        "EXPO_PUBLIC_USE_MOCK_PROVIDERS": "false"
       }
     },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_APP_NAME": "TravelAssistant",
         "EXPO_PUBLIC_USE_MOCK_PROVIDERS": "false"
       }
     }

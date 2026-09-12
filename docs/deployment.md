@@ -4,6 +4,8 @@
 
 Expo web SPA export. Config: `vercel.json`.
 
+**Production:** https://travelassistant-umber.vercel.app
+
 ```bash
 npm run build:web   # outputs to dist/
 npx vercel          # preview
@@ -12,11 +14,11 @@ npx vercel --prod   # production
 
 ### Required Vercel environment variables (Production + Preview)
 
-Set in [Vercel → Project → Settings → Environment Variables](https://vercel.com/dashboard):
+Already set on project `travelassistant` for Production, Preview, and Development:
 
-| Variable | Value |
+| Variable | Notes |
 |----------|--------|
-| `EXPO_PUBLIC_APP_ENV` | `production` |
+| `EXPO_PUBLIC_APP_ENV` | `production` / `preview` / `development` |
 | `EXPO_PUBLIC_APP_NAME` | `TravelAssistant` |
 | `EXPO_PUBLIC_SUPABASE_URL` | `https://viyzvgdvnxhddtobpyys.supabase.co` |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key |
@@ -26,14 +28,22 @@ Optional: `EXPO_PUBLIC_POSTHOG_*`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_GOOGLE
 
 Rebuild after changing env vars (`EXPO_PUBLIC_*` are inlined at build time).
 
+### Connect GitHub → Vercel (optional auto-deploy)
+
+Vercel GitHub login connection may need to be enabled once in the Vercel dashboard, then:
+
+```bash
+npx vercel git connect https://github.com/jcaneda120394/TravelAssisstant.git
+```
+
 ### Supabase Auth redirects for Vercel
 
 [Auth → URL Configuration](https://supabase.com/dashboard/project/viyzvgdvnxhddtobpyys/auth/url-configuration)
 
-Add your Vercel URLs, for example:
+Add:
 
-- `https://<your-project>.vercel.app`
-- `https://<your-project>.vercel.app/**`
+- `https://travelassistant-umber.vercel.app`
+- `https://travelassistant-umber.vercel.app/**`
 - `https://*.vercel.app/**` (preview deployments)
 
 Also keep:
@@ -42,6 +52,8 @@ Also keep:
 - `travelassistant://**`
 - `exp://127.0.0.1:8081/--/*`
 - `exp://localhost:8081/--/*`
+
+Site URL can be `https://travelassistant-umber.vercel.app`.
 
 ## Mobile
 

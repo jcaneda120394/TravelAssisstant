@@ -1,0 +1,3 @@
+-- Phase 1 placeholder.
+-- Schema migrations begin in Phase 2 (profiles, preferences, auth-linked tables).
+-- Always add RLS policies with every user-owned table.

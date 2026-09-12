@@ -55,15 +55,15 @@ Or run migrations in order if starting fresh:
 
 Add redirect URLs:
 
+- `https://travelassistant-umber.vercel.app` (production Site URL — applied)
+- `https://travelassistant-umber.vercel.app/**`
+- `https://*.vercel.app/**` (preview deploys)
 - `travelassistant://`
 - `travelassistant://**`
 - `exp://127.0.0.1:8081/--/*` (local Expo)
 - `exp://localhost:8081/--/*`
-- `https://<your-vercel-app>.vercel.app`
-- `https://<your-vercel-app>.vercel.app/**`
-- `https://*.vercel.app/**` (preview deploys)
 
-Site URL: use your Vercel production URL once deployed (or keep `travelassistant://` for native-first).
+Site URL is set to `https://travelassistant-umber.vercel.app`.
 
 ---
 

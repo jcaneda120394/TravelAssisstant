@@ -212,6 +212,51 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
   return merged.slice(0, limit);
 }
 
+/**
+ * Single best photo for list tiles (Home / Explore cards).
+ * Prefer an attached place photo, else Wikipedia/Commons, else map preview.
+ */
+export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
+  const existing = (place.photos ?? []).find(
+    (url) => typeof url === 'string' && /^https?:\/\//i.test(url),
+  );
+  if (existing) {
+    return { url: existing, thumbUrl: existing, source: 'place' };
+  }
+
+  const name = cleanSearchName(displayNameForSearch(place));
+  const city = cityHint(place);
+  const isFood =
+    place.category === 'restaurant' ||
+    place.category === 'cafe' ||
+    place.category === 'bakery' ||
+    place.category === 'nightlife';
+
+  // Food places rarely have Wikipedia pages — bias Commons toward the venue + cuisine.
+  if (isFood && name.length >= 3) {
+    const cuisine = place.cuisine?.split(/[;,]/)[0]?.trim();
+    const foodQueries = [
+      [name, city].filter(Boolean).join(' '),
+      [name, cuisine, 'restaurant'].filter(Boolean).join(' '),
+      [name, 'food'].filter(Boolean).join(' '),
+    ].filter((q, i, arr) => q.length >= 3 && arr.indexOf(q) === i);
+
+    for (const query of foodQueries) {
+      const [wiki, commons] = await Promise.all([
+        wikipediaSearchPhotos(query, 2),
+        commonsSearchPhotos(query, 3),
+      ]);
+      const hit = dedupePhotos([...wiki, ...commons])[0];
+      if (hit) {
+        return hit;
+      }
+    }
+  }
+
+  const photos = await fetchPlacePhotos(place, 1);
+  return photos[0] ?? mapPreviewPhoto(place);
+}
+
 function displayNameForSearch(place: Place): string {
   // Prefer English / short display name without bilingual duplicate.
   const english = place.nameEnglish?.trim();

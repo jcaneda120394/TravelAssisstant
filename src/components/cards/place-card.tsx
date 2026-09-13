@@ -1,5 +1,7 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { Image } from 'react-native';
 
 import { AppText } from '@/components/ui/typography';
 import { Pressable, View } from '@/components/ui/primitives';
@@ -8,6 +10,7 @@ import { labelize } from '@/constants/preferences';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { rememberPlace } from '@/services/places/place-cache';
+import { fetchBestPlacePhoto } from '@/services/places/place-photos.service';
 import { formatDistanceMeters } from '@/utils/format';
 import {
   estimatePlacePrice,
@@ -39,6 +42,42 @@ const CATEGORY_BAR: Partial<Record<PlaceCategory, string>> = {
   bicycle_rental: 'bg-teal-500',
   post_office: 'bg-violet-500',
 };
+
+const PHOTO_HEIGHT = 148;
+
+function PlaceCardPhoto({ place }: { place: Place }) {
+  const scheme = useAppColorScheme();
+  const [failed, setFailed] = useState(false);
+  const photoQuery = useQuery({
+    queryKey: ['place-card-photo', place.id, place.name],
+    queryFn: () => fetchBestPlacePhoto(place),
+    staleTime: 45 * 60_000,
+    gcTime: 2 * 60 * 60_000,
+  });
+
+  const uri = failed ? undefined : photoQuery.data?.thumbUrl ?? photoQuery.data?.url;
+  const skeletonClass = scheme === 'dark' ? 'bg-brand-900' : 'bg-brand-100';
+
+  return (
+    <View className={`w-full overflow-hidden ${skeletonClass}`} style={{ height: PHOTO_HEIGHT }}>
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={{ width: '100%', height: PHOTO_HEIGHT }}
+          resizeMode="cover"
+          accessibilityLabel={`${displayPlaceName(place)} photo`}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <View className={`h-full w-full items-center justify-center ${skeletonClass}`}>
+          <AppText muted className="text-xs">
+            {photoQuery.isLoading ? 'Loading photo…' : 'No photo'}
+          </AppText>
+        </View>
+      )}
+    </View>
+  );
+}
 
 function PlaceCardComponent({
   place,
@@ -92,6 +131,7 @@ function PlaceCardComponent({
             }
       }
     >
+      <PlaceCardPhoto place={place} />
       <View className={`h-1.5 w-full ${bar}`} />
       <View className="p-4">
         <View className="flex-row items-start justify-between gap-3">

@@ -223,6 +223,15 @@ export const LOCAL_DESTINATIONS: DestinationSuggestion[] = [
     countryCode: 'PH',
   },
   {
+    id: 'local-japan',
+    label: 'Japan',
+    shortName: 'Japan',
+    kind: 'country',
+    latitude: 36.2048,
+    longitude: 138.2529,
+    countryCode: 'JP',
+  },
+  {
     id: 'local-tokyo',
     label: 'Tokyo, Japan',
     shortName: 'Tokyo',
@@ -478,7 +487,7 @@ function normalizeQuery(value: string): string {
     .trim();
 }
 
-function searchLocalDestinations(query: string): DestinationSuggestion[] {
+export function searchLocalDestinations(query: string): DestinationSuggestion[] {
   const q = normalizeQuery(query);
   if (q.length < 2) {
     return [];

@@ -9,6 +9,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import {
   searchDestinations,
+  searchLocalDestinations,
   type DestinationSuggestion,
 } from '@/services/geo/geocode.service';
 
@@ -77,16 +78,25 @@ export function CityAutocomplete({
   });
 
   const suggestions = useMemo(() => {
-    const items = suggestionsQuery.data ?? [];
+    const local = searchLocalDestinations(debounced);
+    const remote = suggestionsQuery.data ?? [];
+    const seen = new Set<string>();
+    const merged: DestinationSuggestion[] = [];
+    for (const item of [...local, ...remote]) {
+      const key = item.label.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
     if (includePlaces) {
-      return items.slice(0, 8);
+      return merged.slice(0, 8);
     }
     // Prefer real cities/regions; keep a few places only if nothing better.
-    const cities = items.filter(
+    const cities = merged.filter(
       (item) => item.kind === 'city' || item.kind === 'region' || item.kind === 'country',
     );
-    return (cities.length ? cities : items).slice(0, 6);
-  }, [suggestionsQuery.data, includePlaces]);
+    return (cities.length ? cities : merged).slice(0, 6);
+  }, [debounced, suggestionsQuery.data, includePlaces]);
 
   const showList =
     focused && !picked && debounced.trim().length >= 2;

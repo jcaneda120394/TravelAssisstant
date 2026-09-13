@@ -241,7 +241,7 @@ export function DatePickerField({
       <DateDisplay
         label={label}
         displayLabel={displayLabel}
-        hint={readOnly ? `View only · ${value}` : 'Tap to change'}
+        hint={readOnly ? `View only · ${value}` : 'Tap to edit date'}
         borderClass={borderClass}
         onPress={readOnly ? undefined : () => setEditing(true)}
         testID={readOnly ? 'date-picker-readonly' : 'date-picker-label'}

@@ -3,8 +3,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
+import { CityAutocomplete } from '@/components/forms/city-autocomplete';
 import { DatePickerField } from '@/components/forms/date-picker-field';
-import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
@@ -12,6 +12,7 @@ import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { requireAuthToSave } from '@/features/auth/require-auth';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useAuth } from '@/hooks/use-auth';
+import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { analytics } from '@/lib/analytics';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { useTripTemplate } from '@/services/trips/create-trip.service';
@@ -20,8 +21,9 @@ import {
   filterTripTemplates,
   type TripTemplate,
 } from '@/services/trips/trip-templates.catalog';
-import { BUDGET_LEVELS, DURATION_PRESETS, TRAVEL_STYLES } from '@/stores/create-trip-store';
+import { BUDGET_LEVELS, TRAVEL_STYLES } from '@/stores/create-trip-store';
 import type { TripBudgetLevel, TripPace } from '@/types/domain';
+import { addDaysIso, eachDayBetween } from '@/utils/dates';
 
 function Chip({
   label,
@@ -119,14 +121,25 @@ export function TripSuggestionsScreen() {
   const { user } = useAuth();
   const scheme = useAppColorScheme();
   const queryClient = useQueryClient();
+  const { coords, label } = useEnsureLocation({ auto: true, refresh: false });
 
   const [destination, setDestination] = useState(
     typeof params.destination === 'string' ? params.destination : '',
   );
-  const [durationDays, setDurationDays] = useState<number | undefined>(() => {
+  const [startDate, setStartDate] = useState(
+    typeof params.startDate === 'string' ? params.startDate : defaultTemplateStartDate(),
+  );
+  const [endDate, setEndDate] = useState(() => {
+    const start =
+      typeof params.startDate === 'string' ? params.startDate : defaultTemplateStartDate();
     const raw = typeof params.durationDays === 'string' ? Number(params.durationDays) : NaN;
-    return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+    const days = Number.isFinite(raw) && raw > 0 ? raw : 3;
+    return addDaysIso(days - 1, new Date(`${start}T12:00:00`));
   });
+  const durationDays = useMemo(
+    () => eachDayBetween(startDate, endDate).length,
+    [startDate, endDate],
+  );
   const [travelStyle, setTravelStyle] = useState<string | undefined>(
     typeof params.travelStyle === 'string' ? params.travelStyle : undefined,
   );
@@ -138,9 +151,6 @@ export function TripSuggestionsScreen() {
   );
   const [childrenOnly, setChildrenOnly] = useState(
     typeof params.children === 'string' ? Number(params.children) > 0 : false,
-  );
-  const [startDate, setStartDate] = useState(
-    typeof params.startDate === 'string' ? params.startDate : defaultTemplateStartDate(),
   );
   const [viewId, setViewId] = useState<string | null>(
     typeof params.templateId === 'string' ? params.templateId : null,
@@ -161,13 +171,13 @@ export function TripSuggestionsScreen() {
     () =>
       filterTripTemplates({
         destination: destination || undefined,
-        durationDays,
+        // Dates control the saved trip length — don’t hide templates that differ by a day or two.
         travelStyle,
         budgetLevel,
         pace,
         children: childrenOnly ? 1 : undefined,
       }),
-    [destination, durationDays, travelStyle, budgetLevel, pace, childrenOnly],
+    [destination, travelStyle, budgetLevel, pace, childrenOnly],
   );
 
   const viewing = results.find((t) => t.id === viewId) ?? filterTripTemplates({}).find((t) => t.id === viewId);
@@ -179,14 +189,17 @@ export function TripSuggestionsScreen() {
         ownerId: user.id,
         template,
         startDate,
-        overrides: customize
-          ? {
-              adults: customAdults,
-              children: customChildren,
-              pace: customPace,
-              budgetLevel: customBudget,
-            }
-          : undefined,
+        overrides: {
+          durationDays,
+          ...(customize
+            ? {
+                adults: customAdults,
+                children: customChildren,
+                pace: customPace,
+                budgetLevel: customBudget,
+              }
+            : {}),
+        },
       });
     },
     onSuccess: (trip) => {
@@ -218,7 +231,7 @@ export function TripSuggestionsScreen() {
           <Button label="← All suggestions" variant="ghost" onPress={() => setViewId(null)} />
           <SectionHeader
             title={`${viewing.heroEmoji} ${viewing.name}`}
-            subtitle={`${viewing.durationDays} days · ${viewing.adults} adults${
+            subtitle={`${durationDays} days (${startDate} → ${endDate}) · ${viewing.adults} adults${
               viewing.children ? ` + ${viewing.children} child` : ''
             } · ${viewing.budgetLevel.replace('_', '-')} · ${viewing.pace}`}
           />
@@ -244,8 +257,26 @@ export function TripSuggestionsScreen() {
           </Card>
 
           <Card className="mb-4">
-            <SectionHeader title="Start date" subtitle="Used when you save this suggestion" />
-            <DatePickerField label="Trip start" value={startDate} onChange={setStartDate} />
+            <SectionHeader
+              title="Trip dates"
+              subtitle={`${durationDays} day${durationDays === 1 ? '' : 's'} · used when you save this suggestion`}
+            />
+            <DatePickerField
+              label="Start date"
+              value={startDate}
+              onChange={(next) => {
+                setStartDate(next);
+                if (endDate < next) {
+                  setEndDate(next);
+                }
+              }}
+            />
+            <DatePickerField
+              label="End date"
+              value={endDate}
+              minimumDate={new Date(`${startDate}T12:00:00`)}
+              onChange={setEndDate}
+            />
             <Chip
               label={customize ? '✓ Customize before save' : 'Customize before save'}
               selected={customize}
@@ -366,34 +397,52 @@ export function TripSuggestionsScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-12" keyboardShouldPersistTaps="handled">
+      <ScrollView
+        className="flex-1 px-5 pt-4"
+        contentContainerClassName="pb-12"
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        keyboardDismissMode="on-drag"
+      >
         <SectionHeader
           title="Trip Suggestions"
           subtitle="Complete sample trips — same format as Create Trip"
         />
 
         <Card className="mb-4">
-          <TextField
+          <CityAutocomplete
             label="Destination"
             value={destination}
-            onChangeText={setDestination}
-            placeholder="Japan, Hong Kong, Tokyo…"
-            autoCapitalize="words"
+            onChange={setDestination}
+            onSelect={(next) => setDestination(next)}
+            placeholder="Search city, country, or place…"
+            near={coords}
+            nearLabel={label}
+            includePlaces
+            testID="trip-suggestions-destination"
           />
-          <AppText muted className="mb-2">
-            Duration
+          <AppText muted className="mb-2 font-sans-medium">
+            Trip dates
           </AppText>
-          <View className="mb-2 flex-row flex-wrap">
-            <Chip label="Any" selected={durationDays == null} onPress={() => setDurationDays(undefined)} />
-            {DURATION_PRESETS.map((n) => (
-              <Chip
-                key={n}
-                label={`${n}d`}
-                selected={durationDays === n}
-                onPress={() => setDurationDays(n)}
-              />
-            ))}
-          </View>
+          <DatePickerField
+            label="Start date"
+            value={startDate}
+            onChange={(next) => {
+              setStartDate(next);
+              if (endDate < next) {
+                setEndDate(next);
+              }
+            }}
+          />
+          <DatePickerField
+            label="End date"
+            value={endDate}
+            minimumDate={new Date(`${startDate}T12:00:00`)}
+            onChange={setEndDate}
+          />
+          <AppText muted className="mb-3 text-xs">
+            Duration updates automatically: {durationDays} day{durationDays === 1 ? '' : 's'}
+          </AppText>
           <AppText muted className="mb-2">
             Style
           </AppText>

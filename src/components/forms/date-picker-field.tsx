@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { Platform } from 'react-native';
 
-import { TextField } from '@/components/forms/text-field';
 import { AppText } from '@/components/ui/typography';
-import { Pressable, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { formatDayLabel, startOfLocalToday, toLocalIsoDate } from '@/utils/dates';
 
@@ -57,7 +57,10 @@ function isoDayKey(date: Date): string {
   return toLocalIsoDate(date);
 }
 
-/** Web date field — avoids importing native DateTimePicker (codegenNativeComponent). */
+/**
+ * Web date field — always shows an editable native date input (calendar).
+ * Avoids importing native DateTimePicker (codegenNativeComponent).
+ */
 export function DatePickerField({
   label = 'Date',
   value,
@@ -68,10 +71,6 @@ export function DatePickerField({
   readOnly = false,
 }: Props) {
   const scheme = useAppColorScheme();
-  const hasValidDate = Boolean(normalizeIsoDate(value));
-  const [editing, setEditing] = useState(!hasValidDate);
-  const borderClass =
-    scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-brand-100 bg-white';
 
   const effectiveMinimum = useMemo(() => {
     const today = startOfLocalToday();
@@ -84,61 +83,68 @@ export function DatePickerField({
     return laterDate(today, startOfDay(minimumDate));
   }, [allowPast, minimumDate]);
 
-  const displayLabel = useMemo(() => {
-    const normalized = normalizeIsoDate(value);
-    return normalized ? formatDayLabel(normalized) : value || 'Pick a date';
-  }, [value]);
-
   const minAttr = effectiveMinimum ? isoDayKey(effectiveMinimum) : undefined;
   const maxAttr = maximumDate ? isoDayKey(maximumDate) : undefined;
+  const normalized = normalizeIsoDate(value) ?? value;
 
-  if (readOnly || (hasValidDate && !editing)) {
-    return (
-      <View className="mb-4">
-        <AppText className="mb-2 font-sans-semibold">{label}</AppText>
-        <Pressable
-          disabled={readOnly}
-          onPress={readOnly ? undefined : () => setEditing(true)}
-          accessibilityRole="button"
-          className={`rounded-2xl border px-4 py-3 ${borderClass}`}
-          testID={readOnly ? 'date-picker-readonly' : 'date-picker-label'}
-        >
-          <AppText className="font-sans-semibold">{displayLabel}</AppText>
-          <AppText muted className="mt-0.5 text-xs">
-            {readOnly ? 'View only' : `Tap to change · ${value}`}
-          </AppText>
-        </Pressable>
-      </View>
-    );
-  }
+  const commit = (raw: string) => {
+    const next = normalizeIsoDate(raw);
+    if (!next) return;
+    if (minAttr && next < minAttr) {
+      onChange(minAttr);
+      return;
+    }
+    if (maxAttr && next > maxAttr) {
+      onChange(maxAttr);
+      return;
+    }
+    onChange(next);
+  };
+
+  const borderColor = scheme === 'dark' ? 'rgba(15, 118, 110, 0.45)' : 'rgba(18, 32, 30, 0.08)';
+  const bg = scheme === 'dark' ? '#0F2A28' : '#FFFFFF';
+  const color = scheme === 'dark' ? '#E8F5F3' : '#12201E';
 
   return (
-    <TextField
-      label={label}
-      value={value}
-      onChangeText={(next) => {
-        const normalized = normalizeIsoDate(next);
-        if (!normalized) {
-          onChange(next);
-          return;
-        }
-        if (minAttr && normalized < minAttr) {
-          onChange(minAttr);
-          return;
-        }
-        if (maxAttr && normalized > maxAttr) {
-          onChange(maxAttr);
-          return;
-        }
-        onChange(normalized);
-        setEditing(false);
-      }}
-      placeholder="YYYY-MM-DD"
-      autoCapitalize="none"
-      keyboardType="numbers-and-punctuation"
-      // @ts-expect-error web-only attrs passthrough
-      min={minAttr}
-      max={maxAttr}
-    />
+    <View className="mb-4">
+      <AppText className="mb-2 font-sans-semibold">{label}</AppText>
+      {/* Native HTML date input — editable calendar on web */}
+      {Platform.OS === 'web' ? (
+        // @ts-expect-error web DOM input
+        <input
+          type="date"
+          value={normalized}
+          min={minAttr}
+          max={maxAttr}
+          disabled={readOnly}
+          onChange={(event: { target: { value: string } }) => commit(event.target.value)}
+          aria-label={label}
+          data-testid="date-picker-input"
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            borderRadius: 16,
+            borderWidth: 1,
+            borderStyle: 'solid',
+            borderColor,
+            backgroundColor: bg,
+            color,
+            paddingTop: 14,
+            paddingBottom: 14,
+            paddingLeft: 16,
+            paddingRight: 16,
+            fontSize: 16,
+            fontFamily: 'inherit',
+            opacity: readOnly ? 0.6 : 1,
+            cursor: readOnly ? 'default' : 'pointer',
+          }}
+        />
+      ) : null}
+      <AppText muted className="mt-1 text-xs">
+        {readOnly
+          ? `View only · ${formatDayLabel(normalized)}`
+          : `Editable · ${formatDayLabel(normalized)}`}
+      </AppText>
+    </View>
   );
 }

@@ -12,6 +12,11 @@ import { EmptyState } from '@/components/feedback/states';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { ScrollView, View } from '@/components/ui/primitives';
+import {
+  EXPLORE_CATEGORIES,
+  ExploreCategoryPicker,
+  type ExploreCategory,
+} from '@/features/explore/explore-category-picker';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { useAuth } from '@/hooks/use-auth';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
@@ -72,59 +77,6 @@ function parseCustomKmToMeters(text: string): number | null {
   const meters = Math.round(km * 1000);
   return Math.min(MAX_RADIUS_METERS, Math.max(MIN_RADIUS_METERS, meters));
 }
-const CATEGORIES = [
-  // Discover
-  'attraction',
-  'restaurant',
-  'cafe',
-  'bakery',
-  'hotel',
-  // Everyday essentials
-  'convenience',
-  'pharmacy',
-  'atm',
-  'bank',
-  'laundry',
-  // Shopping & culture
-  'shopping',
-  'mall',
-  'market',
-  'souvenir',
-  'park',
-  'museum',
-  'temple',
-  'viewpoint',
-  'zoo',
-  'nightlife',
-  'beach',
-  'hot_spring',
-  'cold_spring',
-  'spring',
-  'lake',
-  'river',
-  'resort',
-  'spa',
-  'gym',
-  // Getting around
-  'transit_station',
-  'airport',
-  'bicycle_rental',
-  'fuel',
-  'parking',
-  // Travel help
-  'tourist_info',
-  'post_office',
-  'coworking',
-  'toilet',
-  // Emergency
-  'hospital',
-  'clinic',
-  'police',
-  'embassy',
-  'all',
-] as const;
-
-type ExploreCategory = (typeof CATEGORIES)[number];
 
 function normalizeCategory(raw: string | string[] | undefined): ExploreCategory | null {
   // Expo Router can stack the same param into an array when navigating repeatedly.
@@ -133,7 +85,9 @@ function normalizeCategory(raw: string | string[] | undefined): ExploreCategory 
   if (!value) {
     return null;
   }
-  return (CATEGORIES as readonly string[]).includes(value) ? (value as ExploreCategory) : null;
+  return (EXPLORE_CATEGORIES as readonly string[]).includes(value)
+    ? (value as ExploreCategory)
+    : null;
 }
 
 export function ExploreScreen() {
@@ -317,57 +271,7 @@ export function ExploreScreen() {
         ) : null}
 
         <AppText className="mb-2 mt-4 font-sans-medium">Category</AppText>
-        <ChipSelect
-          options={CATEGORIES}
-          values={[category]}
-          multiple={false}
-          labels={{
-            attraction: 'Things to do',
-            restaurant: 'Food',
-            cafe: 'Cafe',
-            bakery: 'Bakery',
-            hotel: 'Hotels',
-            convenience: 'Convenience store',
-            pharmacy: 'Pharmacy',
-            atm: 'ATM',
-            bank: 'Bank / FX',
-            laundry: 'Laundry',
-            shopping: 'Shopping',
-            mall: 'Malls',
-            market: 'Markets',
-            souvenir: 'Souvenirs',
-            park: 'Parks',
-            museum: 'Museums',
-            temple: 'Temples',
-            viewpoint: 'Viewpoints',
-            zoo: 'Zoo / Aquarium',
-            nightlife: 'Nightlife',
-            beach: 'Beaches',
-            hot_spring: 'Hot springs',
-            cold_spring: 'Cold springs',
-            spring: 'Springs',
-            lake: 'Lakes',
-            river: 'Rivers / falls',
-            resort: 'Resorts',
-            spa: 'Spa',
-            gym: 'Gym / Fitness',
-            transit_station: 'Transit',
-            airport: 'Airport',
-            bicycle_rental: 'Bike rental',
-            fuel: 'Fuel',
-            parking: 'Parking',
-            tourist_info: 'Tourist info',
-            post_office: 'Post office',
-            coworking: 'Coworking',
-            toilet: 'Toilets',
-            hospital: 'Hospital',
-            clinic: 'Clinic',
-            police: 'Police',
-            embassy: 'Embassy',
-            all: 'All',
-          }}
-          onChange={(values) => applyCategory(values[0] ?? 'attraction')}
-        />
+        <ExploreCategoryPicker value={category} onChange={applyCategory} />
 
         <View className="mt-5 mb-5">
           <Button

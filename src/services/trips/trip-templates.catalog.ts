@@ -438,7 +438,10 @@ export function filterTripTemplates(filters: TripSuggestionFilters = {}): TripTe
         .toLowerCase();
       if (!hay.includes(dest)) return false;
     }
-    if (filters.durationDays != null && tpl.durationDays !== filters.durationDays) return false;
+    if (filters.durationDays != null) {
+      // Calendar-picked ranges often land near a template length (±2 days).
+      if (Math.abs(tpl.durationDays - filters.durationDays) > 2) return false;
+    }
     if (filters.travelStyle && tpl.travelStyle !== filters.travelStyle) return false;
     if (filters.budgetLevel && tpl.budgetLevel !== filters.budgetLevel) return false;
     if (filters.pace && tpl.pace !== filters.pace) return false;
@@ -456,10 +459,15 @@ export function filterTripTemplates(filters: TripSuggestionFilters = {}): TripTe
   });
 }
 
-/** Materialize template day dates from a chosen start date. */
-export function templateDayDates(template: TripTemplate, startDate: string): string[] {
-  const end = addDaysIso(template.durationDays - 1, new Date(`${startDate}T12:00:00`));
-  return eachDayBetween(startDate, end).slice(0, template.durationDays);
+/** Materialize template day dates from a chosen start date (and optional length). */
+export function templateDayDates(
+  template: TripTemplate,
+  startDate: string,
+  durationDays?: number,
+): string[] {
+  const days = Math.max(1, Math.min(120, durationDays ?? template.durationDays));
+  const end = addDaysIso(days - 1, new Date(`${startDate}T12:00:00`));
+  return eachDayBetween(startDate, end).slice(0, days);
 }
 
 export function defaultTemplateStartDate(): string {

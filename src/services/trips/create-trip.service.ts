@@ -205,7 +205,11 @@ export async function useTripTemplate(input: {
   const budgetLevel = input.overrides?.budgetLevel ?? input.template.budgetLevel;
   const travelStyle = input.overrides?.travelStyle ?? input.template.travelStyle;
 
-  const dayDates = templateDayDates(input.template, startDate);
+  const dayDates = templateDayDates(
+    input.template,
+    startDate,
+    input.overrides?.durationDays,
+  );
   const endDate = dayDates[dayDates.length - 1] ?? startDate;
   const daysToUse = input.template.days.slice(0, dayDates.length);
 

@@ -351,16 +351,10 @@ export function getWorldNearbyPlaces(params: {
       : (entry: WorldEntry) => ATTRACTION.has(entry.category);
 
   const start = params.radiusMeters ?? 40_000;
-  for (const radius of [start, 80_000, 150_000, 200_000]) {
-    const places = WORLD.filter(match)
-      .map((entry) => toPlace(entry, params.location))
-      .filter((place) => (place.distanceMeters ?? 0) <= radius);
-    const ranked = sortPlacesByCategoryPopularity(places, params.category);
-    if (ranked.length >= Math.min(6, limit) || radius === 200_000) {
-      return ranked.slice(0, limit);
-    }
-  }
-  return [];
+  const places = WORLD.filter(match)
+    .map((entry) => toPlace(entry, params.location))
+    .filter((place) => (place.distanceMeters ?? 0) <= start);
+  return sortPlacesByCategoryPopularity(places, params.category).slice(0, limit);
 }
 
 /** Total curated entries (for tests / diagnostics). */

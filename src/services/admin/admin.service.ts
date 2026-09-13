@@ -172,7 +172,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
     client
       .from('profiles')
       .select(
-        'id, email, full_name, avatar_url, phone, bio, admin_notes, role, is_disabled, onboarding_completed, created_at, updated_at',
+        'id, email, full_name, avatar_url, phone, bio, role, is_disabled, onboarding_completed, created_at, updated_at',
       )
       .eq('id', userId)
       .maybeSingle(),
@@ -190,6 +190,9 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   }
 
   const row = profileResult.data;
+  const { data: notes } = await client.rpc('admin_get_profile_notes', { target_id: userId });
+  const adminNotes = typeof notes === 'string' ? notes : null;
+
   return {
     profile: {
       id: row.id as string,
@@ -198,7 +201,7 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
       avatar_url: (row.avatar_url as string | null) ?? null,
       phone: (row.phone as string | null) ?? null,
       bio: (row.bio as string | null) ?? null,
-      admin_notes: (row.admin_notes as string | null) ?? null,
+      admin_notes: adminNotes,
       role: row.role === 'admin' ? 'admin' : 'user',
       is_disabled: Boolean(row.is_disabled),
       onboarding_completed: Boolean(row.onboarding_completed),
@@ -209,11 +212,35 @@ export async function fetchAdminUserDetail(userId: string): Promise<AdminUserDet
   };
 }
 
+export async function setAdminUserDisabled(userId: string, disabled: boolean): Promise<void> {
+  const client = requireLive();
+  const { data, error } = await client.functions.invoke<{
+    error?: string;
+    ok?: boolean;
+    sessionsRevoked?: boolean;
+  }>('admin-set-user-status', {
+    body: { userId, disabled },
+  });
+
+  if (error) {
+    throw toAppError(error, 'Failed to update user status');
+  }
+  if (data?.error) {
+    throw new AppError(data.error, { code: 'ADMIN_STATUS_UPDATE_FAILED' });
+  }
+}
+
 export async function updateAdminUserProfile(
   userId: string,
   patch: AdminProfileUpdate,
 ): Promise<void> {
   const client = requireLive();
+
+  // Status changes go through Edge Function so sessions are revoked server-side.
+  if (typeof patch.is_disabled === 'boolean') {
+    await setAdminUserDisabled(userId, patch.is_disabled);
+  }
+
   const { error } = await client
     .from('profiles')
     .update({
@@ -225,7 +252,6 @@ export async function updateAdminUserProfile(
       admin_notes: patch.admin_notes,
       onboarding_completed: patch.onboarding_completed,
       role: patch.role,
-      is_disabled: patch.is_disabled,
     })
     .eq('id', userId);
 
@@ -297,17 +323,6 @@ export async function setAdminUserRole(
   const { error } = await client.from('profiles').update({ role }).eq('id', userId);
   if (error) {
     throw toAppError(error, 'Failed to update role');
-  }
-}
-
-export async function setAdminUserDisabled(userId: string, disabled: boolean): Promise<void> {
-  const client = requireLive();
-  const { error } = await client
-    .from('profiles')
-    .update({ is_disabled: disabled })
-    .eq('id', userId);
-  if (error) {
-    throw toAppError(error, 'Failed to update user status');
   }
 }
 

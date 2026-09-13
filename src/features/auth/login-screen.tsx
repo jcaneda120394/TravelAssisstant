@@ -59,8 +59,20 @@ export function LoginScreen() {
     try {
       const user = await signInWithEmail(values);
       await hydrateAfterAuth(user);
+      const profile = useAuthStore.getState().profile;
+      if (profile && !profile.onboarding_completed) {
+        router.replace('/(onboarding)');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (error) {
-      Alert.alert('Sign in failed', getErrorMessage(error));
+      const message = getErrorMessage(error);
+      if (Platform.OS === 'web') {
+        // Alert.alert is unreliable in some browsers — surface a blocking message.
+        window.alert(`Sign in failed\n\n${message}`);
+      } else {
+        Alert.alert('Sign in failed', message);
+      }
     }
   });
 

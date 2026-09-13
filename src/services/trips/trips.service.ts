@@ -1,6 +1,7 @@
 import { createId, dbGet, dbSet } from '@/lib/storage/local-db';
 import { isUuid, useCloudStorage } from '@/lib/storage/cloud';
 import { supabase } from '@/lib/supabase/client';
+import { inviteEmailSchema } from '@/lib/validation/security-schemas';
 import type {
   Trip,
   TripBudgetLevel,
@@ -49,8 +50,25 @@ type MemberRow = {
   user_id: string | null;
   email: string;
   role: 'owner' | 'editor' | 'viewer';
-  status: 'pending' | 'accepted';
+  status: 'pending' | 'accepted' | 'revoked';
+  invite_token?: string | null;
+  expires_at?: string | null;
+  revoked_at?: string | null;
 };
+
+function mapMember(row: MemberRow): TripMember {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    userId: row.user_id ?? '',
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    inviteToken: row.invite_token ?? null,
+    expiresAt: row.expires_at ?? null,
+    revokedAt: row.revoked_at ?? null,
+  };
+}
 
 export type CreateTripInput = {
   ownerId: string;
@@ -374,12 +392,13 @@ export async function inviteTripMember(input: {
   role: 'editor' | 'viewer';
   invitedByUserId: string;
 }): Promise<TripMember> {
+  const email = inviteEmailSchema.parse(input.email.trim().toLowerCase());
   if (useCloudStorage(input.invitedByUserId) && isUuid(input.tripId) && supabase) {
     const { data, error } = await supabase
       .from('trip_members')
       .insert({
         trip_id: input.tripId,
-        email: input.email,
+        email,
         role: input.role,
         status: 'pending',
       })
@@ -389,23 +408,18 @@ export async function inviteTripMember(input: {
       throw error;
     }
     const row = data as MemberRow;
-    return {
-      id: row.id,
-      tripId: row.trip_id,
-      userId: row.user_id ?? createId('invitee'),
-      email: row.email,
-      role: row.role,
-      status: row.status,
-    };
+    return mapMember(row);
   }
 
   const member: TripMember = {
     id: createId('member'),
     tripId: input.tripId,
     userId: createId('invitee'),
-    email: input.email,
+    email,
     role: input.role,
     status: 'pending',
+    inviteToken: `local_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`,
+    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
   };
   const members = await dbGet<TripMember[]>(MEMBERS_KEY, []);
   await dbSet(MEMBERS_KEY, [...members, member]);
@@ -420,22 +434,77 @@ export async function inviteTripMember(input: {
   return member;
 }
 
-export async function listTripMembers(tripId: string): Promise<TripMember[]> {
-  if (useCloudStorage() && isUuid(tripId) && supabase) {
-    const { data, error } = await supabase.from('trip_members').select('*').eq('trip_id', tripId);
+export async function acceptTripInvite(token: string): Promise<TripMember> {
+  const cleaned = token.trim();
+  if (cleaned.length < 32) {
+    throw new Error('Invalid invite token');
+  }
+
+  if (useCloudStorage() && supabase) {
+    const { data, error } = await supabase.rpc('accept_trip_invite', { p_token: cleaned });
     if (error) {
       throw error;
     }
-    return (data as MemberRow[]).map((row) => ({
-      id: row.id,
-      tripId: row.trip_id,
-      userId: row.user_id ?? '',
-      email: row.email,
-      role: row.role,
-      status: row.status,
-    }));
+    return mapMember(data as MemberRow);
   }
 
   const members = await dbGet<TripMember[]>(MEMBERS_KEY, []);
-  return members.filter((member) => member.tripId === tripId);
+  const index = members.findIndex((m) => m.inviteToken === cleaned && m.status === 'pending');
+  if (index < 0) {
+    throw new Error('Invite not found');
+  }
+  const current = members[index]!;
+  if (current.expiresAt && new Date(current.expiresAt).getTime() < Date.now()) {
+    throw new Error('Invite expired');
+  }
+  const next: TripMember = {
+    ...current,
+    status: 'accepted',
+    inviteToken: null,
+  };
+  members[index] = next;
+  await dbSet(MEMBERS_KEY, members);
+  return next;
+}
+
+export async function revokeTripInvite(memberId: string): Promise<TripMember> {
+  if (useCloudStorage() && isUuid(memberId) && supabase) {
+    const { data, error } = await supabase.rpc('revoke_trip_invite', { p_member_id: memberId });
+    if (error) {
+      throw error;
+    }
+    return mapMember(data as MemberRow);
+  }
+
+  const members = await dbGet<TripMember[]>(MEMBERS_KEY, []);
+  const index = members.findIndex((m) => m.id === memberId);
+  if (index < 0) {
+    throw new Error('Invite not found');
+  }
+  const next: TripMember = {
+    ...members[index]!,
+    status: 'revoked',
+    revokedAt: new Date().toISOString(),
+    inviteToken: null,
+  };
+  members[index] = next;
+  await dbSet(MEMBERS_KEY, members);
+  return next;
+}
+
+export async function listTripMembers(tripId: string): Promise<TripMember[]> {
+  if (useCloudStorage() && isUuid(tripId) && supabase) {
+    const { data, error } = await supabase
+      .from('trip_members')
+      .select('id, trip_id, user_id, email, role, status, invite_token, expires_at, revoked_at')
+      .eq('trip_id', tripId)
+      .neq('status', 'revoked');
+    if (error) {
+      throw error;
+    }
+    return (data as MemberRow[]).map(mapMember);
+  }
+
+  const members = await dbGet<TripMember[]>(MEMBERS_KEY, []);
+  return members.filter((member) => member.tripId === tripId && member.status !== 'revoked');
 }

@@ -54,6 +54,11 @@ export async function signUpWithEmail(params: {
   fullName: string;
 }): Promise<{ user: AuthUser; sessionCreated: boolean }> {
   if (!env.isSupabaseConfigured) {
+    if (env.isProduction) {
+      throw new AppError('Authentication is unavailable. Contact support.', {
+        code: 'AUTH_NOT_CONFIGURED',
+      });
+    }
     const session = await createLocalSession({
       email: params.email,
       fullName: params.fullName,
@@ -103,6 +108,11 @@ export async function signInWithEmail(params: {
   password: string;
 }): Promise<AuthUser> {
   if (!env.isSupabaseConfigured) {
+    if (env.isProduction) {
+      throw new AppError('Authentication is unavailable. Contact support.', {
+        code: 'AUTH_NOT_CONFIGURED',
+      });
+    }
     const session = await createLocalSession({
       email: params.email,
       fullName: params.email.split('@')[0] ?? 'Traveler',
@@ -275,6 +285,9 @@ export async function signInWithApple(): Promise<AuthUser | null> {
 }
 
 export async function signOut(): Promise<void> {
+  const { clearPrivateOfflineData } = await import('@/services/offline/offline.service');
+  await clearPrivateOfflineData().catch(() => undefined);
+
   if (!env.isSupabaseConfigured) {
     await clearLocalSession();
     analytics.track('auth_logout', { method: 'demo' });
@@ -287,6 +300,44 @@ export async function signOut(): Promise<void> {
     throw toAppError(error, 'Sign out failed');
   }
   analytics.track('auth_logout', { method: 'supabase' });
+}
+
+/**
+ * Permanently deletes the signed-in user's Auth account (cascades owned rows via FKs).
+ * Requires Supabase Edge Function `delete-account`.
+ */
+export async function deleteAccount(): Promise<void> {
+  if (!env.isSupabaseConfigured) {
+    await clearLocalSession();
+    const { clearPrivateOfflineData } = await import('@/services/offline/offline.service');
+    await clearPrivateOfflineData().catch(() => undefined);
+    analytics.track('auth_account_deleted', { method: 'demo' });
+    return;
+  }
+
+  const client = assertSupabase();
+  const {
+    data: { user },
+  } = await client.auth.getUser();
+  if (!user) {
+    throw new AppError('Not signed in', { code: 'AUTH_REQUIRED' });
+  }
+
+  const { data, error } = await client.functions.invoke('delete-account', {
+    body: { confirmUserId: user.id },
+  });
+
+  if (error) {
+    throw toAppError(error, 'Unable to delete account');
+  }
+  if (data && typeof data === 'object' && 'error' in data && data.error) {
+    throw new AppError(String(data.error), { code: 'DELETE_ACCOUNT' });
+  }
+
+  const { clearPrivateOfflineData } = await import('@/services/offline/offline.service');
+  await clearPrivateOfflineData(user.id).catch(() => undefined);
+  await client.auth.signOut().catch(() => undefined);
+  analytics.track('auth_account_deleted', { method: 'supabase' });
 }
 
 export function subscribeToAuthChanges(

@@ -14,7 +14,7 @@ import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useCountryAppearance } from '@/hooks/use-country-appearance';
 import { getErrorMessage } from '@/lib/errors/app-error';
-import { signOut } from '@/services/auth/auth.service';
+import { signOut, deleteAccount } from '@/services/auth/auth.service';
 import { buildOfflinePack } from '@/services/offline/offline.service';
 import { useAuthStore } from '@/stores/auth-store';
 import { useThemeStore, type ThemePreference } from '@/stores/theme-store';
@@ -27,6 +27,7 @@ export function ProfileScreen() {
   const { user, profile, preferences, isAdmin } = useAuth();
   const { currency, setCurrency } = useDisplayCurrency();
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const preference = useThemeStore((state) => state.preference);
   const setPreference = useThemeStore((state) => state.setPreference);
   const followCountryTheme = useThemeStore((state) => state.followCountryTheme);
@@ -41,6 +42,34 @@ export function ProfileScreen() {
     } catch (error) {
       Alert.alert('Sign out failed', getErrorMessage(error));
     }
+  };
+
+  const onDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your profile, trips, and saved data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete forever',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setDeleting(true);
+              try {
+                await deleteAccount();
+                useAuthStore.getState().reset();
+                router.replace('/(tabs)');
+              } catch (error) {
+                Alert.alert('Unable to delete account', getErrorMessage(error));
+              } finally {
+                setDeleting(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
   };
 
   const onOfflinePack = async () => {
@@ -84,6 +113,13 @@ export function ProfileScreen() {
                   />
                 ) : null}
                 <Button label="Sign out" variant="secondary" onPress={() => void onSignOut()} />
+                <Button
+                  label={deleting ? 'Deleting…' : 'Delete account'}
+                  variant="secondary"
+                  disabled={deleting}
+                  onPress={onDeleteAccount}
+                  testID="delete-account"
+                />
               </>
             ) : (
               <>

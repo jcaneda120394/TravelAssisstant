@@ -54,8 +54,10 @@ export function SignupScreen() {
       useAuthStore.getState().setProfile(profile);
       useAuthStore.getState().setPreferences(preferences);
 
-      if (env.isSupabaseConfigured) {
-        Alert.alert('Account created', 'You are signed in and can continue onboarding.');
+      if (profile && !profile.onboarding_completed) {
+        router.replace('/(onboarding)');
+      } else {
+        router.replace('/(tabs)');
       }
     } catch (error) {
       Alert.alert('Sign up failed', getErrorMessage(error));

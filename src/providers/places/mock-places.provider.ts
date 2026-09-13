@@ -4,209 +4,211 @@ import type {
   SearchPlacesParams,
 } from '@/providers/places/places.provider';
 import type { Place, PlaceCategory } from '@/types/domain';
+import { filterPlacesWithinRadius, haversineMeters } from '@/utils/geo';
 
-const BASE = { latitude: 35.6595, longitude: 139.7005 };
+/**
+ * Demo POIs are generated around the *request* origin so they never appear as
+ * another city (e.g. Shibuya) when the traveler is elsewhere.
+ */
+function buildDemoPlaces(origin: { latitude: number; longitude: number }): Place[] {
+  const templates: Array<{
+    id: string;
+    name: string;
+    category: PlaceCategory;
+    dLat: number;
+    dLon: number;
+    address: string;
+    rating?: number;
+    reviewCount?: number;
+    priceLevel?: number;
+    priceRange?: string;
+    tags?: string[];
+    description?: string;
+  }> = [
+    {
+      id: 'mock-breakfast-1',
+      name: 'Local Morning Kitchen',
+      category: 'restaurant',
+      dLat: 0.002,
+      dLon: 0.001,
+      address: 'Near your location',
+      rating: 4.6,
+      reviewCount: 312,
+      priceLevel: 2,
+      priceRange: 'Budget–mid',
+      tags: ['breakfast', 'local'],
+      description: 'Demo restaurant near your selected city.',
+    },
+    {
+      id: 'mock-lunch-1',
+      name: 'Neighborhood Noodle Counter',
+      category: 'restaurant',
+      dLat: 0.004,
+      dLon: -0.001,
+      address: 'Near your location',
+      rating: 4.7,
+      reviewCount: 980,
+      priceLevel: 1,
+      priceRange: 'Budget',
+      tags: ['lunch', 'noodles'],
+      description: 'Demo lunch spot for offline / mock mode.',
+    },
+    {
+      id: 'mock-attraction-1',
+      name: 'City Viewpoint',
+      category: 'attraction',
+      dLat: 0.001,
+      dLon: 0.002,
+      address: 'Near your location',
+      rating: 4.8,
+      reviewCount: 1520,
+      tags: ['viewpoint'],
+      description: 'Demo attraction near your selected city.',
+    },
+    {
+      id: 'mock-museum-1',
+      name: 'City Design Museum',
+      category: 'attraction',
+      dLat: 0.006,
+      dLon: 0.003,
+      address: 'Near your location',
+      rating: 4.5,
+      reviewCount: 220,
+      tags: ['museum', 'indoor'],
+    },
+    {
+      id: 'mock-hospital-1',
+      name: 'Central Emergency Hospital',
+      category: 'hospital',
+      dLat: -0.003,
+      dLon: 0.004,
+      address: 'Near your location',
+      rating: 4.2,
+      tags: ['emergency'],
+    },
+    {
+      id: 'mock-clinic-1',
+      name: 'Walk-in Travel Clinic',
+      category: 'clinic',
+      dLat: -0.001,
+      dLon: -0.002,
+      address: 'Near your location',
+    },
+    {
+      id: 'mock-pharmacy-1',
+      name: 'Station Pharmacy',
+      category: 'pharmacy',
+      dLat: 0.0005,
+      dLon: -0.0008,
+      address: 'Near your location',
+      rating: 4.3,
+    },
+    {
+      id: 'mock-police-1',
+      name: 'Local Police Station',
+      category: 'police',
+      dLat: 0.0008,
+      dLon: 0.0004,
+      address: 'Near your location',
+    },
+    {
+      id: 'mock-atm-1',
+      name: 'Convenience ATM',
+      category: 'atm',
+      dLat: 0.0012,
+      dLon: -0.0015,
+      address: 'Near your location',
+    },
+    {
+      id: 'mock-cowork-1',
+      name: 'Nomad Hub Coworking',
+      category: 'coworking',
+      dLat: 0.0035,
+      dLon: 0.0025,
+      address: 'Near your location',
+      rating: 4.6,
+      tags: ['wifi', 'power'],
+    },
+    {
+      id: 'mock-station-1',
+      name: 'Central Transit Station',
+      category: 'transit_station',
+      dLat: 0,
+      dLon: 0,
+      address: 'Near your location',
+      tags: ['transit'],
+    },
+    {
+      id: 'mock-hotel-place-1',
+      name: 'Station Front Hotel',
+      category: 'hotel',
+      dLat: -0.002,
+      dLon: 0.0015,
+      address: 'Near your location',
+      rating: 4.4,
+      priceRange: 'Mid-range',
+    },
+  ];
 
-function place(
-  partial: Omit<Place, 'provider' | 'providerPlaceId'> & { id: string },
-): Place {
-  return {
-    provider: 'mock',
-    providerPlaceId: partial.id,
-    ...partial,
-  };
+  return templates.map((t) => {
+    const latitude = origin.latitude + t.dLat;
+    const longitude = origin.longitude + t.dLon;
+    return {
+      id: t.id,
+      provider: 'mock' as const,
+      providerPlaceId: t.id,
+      name: t.name,
+      category: t.category,
+      latitude,
+      longitude,
+      address: t.address,
+      rating: t.rating,
+      reviewCount: t.reviewCount,
+      priceLevel: t.priceLevel,
+      priceRange: t.priceRange,
+      tags: t.tags,
+      description: t.description,
+      distanceMeters: Math.round(
+        haversineMeters(origin, { latitude, longitude }),
+      ),
+      isOpen: true,
+    };
+  });
 }
 
-export const MOCK_PLACES: Place[] = [
-  place({
-    id: 'mock-breakfast-1',
-    name: 'Shibuya Morning Kitchen',
-    category: 'restaurant',
-    latitude: BASE.latitude + 0.002,
-    longitude: BASE.longitude + 0.001,
-    address: '1-2 Shibuya',
-    rating: 4.6,
-    reviewCount: 312,
-    priceLevel: 2,
-    priceRange: '¥1,000–¥1,500',
-    distanceMeters: 350,
-    isOpen: true,
-    openingHours: ['07:00–14:00'],
-    tags: ['breakfast', 'local'],
-    description: 'Highly rated local breakfast near the station.',
-    phone: '+81-3-0000-0001',
-  }),
-  place({
-    id: 'mock-lunch-1',
-    name: 'Ramen Alley Counter',
-    category: 'restaurant',
-    latitude: BASE.latitude + 0.004,
-    longitude: BASE.longitude - 0.001,
-    address: '3-8 Dogenzaka',
-    rating: 4.7,
-    reviewCount: 980,
-    priceLevel: 1,
-    priceRange: '¥900–¥1,200',
-    distanceMeters: 600,
-    isOpen: true,
-    tags: ['lunch', 'ramen'],
-    description: 'Busy local ramen spot popular with travelers.',
-  }),
-  place({
-    id: 'mock-attraction-1',
-    name: 'Shibuya Sky',
-    category: 'attraction',
-    latitude: BASE.latitude + 0.001,
-    longitude: BASE.longitude + 0.002,
-    address: 'Shibuya Scramble Square',
-    rating: 4.8,
-    reviewCount: 15200,
-    distanceMeters: 500,
-    isOpen: true,
-    openingHours: ['10:00–22:00'],
-    tags: ['viewpoint'],
-    description: 'Observation deck with city views.',
-  }),
-  place({
-    id: 'mock-museum-1',
-    name: 'City Design Museum',
-    category: 'attraction',
-    latitude: BASE.latitude + 0.006,
-    longitude: BASE.longitude + 0.003,
-    address: '4-1 Museum Ave',
-    rating: 4.5,
-    reviewCount: 2200,
-    distanceMeters: 1100,
-    isOpen: true,
-    tags: ['museum', 'indoor'],
-  }),
-  place({
-    id: 'mock-hospital-1',
-    name: 'Central Emergency Hospital',
-    category: 'hospital',
-    latitude: BASE.latitude - 0.003,
-    longitude: BASE.longitude + 0.004,
-    address: '9-1 Medical Plaza',
-    rating: 4.2,
-    distanceMeters: 900,
-    phone: '+81-3-0000-9110',
-    isOpen: true,
-    tags: ['emergency'],
-  }),
-  place({
-    id: 'mock-clinic-1',
-    name: 'Walk-in Travel Clinic',
-    category: 'clinic',
-    latitude: BASE.latitude - 0.001,
-    longitude: BASE.longitude - 0.002,
-    address: '2-4 Health Street',
-    distanceMeters: 450,
-    phone: '+81-3-0000-2200',
-    isOpen: true,
-  }),
-  place({
-    id: 'mock-pharmacy-1',
-    name: 'Station Pharmacy',
-    category: 'pharmacy',
-    latitude: BASE.latitude + 0.0005,
-    longitude: BASE.longitude - 0.0008,
-    address: 'Station Plaza B1',
-    rating: 4.3,
-    distanceMeters: 200,
-    phone: '+81-3-0000-3300',
-    isOpen: true,
-  }),
-  place({
-    id: 'mock-police-1',
-    name: 'Shibuya Police Box',
-    category: 'police',
-    latitude: BASE.latitude + 0.0008,
-    longitude: BASE.longitude + 0.0004,
-    address: 'Scramble crossing',
-    distanceMeters: 180,
-    phone: '110',
-  }),
-  place({
-    id: 'mock-atm-1',
-    name: '7-Eleven ATM',
-    category: 'atm',
-    latitude: BASE.latitude + 0.0012,
-    longitude: BASE.longitude - 0.0015,
-    address: 'Convenience corner',
-    distanceMeters: 260,
-    isOpen: true,
-  }),
-  place({
-    id: 'mock-cowork-1',
-    name: 'Nomad Hub Shibuya',
-    category: 'coworking',
-    latitude: BASE.latitude + 0.0035,
-    longitude: BASE.longitude + 0.0025,
-    address: '5-12 Work Lane',
-    rating: 4.6,
-    distanceMeters: 750,
-    priceRange: 'Day pass ¥3,500',
-    tags: ['wifi', 'power'],
-    isOpen: true,
-  }),
-  place({
-    id: 'mock-station-1',
-    name: 'Shibuya Station',
-    category: 'transit_station',
-    latitude: BASE.latitude,
-    longitude: BASE.longitude,
-    address: 'Shibuya Station',
-    distanceMeters: 120,
-    tags: ['subway', 'train'],
-  }),
-  place({
-    id: 'mock-embassy-1',
-    name: 'Sample Embassy Consular Section',
-    category: 'embassy',
-    latitude: BASE.latitude + 0.01,
-    longitude: BASE.longitude + 0.008,
-    address: '1-1 Diplomatic Ave',
-    distanceMeters: 2400,
-    phone: '+81-3-0000-4400',
-    openingHours: ['09:00–17:00'],
-  }),
-  place({
-    id: 'mock-hotel-place-1',
-    name: 'Station Front Hotel',
-    category: 'hotel',
-    latitude: BASE.latitude - 0.002,
-    longitude: BASE.longitude + 0.0015,
-    address: 'Hotel Row 1',
-    rating: 4.4,
-    distanceMeters: 400,
-    priceRange: 'From ¥18,000',
-  }),
-];
+/** @deprecated Kept for tests — demo places around a neutral origin. */
+export const MOCK_PLACES: Place[] = buildDemoPlaces({
+  latitude: 14.5995,
+  longitude: 120.9842,
+});
 
 export class MockPlacesProvider implements PlacesProvider {
   readonly name = 'mock-places';
 
   async searchPlaces(params: SearchPlacesParams): Promise<Place[]> {
+    const origin = params.location ?? { latitude: 14.5995, longitude: 120.9842 };
     const q = params.query.toLowerCase();
-    return MOCK_PLACES.filter(
-      (placeItem) =>
-        placeItem.name.toLowerCase().includes(q) ||
-        placeItem.category.includes(q) ||
-        placeItem.tags?.some((tag) => tag.includes(q)),
-    ).slice(0, params.limit ?? 20);
+    return buildDemoPlaces(origin)
+      .filter(
+        (placeItem) =>
+          placeItem.name.toLowerCase().includes(q) ||
+          placeItem.category.includes(q) ||
+          placeItem.tags?.some((tag) => tag.includes(q)),
+      )
+      .slice(0, params.limit ?? 20);
   }
 
   async getNearbyPlaces(params: NearbyPlacesParams): Promise<Place[]> {
-    return MOCK_PLACES.filter((placeItem) =>
+    const places = buildDemoPlaces(params.location).filter((placeItem) =>
       params.category ? placeItem.category === params.category : true,
-    )
-      .filter((placeItem) => (placeItem.distanceMeters ?? 0) <= params.radiusMeters)
-      .filter((placeItem) =>
-        params.query
-          ? placeItem.name.toLowerCase().includes(params.query.toLowerCase())
-          : true,
-      )
-      .slice(0, params.limit ?? 30);
+    ).filter((placeItem) =>
+      params.query ? placeItem.name.toLowerCase().includes(params.query.toLowerCase()) : true,
+    );
+
+    return filterPlacesWithinRadius(places, params.location, params.radiusMeters).slice(
+      0,
+      params.limit ?? 30,
+    );
   }
 
   async getPlaceDetails(placeId: string): Promise<Place | null> {
@@ -218,6 +220,6 @@ export class MockPlacesProvider implements PlacesProvider {
   }
 }
 
-export function placesByCategories(categories: PlaceCategory[]): Place[] {
-  return MOCK_PLACES.filter((placeItem) => categories.includes(placeItem.category));
+export function getMockPlacesByCategory(category: PlaceCategory): Place[] {
+  return MOCK_PLACES.filter((placeItem) => placeItem.category === category);
 }

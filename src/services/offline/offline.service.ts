@@ -20,6 +20,43 @@ export async function readCache<T>(key: string): Promise<{ savedAt: string; valu
   return JSON.parse(raw) as { savedAt: string; value: T };
 }
 
+const PRIVATE_PREFIXES = [
+  CACHE_PREFIX,
+  'travelassistant.db.',
+  'travelassistant.local.',
+  'travelassistant.auth.',
+];
+
+const PRIVATE_SUBSTRINGS = [
+  'pack:',
+  'trips',
+  'trip_members',
+  'profile',
+  'preferences',
+  'route:',
+  'places:',
+  'itinerary',
+  'expenses',
+  'budgets',
+  'session',
+];
+
+/** Removes cached private trip/profile data. Call on logout and account deletion. */
+export async function clearPrivateOfflineData(userId?: string): Promise<void> {
+  const keys = await AsyncStorage.getAllKeys();
+  const privateKeys = keys.filter((key) => {
+    const underPrivateNs = PRIVATE_PREFIXES.some((prefix) => key.startsWith(prefix));
+    if (!underPrivateNs && !(userId && key.includes(userId))) {
+      return false;
+    }
+    if (userId && key.includes(userId)) return true;
+    return PRIVATE_SUBSTRINGS.some((part) => key.includes(part));
+  });
+  if (privateKeys.length) {
+    await AsyncStorage.multiRemove(privateKeys);
+  }
+}
+
 export async function buildOfflinePack(userId: string) {
   const trips = await dbGet<Trip[]>('trips', []);
   const userTrips = trips.filter((trip) => trip.ownerId === userId || trip.memberIds.includes(userId));

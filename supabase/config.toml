@@ -7,7 +7,13 @@ enabled = true
 major_version = 15
 
 [functions.ai-chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.admin-update-user]
+verify_jwt = true
+
+[functions.delete-account]
+verify_jwt = true
+
+[functions.admin-set-user-status]
 verify_jwt = true

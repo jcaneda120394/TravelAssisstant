@@ -49,13 +49,16 @@ export function MapScreen() {
     queryKey: ['map-places', coords?.latitude, coords?.longitude],
     enabled: Boolean(coords),
     staleTime: 3 * 60_000,
-    queryFn: () =>
-      providers.places.getNearbyPlaces({
+    queryFn: async () => {
+      const places = await providers.places.getNearbyPlaces({
         location: coords!,
         radiusMeters: 4000,
         category: 'attraction',
         limit: MAP_ATTRACTIONS_LIMIT,
-      }),
+      });
+      const { filterPlacesWithinRadius } = await import('@/utils/geo');
+      return filterPlacesWithinRadius(places, coords!, 4000);
+    },
   });
 
   const attractions = useMemo(

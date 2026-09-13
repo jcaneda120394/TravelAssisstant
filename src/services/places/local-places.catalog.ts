@@ -477,27 +477,13 @@ export function getLocalNearbyPlaces(params: {
   limit?: number;
 }): Place[] {
   const limit = Math.min(Math.max(params.limit ?? 15, 1), 20);
-  const startRadius = params.radiusMeters ?? 15_000;
-  const radii = [
-    startRadius,
-    Math.max(startRadius, 25_000),
-    40_000,
-    80_000,
-  ];
+  const radius = params.radiusMeters ?? 15_000;
 
-  for (const radius of radii) {
-    const places = CATALOG.filter((entry) => matchesHomeCategory(entry, params.category))
-      .map((entry) => toPlace(entry, params.location))
-      .filter((place) => (place.distanceMeters ?? 0) <= radius)
-      .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
-    if (places.length >= Math.min(8, limit)) {
-      return places.slice(0, limit);
-    }
-    if (places.length > 0 && radius === radii[radii.length - 1]) {
-      return places.slice(0, limit);
-    }
-  }
-  return [];
+  return CATALOG.filter((entry) => matchesHomeCategory(entry, params.category))
+    .map((entry) => toPlace(entry, params.location))
+    .filter((place) => (place.distanceMeters ?? 0) <= radius)
+    .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0))
+    .slice(0, limit);
 }
 
 /** Full pools for trip suggestion when live OSM/Nominatim fail. */

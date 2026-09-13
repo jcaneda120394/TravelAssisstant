@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -21,6 +21,7 @@ import { getExploreNearbyPlaces } from '@/services/places/explore-nearby.service
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { companionFilterActive } from '@/utils/companion-suitability';
 import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
+import { filterPlacesWithinRadius } from '@/utils/geo';
 
 const MIN_RADIUS_METERS = 500;
 const MAX_RADIUS_METERS = 200_000;
@@ -178,7 +179,7 @@ export function ExploreScreen() {
   const query = useQuery({
     queryKey: [
       'nearby',
-      'explore-v2',
+      'explore-v3',
       coords?.latitude,
       coords?.longitude,
       radiusMeters,
@@ -192,7 +193,7 @@ export function ExploreScreen() {
     enabled: hasLocation && Boolean(coords),
     staleTime: 60_000,
     retry: 1,
-    placeholderData: keepPreviousData,
+    // Never keep previous city's results (e.g. Shibuya) after a location change.
     queryFn: async () => {
       const places = await getExploreNearbyPlaces({
         location: coords!,
@@ -208,16 +209,14 @@ export function ExploreScreen() {
   });
 
   const places = useMemo(() => {
-    const maxMeters = radiusMeters + 120;
-    const inRange = (query.data ?? []).filter(
-      (place) => (place.distanceMeters ?? Number.POSITIVE_INFINITY) <= maxMeters,
-    );
-    // Always show most popular places first within the selected category/radius.
+    const raw = query.data ?? [];
+    if (!coords) return [];
+    const inRange = filterPlacesWithinRadius(raw, coords, radiusMeters);
     return sortPlacesByCategoryPopularity(
       inRange,
       category === 'all' ? undefined : (category as PlaceCategory),
     );
-  }, [query.data, radiusMeters, category]);
+  }, [query.data, radiusMeters, category, coords]);
 
   const subtitle = useMemo(() => {
     if (!hasLocation) {

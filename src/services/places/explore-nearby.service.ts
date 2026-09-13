@@ -4,6 +4,8 @@ import { rememberPlaces } from '@/services/places/place-cache';
 import type { GeoPoint, Place, PlaceCategory } from '@/types/domain';
 import type { CompanionPrefs } from '@/utils/companion-suitability';
 import { applyCompanionFilter, companionFilterActive } from '@/utils/companion-suitability';
+import { filterPlacesWithinRadius } from '@/utils/geo';
+import { env } from '@/config/env';
 import {
   filterPlacesByCategory,
   isSightseeingCategory,
@@ -43,6 +45,28 @@ function scrubNoiseTags(place: Place): Place {
   return tags.length === place.tags.length ? place : { ...place, tags };
 }
 
+/** Famous-city tokens that must not appear when the traveler is elsewhere. */
+const FOREIGN_LANDMARK_HINT =
+  /\b(shibuya|dogenzaka|shinjuku|harajuku|asakusa|akihabara|ginza|meiji jingu|tokyo tower|shibuya sky|ichiran shibuya)\b/i;
+
+/**
+ * Drop curated/demo rows that still carry another city's landmark names when
+ * the active city label is not that city (extra safety beyond haversine).
+ */
+function dropForeignLandmarkNoise(
+  places: Place[],
+  cityLabel?: string | null,
+): Place[] {
+  const label = (cityLabel ?? '').toLowerCase();
+  const inTokyoContext = /tokyo|shibuya|shinjuku|harajuku|japan/.test(label);
+  if (inTokyoContext) return places;
+
+  return places.filter((place) => {
+    const haystack = `${place.name} ${place.address ?? ''}`;
+    return !FOREIGN_LANDMARK_HINT.test(haystack);
+  });
+}
+
 function shouldBlendCatalog(category?: PlaceCategory): boolean {
   return (
     !category ||
@@ -56,6 +80,7 @@ function shouldBlendCatalog(category?: PlaceCategory): boolean {
 /**
  * Explore nearby: merge live OSM + Photon + curated landmarks, then rank by
  * popularity within the selected category (not only distance).
+ * Coordinates are always re-checked against the selected radius.
  */
 export async function getExploreNearbyPlaces(params: {
   location: GeoPoint;
@@ -67,14 +92,12 @@ export async function getExploreNearbyPlaces(params: {
 }): Promise<Place[]> {
   const limit = Math.min(Math.max(params.limit ?? 80, 20), 120);
   const radius = Math.min(Math.max(params.radiusMeters, 500), MAX_RADIUS_METERS);
-  const catalogRadius = Math.max(radius, 40_000);
-  const photonRadius = Math.max(radius, 25_000);
 
   const photonPromise = searchPhotonNearby({
     location: params.location,
     category: params.category,
     cityLabel: params.cityLabel,
-    radiusMeters: photonRadius,
+    radiusMeters: radius,
     limit: Math.max(limit, 40),
   }).catch(() => [] as Place[]);
 
@@ -98,21 +121,19 @@ export async function getExploreNearbyPlaces(params: {
     ? searchCatalogNearby({
         location: params.location,
         category: params.category ?? 'attraction',
-        radiusMeters: catalogRadius,
+        radiusMeters: radius,
         limit: Math.max(40, Math.floor(limit / 2)),
       })
     : [];
 
-  const sightseeing = isSightseeingCategory(params.category);
-  const landmarkPool = sightseeing
-    ? catalog.filter((place) => (place.distanceMeters ?? 0) <= catalogRadius + 120)
-    : catalog.filter((place) => (place.distanceMeters ?? 0) <= radius + 120);
-
-  let merged = dedupe([...landmarkPool, ...lateLive, ...photon])
-    .map(scrubNoiseTags)
-    .filter((place) => (place.distanceMeters ?? Number.POSITIVE_INFINITY) <= radius + 120);
-
-  // Hard filter — never keep Disneyland under Airport just because the list is thin.
+  let merged = dedupe([...catalog, ...lateLive, ...photon]).map(scrubNoiseTags);
+  // Never leak Tokyo/demo POIs into live mode.
+  if (!env.useMockProviders) {
+    merged = merged.filter((place) => place.provider !== 'mock');
+  }
+  merged = filterPlacesWithinRadius(merged, params.location, radius);
+  // Drop anything whose name/address clearly belongs to another famous city far away.
+  merged = dropForeignLandmarkNoise(merged, params.cityLabel);
   merged = filterPlacesByCategory(merged, params.category);
 
   const ranked = sortPlacesByCategoryPopularity(merged, params.category);

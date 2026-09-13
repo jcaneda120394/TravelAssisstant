@@ -435,7 +435,10 @@ export type TripMember = {
   userId: string;
   email: string;
   role: TripMemberRole;
-  status: 'pending' | 'accepted';
+  status: 'pending' | 'accepted' | 'revoked';
+  inviteToken?: string | null;
+  expiresAt?: string | null;
+  revokedAt?: string | null;
 };
 
 export type ItineraryItem = {

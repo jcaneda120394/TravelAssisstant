@@ -28,6 +28,8 @@ import {
   deleteTrip,
   getTrip,
   inviteTripMember,
+  listTripMembers,
+  revokeTripInvite,
   updateTrip,
 } from '@/services/trips/trips.service';
 import { setTripPublic } from '@/services/travel-spots/travel-spots.service';
@@ -38,6 +40,8 @@ import { Skeleton } from '@/components/feedback/skeleton';
 import { formatDayLabel, formatTripDateRange, tripCalendarDays } from '@/utils/dates';
 import { findNextFreeSlot } from '@/utils/itinerary-time';
 import type { ItineraryItem, TransportSegment, Trip } from '@/types/domain';
+import * as Clipboard from 'expo-clipboard';
+import { Platform } from 'react-native';
 
 type TabId = 'overview' | 'itinerary' | 'map' | 'hotels' | 'budget';
 
@@ -246,11 +250,40 @@ export function TripDetailScreen() {
         invitedByUserId: user.id,
       });
     },
-    onSuccess: () => {
+    onSuccess: async (member) => {
       setInviteEmail('');
-      Alert.alert('Invite saved', 'Collaboration invite stored.');
+      void queryClient.invalidateQueries({ queryKey: ['trip-members', id] });
+      const token = member.inviteToken;
+      if (token) {
+        const link =
+          Platform.OS === 'web'
+            ? `${typeof window !== 'undefined' ? window.location.origin : ''}/invite/${token}`
+            : `travelassistant://invite/${token}`;
+        await Clipboard.setStringAsync(link).catch(() => undefined);
+        Alert.alert(
+          'Invite created',
+          `A secure invite link was copied to the clipboard. It expires in 14 days and is single-use after acceptance.`,
+        );
+      } else {
+        Alert.alert('Invite saved', 'Collaboration invite stored.');
+      }
     },
     onError: (error) => Alert.alert('Invite failed', getErrorMessage(error)),
+  });
+
+  const membersQuery = useQuery({
+    queryKey: ['trip-members', id],
+    queryFn: () => listTripMembers(String(id)),
+    enabled: Boolean(id) && Boolean(user),
+  });
+
+  const revokeInvite = useMutation({
+    mutationFn: (memberId: string) => revokeTripInvite(memberId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['trip-members', id] });
+      Alert.alert('Invite revoked', 'That collaborator can no longer use the invite.');
+    },
+    onError: (error) => Alert.alert('Revoke failed', getErrorMessage(error)),
   });
 
   const ensureBudget = useMutation({
@@ -726,19 +759,49 @@ export function TripDetailScreen() {
 
             {canEdit ? (
               <Card className="mb-4">
-                <SectionHeader title="Collaborate" subtitle="Invite partner/family/friends" />
+                <SectionHeader
+                  title="Collaborate"
+                  subtitle="Invite by email — link expires in 14 days"
+                />
                 <TextField
                   label="Invite email"
                   value={inviteEmail}
                   onChangeText={setInviteEmail}
                   keyboardType="email-address"
+                  autoCapitalize="none"
                 />
                 <Button
-                  label="Send invite"
+                  label="Create invite link"
                   loading={invite.isPending}
                   disabled={!inviteEmail.includes('@')}
                   onPress={() => invite.mutate()}
                 />
+                {(membersQuery.data ?? [])
+                  .filter((m) => m.role !== 'owner')
+                  .map((member) => (
+                    <View
+                      key={member.id}
+                      className="mt-3 flex-row items-center justify-between gap-2 border-t border-brand-100 pt-3"
+                    >
+                      <View className="flex-1">
+                        <AppText className="font-sans-semibold">{member.email}</AppText>
+                        <AppText muted className="text-xs">
+                          {member.role} · {member.status}
+                          {member.expiresAt
+                            ? ` · expires ${new Date(member.expiresAt).toLocaleDateString()}`
+                            : ''}
+                        </AppText>
+                      </View>
+                      {member.status !== 'revoked' ? (
+                        <Button
+                          label="Revoke"
+                          variant="secondary"
+                          loading={revokeInvite.isPending}
+                          onPress={() => revokeInvite.mutate(member.id)}
+                        />
+                      ) : null}
+                    </View>
+                  ))}
               </Card>
             ) : null}
           </>

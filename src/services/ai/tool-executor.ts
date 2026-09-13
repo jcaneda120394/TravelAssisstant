@@ -5,6 +5,7 @@ import { useLocationStore } from '@/stores/location-store';
 import type { AIChatRequest, GeoPoint, Place, PlaceCategory, WeatherSnapshot } from '@/types/domain';
 import type { ProviderRegistry } from '@/providers/registry';
 import { DEFAULT_MAP_CENTER } from '@/services/location/location.service';
+import { filterPlacesWithinRadius } from '@/utils/geo';
 
 export type ToolResult = { name: string; result: unknown };
 
@@ -12,6 +13,20 @@ function getProviders(): ProviderRegistry {
   // Lazy require avoids circular init with MockAIProvider → tools → registry.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require('@/providers/registry').providers as ProviderRegistry;
+}
+
+async function nearbyPlaces(params: {
+  location: GeoPoint;
+  radiusMeters: number;
+  category?: PlaceCategory;
+  limit?: number;
+}): Promise<Place[]> {
+  const providers = getProviders();
+  const places = await providers.places.getNearbyPlaces(params);
+  return filterPlacesWithinRadius(places, params.location, params.radiusMeters).slice(
+    0,
+    params.limit ?? places.length,
+  );
 }
 
 const TOOL_NAMES = [
@@ -158,20 +173,20 @@ async function runTool(name: string, request: AIChatRequest): Promise<unknown> {
         source: useLocationStore.getState().coords ? 'user' : 'fallback',
       };
     case 'find_nearby_places':
-      return providers.places.getNearbyPlaces({
+      return nearbyPlaces({
         location: location.coords,
         radiusMeters: 4000,
         limit: 8,
       });
     case 'find_attractions':
-      return providers.places.getNearbyPlaces({
+      return nearbyPlaces({
         location: location.coords,
         radiusMeters: 5000,
         category: 'attraction',
         limit: 8,
       });
     case 'find_food':
-      return providers.places.getNearbyPlaces({
+      return nearbyPlaces({
         location: location.coords,
         radiusMeters: 2500,
         category: 'restaurant',
@@ -184,7 +199,7 @@ async function runTool(name: string, request: AIChatRequest): Promise<unknown> {
         limit: 8,
       });
     case 'get_place_details': {
-      const nearby = await providers.places.getNearbyPlaces({
+      const nearby = await nearbyPlaces({
         location: location.coords,
         radiusMeters: 5000,
         category: 'attraction',
@@ -221,31 +236,31 @@ async function runTool(name: string, request: AIChatRequest): Promise<unknown> {
     case 'search_esim':
       return providers.esim.searchByCountry(location.countryCode);
     case 'find_hospital':
-      return providers.places.getNearbyPlaces({
+      return nearbyPlaces({
         location: location.coords,
         radiusMeters: 5000,
-        category: 'hospital' as PlaceCategory,
+        category: 'hospital',
       });
     case 'find_pharmacy':
-      return providers.places.getNearbyPlaces({
+      return nearbyPlaces({
         location: location.coords,
         radiusMeters: 3000,
         category: 'pharmacy',
       });
     case 'find_police_station':
-      return providers.places.getNearbyPlaces({
+      return nearbyPlaces({
         location: location.coords,
         radiusMeters: 3000,
         category: 'police',
       });
     case 'find_embassy':
-      return providers.places.getNearbyPlaces({
+      return nearbyPlaces({
         location: location.coords,
         radiusMeters: 10000,
         category: 'embassy',
       });
     case 'find_coworking_space':
-      return providers.places.getNearbyPlaces({
+      return nearbyPlaces({
         location: location.coords,
         radiusMeters: 5000,
         category: 'coworking',

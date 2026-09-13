@@ -379,16 +379,16 @@ function dedupePlaces(places: Place[]): Place[] {
   });
 }
 
+/**
+ * Keep Photon results inside the traveler's selected radius.
+ * Do not expand to 25–100 km — that mixed far-away cities into "nearby".
+ */
 function withinExpandingRadius(places: Place[], startRadius: number, limit: number): Place[] {
-  for (const radius of [startRadius, Math.max(startRadius, 25_000), 40_000, 60_000, 100_000]) {
-    const inRadius = places
-      .filter((place) => (place.distanceMeters ?? 0) <= radius)
-      .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
-    if (inRadius.length >= Math.min(6, limit) || radius === 100_000) {
-      return inRadius.slice(0, limit);
-    }
-  }
-  return [];
+  const radius = Math.max(500, startRadius);
+  return places
+    .filter((place) => (place.distanceMeters ?? Number.POSITIVE_INFINITY) <= radius)
+    .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0))
+    .slice(0, limit);
 }
 
 /**

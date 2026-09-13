@@ -1,20 +1,8 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
 
 import { env } from '@/config/env';
-
-const memoryStore = new Map<string, string>();
-
-const memoryStorage = {
-  getItem: async (key: string) => memoryStore.get(key) ?? null,
-  setItem: async (key: string, value: string) => {
-    memoryStore.set(key, value);
-  },
-  removeItem: async (key: string) => {
-    memoryStore.delete(key);
-  },
-};
+import { authSessionStorage } from '@/lib/storage/auth-session-storage';
 
 function createSupabaseClient(): SupabaseClient | null {
   if (!env.isSupabaseConfigured) {
@@ -23,10 +11,11 @@ function createSupabaseClient(): SupabaseClient | null {
 
   return createClient(env.supabaseUrl, env.supabaseAnonKey, {
     auth: {
-      storage: Platform.OS === 'web' ? memoryStorage : AsyncStorage,
+      storage: authSessionStorage,
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: Platform.OS === 'web',
+      flowType: 'pkce',
     },
   });
 }

@@ -10,6 +10,10 @@ import {
 import type { OnboardingDraft, Profile, UserPreferences } from '@/types/auth';
 import { userPreferencesSchema } from '@/types/auth';
 
+/** Columns granted to authenticated clients (excludes admin_notes). */
+const PROFILE_SAFE_COLUMNS =
+  'id, email, full_name, avatar_url, phone, bio, onboarding_completed, role, is_disabled, created_at, updated_at';
+
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   if (!env.isSupabaseConfigured) {
     return getLocalProfile();
@@ -18,7 +22,9 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
   const client = assertSupabase();
   const { data, error } = await client
     .from('profiles')
-    .select('*')
+    .select(
+      PROFILE_SAFE_COLUMNS,
+    )
     .eq('id', userId)
     .maybeSingle();
 
@@ -31,7 +37,8 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
         ...data,
         phone: data.phone ?? null,
         bio: data.bio ?? null,
-        admin_notes: data.admin_notes ?? null,
+        // admin_notes is not granted to authenticated clients — admins use RPC
+        admin_notes: null,
         role: data.role === 'admin' ? 'admin' : 'user',
         is_disabled: Boolean(data.is_disabled),
       } as Profile)
@@ -90,7 +97,7 @@ export async function ensureProfile(user: {
         email: user.email,
         full_name: user.fullName,
       })
-      .select('*')
+      .select(PROFILE_SAFE_COLUMNS)
       .single();
 
   let { data, error } = await upsertProfile();
@@ -101,8 +108,8 @@ export async function ensureProfile(user: {
     ({ data, error } = await upsertProfile());
   }
 
-  if (error) {
-    throw toAppError(error, 'Failed to create profile');
+  if (error || !data) {
+    throw toAppError(error ?? new Error('No profile returned'), 'Failed to create profile');
   }
 
   // Ensure preferences row exists too (trigger may already have inserted it).
@@ -110,6 +117,7 @@ export async function ensureProfile(user: {
 
   return {
     ...data,
+    admin_notes: null,
     role: data.role === 'admin' ? 'admin' : 'user',
     is_disabled: Boolean(data.is_disabled),
   } as Profile;
@@ -212,7 +220,7 @@ export async function completeOnboarding(
       updated_at: now,
     })
     .eq('id', userId)
-    .select('*')
+    .select(PROFILE_SAFE_COLUMNS)
     .single();
 
   if (profileError) {
@@ -259,14 +267,19 @@ export async function updateProfileName(userId: string, fullName: string): Promi
     .from('profiles')
     .update({ full_name: fullName })
     .eq('id', userId)
-    .select('*')
+    .select(PROFILE_SAFE_COLUMNS)
     .single();
 
   if (error) {
     throw toAppError(error, 'Failed to update name');
   }
 
-  return data as Profile;
+  return {
+    ...data,
+    admin_notes: null,
+    role: data.role === 'admin' ? 'admin' : 'user',
+    is_disabled: Boolean(data.is_disabled),
+  } as Profile;
 }
 
 export async function updateHomeCurrency(

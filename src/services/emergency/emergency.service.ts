@@ -2,6 +2,7 @@ import { LOCAL_EMERGENCY_NUMBERS } from '@/constants/app';
 import { COUNTRIES } from '@/constants/preferences';
 import { providers } from '@/providers/registry';
 import type { GeoPoint, Place } from '@/types/domain';
+import { filterPlacesWithinRadius } from '@/utils/geo';
 
 export type EmergencyNumbers = {
   countryCode: string;
@@ -54,15 +55,18 @@ export async function loadNearMeEmergencyPlaces(location: GeoPoint): Promise<
   Array<{ category: (typeof NEAR_ME_CATEGORIES)[number]; places: Place[] }>
 > {
   const groups = await Promise.all(
-    NEAR_ME_CATEGORIES.map(async (category) => ({
-      category,
-      places: await providers.places.getNearbyPlaces({
+    NEAR_ME_CATEGORIES.map(async (category) => {
+      const places = await providers.places.getNearbyPlaces({
         location,
         radiusMeters: 10_000,
         category,
         limit: 5,
-      }),
-    })),
+      });
+      return {
+        category,
+        places: filterPlacesWithinRadius(places, location, 10_000).slice(0, 5),
+      };
+    }),
   );
   return groups;
 }

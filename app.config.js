@@ -48,6 +48,7 @@ module.exports = () => {
       posthogKey: process.env.EXPO_PUBLIC_POSTHOG_KEY ?? '',
       posthogHost: process.env.EXPO_PUBLIC_POSTHOG_HOST ?? '',
       sentryDsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '',
       router: expo.extra?.router ?? {},
       eas: expo.extra?.eas ?? {},
     },

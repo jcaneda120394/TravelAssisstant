@@ -26,6 +26,21 @@ Already set on project `travelassistant` for Production, Preview, and Developmen
 
 Optional: `EXPO_PUBLIC_POSTHOG_*`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`.
 
+### Place photos (Google Places)
+
+Home / Explore cards prefer Google Places photos via the `place-photo` Edge Function.
+
+1. Enable **Places API (New)** on a Google Cloud project.
+2. Create an API key (prefer server restriction / no browser referrer for the Edge Function secret).
+3. Set the secret on Supabase:
+
+```bash
+supabase secrets set GOOGLE_MAPS_API_KEY=your_key --project-ref viyzvgdvnxhddtobpyys
+supabase functions deploy place-photo --project-ref viyzvgdvnxhddtobpyys
+```
+
+Optional client fallback: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (restrict by HTTP referrer to your Vercel domain). Without either key, cards fall back to Wikimedia / map preview.
+
 Rebuild after changing env vars (`EXPO_PUBLIC_*` are inlined at build time).
 
 ### Connect GitHub → Vercel (optional auto-deploy)

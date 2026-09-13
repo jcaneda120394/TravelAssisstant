@@ -156,7 +156,7 @@ export function PlaceDetailScreen() {
   const place = query.data ?? seeded;
 
   const photosQuery = useQuery({
-    queryKey: ['place-photos', 'v2', place?.id, place?.name, place?.latitude, place?.longitude],
+    queryKey: ['place-photos', 'v3-google', place?.id, place?.name, place?.latitude, place?.longitude],
     enabled: Boolean(place?.id),
     queryFn: async () => {
       const photos = await fetchPlacePhotos(place!, 6);

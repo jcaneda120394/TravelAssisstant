@@ -16,6 +16,7 @@ const envSchema = z.object({
   EXPO_PUBLIC_POSTHOG_KEY: z.string().optional().default(''),
   EXPO_PUBLIC_POSTHOG_HOST: z.string().optional().default(''),
   EXPO_PUBLIC_SENTRY_DSN: z.string().optional().default(''),
+  EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional().default(''),
 });
 
 type Extra = {
@@ -27,6 +28,7 @@ type Extra = {
   posthogKey?: string;
   posthogHost?: string;
   sentryDsn?: string;
+  googleMapsApiKey?: string;
 };
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
@@ -54,6 +56,10 @@ const parsed = envSchema.safeParse({
   EXPO_PUBLIC_POSTHOG_KEY: pick(process.env.EXPO_PUBLIC_POSTHOG_KEY, extra.posthogKey),
   EXPO_PUBLIC_POSTHOG_HOST: pick(process.env.EXPO_PUBLIC_POSTHOG_HOST, extra.posthogHost),
   EXPO_PUBLIC_SENTRY_DSN: pick(process.env.EXPO_PUBLIC_SENTRY_DSN, extra.sentryDsn),
+  EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: pick(
+    process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+    extra.googleMapsApiKey,
+  ),
 });
 
 if (!parsed.success) {
@@ -91,6 +97,7 @@ export const env = {
   posthogKey: data.EXPO_PUBLIC_POSTHOG_KEY,
   posthogHost: data.EXPO_PUBLIC_POSTHOG_HOST,
   sentryDsn: data.EXPO_PUBLIC_SENTRY_DSN,
+  googleMapsApiKey: data.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
   isSupabaseConfigured,
   isProduction: data.EXPO_PUBLIC_APP_ENV === 'production',
 } as const;

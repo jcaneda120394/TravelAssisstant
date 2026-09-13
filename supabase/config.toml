@@ -21,3 +21,7 @@ verify_jwt = true
 [functions.scan-translate]
 # Traveler utility: optional JWT; rate-limited in the function.
 verify_jwt = false
+
+[functions.place-photo]
+# Home/Explore card photos: guests allowed; rate-limited; uses Google Places server key.
+verify_jwt = false

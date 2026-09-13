@@ -1,10 +1,13 @@
 import { fetchJson } from '@/lib/http/fetch-json';
+import { env } from '@/config/env';
+import { supabase } from '@/lib/supabase/client';
 import type { Place, PlaceCategory } from '@/types/domain';
+import { haversineMeters } from '@/utils/geo';
 
 export type PlacePhoto = {
   url: string;
   thumbUrl?: string;
-  source: 'place' | 'wikipedia' | 'commons' | 'map' | 'community';
+  source: 'place' | 'google' | 'wikipedia' | 'commons' | 'map' | 'community';
   title?: string;
   /** 0–1 relevance to the place name; map previews are 0. */
   score?: number;
@@ -295,6 +298,145 @@ function isFoodPlace(place: Place): boolean {
   return FOOD_CATEGORIES.has(place.category);
 }
 
+type GooglePhotoPayload = {
+  photo?: {
+    url?: string;
+    thumbUrl?: string;
+    title?: string;
+    source?: string;
+  } | null;
+  error?: string;
+  code?: string;
+};
+
+const googleInflight = new Map<string, Promise<PlacePhoto | null>>();
+
+function googleCacheKey(place: Place): string {
+  return `${place.id}|${place.name}|${place.latitude.toFixed(4)}|${place.longitude.toFixed(4)}`;
+}
+
+/** Prefer Google Places photos — accurate venue imagery for cards + detail. */
+async function fetchGooglePlacePhoto(
+  place: Place,
+  maxWidthPx = 900,
+): Promise<PlacePhoto | null> {
+  const key = googleCacheKey(place);
+  const existing = googleInflight.get(key);
+  if (existing) return existing;
+
+  const run = (async (): Promise<PlacePhoto | null> => {
+    const body = {
+      name: cleanSearchName(displayNameForSearch(place)),
+      address: place.address ?? cityHint(place),
+      latitude: place.latitude,
+      longitude: place.longitude,
+      maxWidthPx,
+    };
+
+    // 1) Supabase Edge Function keeps the Places API key server-side.
+    if (env.isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.functions.invoke<GooglePhotoPayload>('place-photo', {
+          body,
+        });
+        if (!error && data?.photo?.url) {
+          return {
+            url: data.photo.url,
+            thumbUrl: data.photo.thumbUrl ?? data.photo.url,
+            source: 'google',
+            title: data.photo.title ?? place.name,
+            score: 1,
+          };
+        }
+      } catch {
+        // Fall through to optional client key / Wikimedia.
+      }
+    }
+
+    // 2) Optional client Maps key (restricted by HTTP referrer / app bundle).
+    const apiKey = env.googleMapsApiKey?.trim();
+    if (!apiKey) return null;
+
+    try {
+      const textQuery = [body.name, body.address].filter(Boolean).join(', ');
+      const search = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask':
+            'places.id,places.displayName,places.formattedAddress,places.location,places.photos',
+        },
+        body: JSON.stringify({
+          textQuery,
+          maxResultCount: 5,
+          locationBias: {
+            circle: {
+              center: { latitude: place.latitude, longitude: place.longitude },
+              radius: 8_000,
+            },
+          },
+        }),
+      });
+      if (!search.ok) return null;
+      const searchJson = (await search.json()) as {
+        places?: Array<{
+          displayName?: { text?: string };
+          location?: { latitude?: number; longitude?: number };
+          photos?: Array<{ name?: string }>;
+        }>;
+      };
+
+      const match = (searchJson.places ?? []).find((candidate) => {
+        const gName = candidate.displayName?.text ?? '';
+        const score = scorePhotoRelevance(body.name, gName, place.address);
+        if (score < 0.35) {
+          const tokens = significantTokens(body.name);
+          const hay = gName.toLowerCase();
+          if (!tokens.some((t) => t.length >= 5 && hay.includes(t))) return false;
+        }
+        const gLat = candidate.location?.latitude;
+        const gLng = candidate.location?.longitude;
+        if (gLat == null || gLng == null) return true;
+        return (
+          haversineMeters(
+            { latitude: place.latitude, longitude: place.longitude },
+            { latitude: gLat, longitude: gLng },
+          ) <= 12_000
+        );
+      });
+
+      const photoName = match?.photos?.[0]?.name;
+      if (!photoName) return null;
+
+      const media = await fetch(
+        `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidthPx}&skipHttpRedirect=true`,
+        { headers: { 'X-Goog-Api-Key': apiKey } },
+      );
+      if (!media.ok) return null;
+      const mediaJson = (await media.json()) as { photoUri?: string };
+      if (!mediaJson.photoUri) return null;
+
+      return {
+        url: mediaJson.photoUri,
+        thumbUrl: mediaJson.photoUri,
+        source: 'google',
+        title: match?.displayName?.text ?? place.name,
+        score: 1,
+      };
+    } catch {
+      return null;
+    }
+  })();
+
+  googleInflight.set(key, run);
+  try {
+    return await run;
+  } finally {
+    // Keep resolved promise for in-session dedupe of Rapid card grids.
+  }
+}
+
 async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhoto[]> {
   const name = cleanSearchName(displayNameForSearch(place));
   const city = cityHint(place);
@@ -318,7 +460,7 @@ async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhot
 
 /**
  * Resolve a few photos for a place detail screen.
- * Only keep images whose title clearly relates to the venue; otherwise map preview.
+ * Prefer Google Places, then name-matched Wikimedia; otherwise map preview.
  */
 export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePhoto[]> {
   const existing = (place.photos ?? [])
@@ -328,6 +470,9 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
   if (existing.length >= limit) {
     return existing.slice(0, limit);
   }
+
+  const google = await fetchGooglePlacePhoto(place, 1200);
+  const googleList = google ? [google] : [];
 
   const named = await searchNamedPhotos(place, limit);
 
@@ -342,7 +487,7 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
     geo = rankPhotos(place, await wikipediaGeoPhotos(place.latitude, place.longitude, limit));
   }
 
-  const merged = dedupePhotos([...existing, ...named, ...geo]).slice(0, limit);
+  const merged = dedupePhotos([...existing, ...googleList, ...named, ...geo]).slice(0, limit);
   if (merged.length === 0) {
     return [mapPreviewPhoto(place)];
   }
@@ -351,7 +496,7 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
 
 /**
  * Single best photo for list tiles (Home / Explore cards).
- * Never show an unrelated Wikimedia hit — fall back to map preview.
+ * Prefer Google Places venue photos; never show unrelated Wikimedia hits.
  */
 export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
   const existing = (place.photos ?? []).find(
@@ -361,6 +506,9 @@ export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
     return { url: existing, thumbUrl: existing, source: 'place', score: 1 };
   }
 
+  const google = await fetchGooglePlacePhoto(place, 900);
+  if (google) return google;
+
   const named = await searchNamedPhotos(place, 4);
   if (named[0] && (named[0].score ?? 0) >= 0.5) {
     return named[0];
@@ -368,7 +516,11 @@ export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
 
   if (!isFoodPlace(place)) {
     const photos = await fetchPlacePhotos(place, 3);
-    const best = photos.find((photo) => photo.source !== 'map' && (photo.score ?? 0) >= 0.5);
+    const best = photos.find(
+      (photo) =>
+        photo.source !== 'map' &&
+        (photo.source === 'google' || (photo.score ?? 0) >= 0.5),
+    );
     if (best) return best;
   }
 

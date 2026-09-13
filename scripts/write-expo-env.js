@@ -18,6 +18,7 @@ const KEYS = [
   'EXPO_PUBLIC_POSTHOG_KEY',
   'EXPO_PUBLIC_POSTHOG_HOST',
   'EXPO_PUBLIC_SENTRY_DSN',
+  'EXPO_PUBLIC_GOOGLE_MAPS_API_KEY',
 ];
 
 function firstNonEmpty(...keys) {

@@ -120,6 +120,7 @@ function typeHintTokens(type: string | null | undefined): string[] {
   if (t === 'restaurant') return ['restaurant', 'dining', 'kitchen', 'meal', 'eatery'];
   if (t === 'bakery') return ['bakery', 'pastry', 'bread', 'cake'];
   if (t === 'hotel' || t === 'resort') return ['hotel', 'resort', 'lobby', 'room'];
+  if (t === 'hospital' || t === 'clinic') return ['hospital', 'clinic', 'medical', 'emergency'];
   if (t === 'temple') return ['temple', 'shrine', 'pagoda', 'church', 'cathedral', 'basilica'];
   if (t === 'beach') return ['beach', 'coast', 'shore'];
   return [];
@@ -171,8 +172,12 @@ export function isRelevantToPlace(
       // "coffee museum" ok; "vietnam memorial" already rejected above.
       if (IRRELEVANT_FOR_FOOD.test(hay)) return false;
     }
-    // Only for food/hotel businesses — attractions still need name hits.
-    return isBusinessPlaceType(placeType);
+    // Food/hotel/hospital atmosphere fills when name match is thin.
+    return (
+      isBusinessPlaceType(placeType) ||
+      placeType === 'hospital' ||
+      placeType === 'clinic'
+    );
   }
 
   return false;

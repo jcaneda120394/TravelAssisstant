@@ -155,7 +155,7 @@ export async function getTravelImage(input: GetTravelImageInput): Promise<Travel
     const result = await Promise.race([
       resolve(),
       new Promise<TravelImage>((settle) => {
-        setTimeout(() => settle(fallback), 12_000);
+        setTimeout(() => settle(fallback), 8_000);
       }),
     ]);
     setMemoryTravelImage(input, result);

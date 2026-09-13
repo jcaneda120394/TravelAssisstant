@@ -638,12 +638,19 @@ export async function fetchBestPlacePhoto(
     return { url, thumbUrl: url, source: 'place', score: 1 };
   }
 
+  const fallback = mapPreviewPhoto(place);
   try {
-    const image = await getTravelImageForPlace(place, {
-      excludeImageUrls: options?.excludeImageUrls,
-    });
+    const image = await Promise.race([
+      getTravelImageForPlace(place, {
+        excludeImageUrls: options?.excludeImageUrls,
+      }),
+      new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 8_000);
+      }),
+    ]);
+    if (!image) return fallback;
     return travelImageToPlacePhoto(image);
   } catch {
-    return mapPreviewPhoto(place);
+    return fallback;
   }
 }

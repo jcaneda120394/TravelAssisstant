@@ -65,13 +65,20 @@ export async function getDbTravelImage(
   if (!env.isSupabaseConfigured || !supabase) return null;
   const placeKey = buildPlaceImageCacheKey(input);
   try {
-    const { data, error } = await supabase
-      .from('place_images')
-      .select(
-        'place_key,image_url,thumbnail_url,provider,provider_image_id,photographer,photographer_url,source_url,license,attribution,width,height,alt,search_query,updated_at',
-      )
-      .eq('place_key', placeKey)
-      .maybeSingle();
+    const result = await Promise.race([
+      supabase
+        .from('place_images')
+        .select(
+          'place_key,image_url,thumbnail_url,provider,provider_image_id,photographer,photographer_url,source_url,license,attribution,width,height,alt,search_query,updated_at',
+        )
+        .eq('place_key', placeKey)
+        .maybeSingle(),
+      new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 3_000);
+      }),
+    ]);
+    if (!result) return null;
+    const { data, error } = result;
     if (error || !data) return null;
     const row = data as PlaceImageRow;
     const age = Date.now() - new Date(row.updated_at).getTime();

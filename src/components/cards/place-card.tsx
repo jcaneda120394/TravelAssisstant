@@ -9,6 +9,7 @@ import type { Place } from '@/types/domain';
 import { labelize } from '@/constants/preferences';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
+import { esriStreetTileUrl } from '@/lib/images/fallback';
 import { rememberPlace } from '@/services/places/place-cache';
 import { fetchBestPlacePhoto } from '@/services/places/place-photos.service';
 import { formatDistanceMeters } from '@/utils/format';
@@ -25,8 +26,9 @@ function PlaceCardPhoto({ place }: { place: Place }) {
   const scheme = useAppColorScheme();
   const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
   const title = displayPlaceName(place);
+  const mapUri = esriStreetTileUrl(place.latitude, place.longitude);
   const photoQuery = useQuery({
-    queryKey: ['place-card-photo', 'v10-relevant', place.id, place.name, place.address],
+    queryKey: ['place-card-photo', 'v11-instant-map', place.id, place.name, place.address],
     queryFn: () => fetchBestPlacePhoto(place),
     staleTime: 45 * 60_000,
     gcTime: 2 * 60 * 60_000,
@@ -34,46 +36,31 @@ function PlaceCardPhoto({ place }: { place: Place }) {
 
   const candidates = useMemo(() => {
     const data = photoQuery.data;
-    if (!data) return [] as string[];
-    return [...new Set([data.thumbUrl, data.url].filter((u): u is string => Boolean(u)))];
-  }, [photoQuery.data]);
+    const urls = data
+      ? ([data.thumbUrl, data.url].filter((u): u is string => Boolean(u)) as string[])
+      : [];
+    // Always keep a map tile so cards never stick on “Loading photo…”.
+    return [...new Set([...urls, mapUri])];
+  }, [photoQuery.data, mapUri]);
 
-  const uri = candidates.find((u) => !failedUrls.has(u)) ?? null;
+  const uri = candidates.find((u) => !failedUrls.has(u)) ?? mapUri;
   const skeletonClass = scheme === 'dark' ? 'bg-brand-900' : 'bg-surface-mist';
-  const initial = (title.trim().charAt(0) || '?').toUpperCase();
 
   return (
     <View className={`w-full overflow-hidden rounded-2xl ${skeletonClass}`} style={{ height: PHOTO_HEIGHT }}>
-      {uri ? (
-        <Image
-          source={{ uri }}
-          style={{ width: '100%', height: PHOTO_HEIGHT }}
-          resizeMode="cover"
-          accessibilityLabel={`${title} photo`}
-          onError={() =>
-            setFailedUrls((prev) => {
-              const next = new Set(prev);
-              next.add(uri);
-              return next;
-            })
-          }
-        />
-      ) : (
-        <View className={`h-full w-full items-center justify-center ${skeletonClass}`}>
-          {photoQuery.isLoading ? (
-            <AppText muted className="text-xs">
-              Loading photo…
-            </AppText>
-          ) : (
-            <>
-              <AppText className="text-3xl font-sans-semibold opacity-40">{initial}</AppText>
-              <AppText muted className="mt-1 text-xs capitalize">
-                {labelize(place.category)}
-              </AppText>
-            </>
-          )}
-        </View>
-      )}
+      <Image
+        source={{ uri }}
+        style={{ width: '100%', height: PHOTO_HEIGHT }}
+        resizeMode="cover"
+        accessibilityLabel={`${title} photo`}
+        onError={() =>
+          setFailedUrls((prev) => {
+            const next = new Set(prev);
+            next.add(uri);
+            return next;
+          })
+        }
+      />
     </View>
   );
 }

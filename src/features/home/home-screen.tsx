@@ -402,7 +402,7 @@ export function HomeScreen() {
                     scheme === 'dark' ? 'text-brand-200' : 'text-brand-600'
                   }`}
                 >
-                  Conditions
+                  Weather Condition
                 </AppText>
                 <AppText className="mt-1 font-sans-semibold">
                   {weatherQuery.data?.condition ??

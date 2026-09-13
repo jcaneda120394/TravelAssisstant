@@ -3,10 +3,11 @@ import { useMutation } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Pressable as RNPressable,
   ScrollView as RNScrollView,
+  type KeyboardEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -81,9 +82,16 @@ export function AssistantScreen() {
   const [input, setInput] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const listRef = useRef<RNScrollView>(null);
   const locationLabel = location.label ?? 'No city set';
   const stuckOnSf = looksLikeSanFrancisco(location.coords) && location.mode !== 'manual';
+
+  const scrollToEnd = useCallback(() => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
 
   const onTranscript = useCallback((text: string, isFinal: boolean) => {
     setInput(text);
@@ -105,6 +113,44 @@ export function AssistantScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- start voice once when opened from FAB
   }, [promptFromFab]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (event: KeyboardEvent) => {
+      setKeyboardHeight(event.endCoordinates.height);
+      scrollToEnd();
+    };
+    const onHide = () => setKeyboardHeight(0);
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [scrollToEnd]);
+
+  // Mobile browsers: soft keyboard shrinks visualViewport instead of firing RN keyboard events.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const update = () => {
+      const covered = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      setKeyboardHeight(covered > 80 ? covered : 0);
+      if (covered > 80) scrollToEnd();
+    };
+
+    viewport.addEventListener('resize', update);
+    viewport.addEventListener('scroll', update);
+    return () => {
+      viewport.removeEventListener('resize', update);
+      viewport.removeEventListener('scroll', update);
+    };
+  }, [scrollToEnd]);
 
   const [messages, setMessages] = useState<AIMessage[]>([
     {
@@ -192,15 +238,11 @@ export function AssistantScreen() {
   };
 
   const showSuggestions = messages.length <= 1 && !chatMutation.isPending;
+  const composerBottomPad = keyboardHeight > 0 ? 10 : Math.max(insets.bottom, 10);
 
   return (
     <Screen edges={['top']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
-        testID="screen-assistant"
-      >
+      <View style={{ flex: 1 }} testID="screen-assistant">
         <View className="border-b border-black/8 px-5 pb-3 pt-2 dark:border-brand-800">
           <AppText className="font-sans-bold text-xl">Chat</AppText>
           <RNPressable
@@ -228,6 +270,7 @@ export function AssistantScreen() {
           keyboardDismissMode="on-drag"
           nestedScrollEnabled
           showsVerticalScrollIndicator
+          onContentSizeChange={scrollToEnd}
         >
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
@@ -268,7 +311,7 @@ export function AssistantScreen() {
           className={`border-t px-3 pt-2 dark:border-brand-800 ${
             scheme === 'dark' ? 'border-brand-800 bg-surface-dark' : 'border-black/8 bg-surface-light'
           }`}
-          style={{ paddingBottom: Math.max(insets.bottom, 10) }}
+          style={{ paddingBottom: composerBottomPad }}
         >
           <AppText muted className="mb-2 px-1 text-[11px]">
             Nearby places + TravelAssistant only · not a general chatbot
@@ -288,10 +331,12 @@ export function AssistantScreen() {
               }
               placeholderTextColor={scheme === 'dark' ? '#9BB0AC' : '#5B6F6C'}
               multiline
-              className={`max-h-32 min-h-[44px] font-sans text-base ${
+              textAlignVertical="top"
+              className={`max-h-32 min-h-[44px] font-sans text-base leading-6 ${
                 scheme === 'dark' ? 'text-ink-dark' : 'text-ink-light'
               }`}
               testID="assistant-input"
+              onFocus={scrollToEnd}
               onSubmitEditing={() => {
                 if (input.trim() && location.coords && !chatMutation.isPending) send();
               }}
@@ -354,7 +399,10 @@ export function AssistantScreen() {
             </RNPressable>
           ) : null}
         </View>
-      </KeyboardAvoidingView>
+
+        {/* Pushes composer above the keyboard (tab bar hides while typing). */}
+        {keyboardHeight > 0 ? <View style={{ height: keyboardHeight }} /> : null}
+      </View>
 
       <LocationPickerModal visible={pickerOpen} onClose={() => setPickerOpen(false)} />
     </Screen>

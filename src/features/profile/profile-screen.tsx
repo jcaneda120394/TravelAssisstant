@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { CurrencyPickerModal } from '@/components/currency/currency-picker-modal';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
 import { formatCurrencyWithSymbol, formatFxCurrencyName } from '@/constants/fx-currencies';
 import { labelize } from '@/constants/preferences';
@@ -139,14 +140,27 @@ export function ProfileScreen() {
             title="Display currency"
             subtitle="Used for hotels, restaurants, and attraction prices"
           />
-          <AppText className="mb-3 font-sans-semibold text-lg">
-            {formatCurrencyWithSymbol(currency)} · {formatFxCurrencyName(currency)}
-          </AppText>
-          <Button
-            label="Change currency"
-            variant="secondary"
+          <Pressable
             onPress={() => setCurrencyPickerOpen(true)}
-          />
+            accessibilityRole="button"
+            accessibilityLabel="Change display currency"
+            className={`mt-1 flex-row items-center self-start rounded-full border px-3 py-1.5 ${
+              scheme === 'dark' ? 'border-brand-700 bg-surface-cardDark' : 'border-brand-200 bg-white'
+            }`}
+          >
+            <AppText className="text-sm font-sans-semibold">
+              {formatCurrencyWithSymbol(currency)}
+            </AppText>
+            <AppText muted className="ml-1.5 text-xs">
+              {formatFxCurrencyName(currency)}
+            </AppText>
+            <Ionicons
+              name="chevron-down"
+              size={14}
+              color={scheme === 'dark' ? '#9BB0AC' : '#5B6F6C'}
+              style={{ marginLeft: 6 }}
+            />
+          </Pressable>
         </Card>
 
         <Card className="mb-4">

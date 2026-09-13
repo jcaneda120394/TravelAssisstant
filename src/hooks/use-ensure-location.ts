@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   getCurrentPosition,
-  replaceSimulatorSanFranciscoIfNeeded,
 } from '@/services/location/location.service';
 import { useLocationStore } from '@/stores/location-store';
 import { getErrorMessage } from '@/lib/errors/app-error';
@@ -11,10 +10,8 @@ type LocateStatus = 'idle' | 'loading' | 'ready' | 'denied' | 'error';
 
 /**
  * Asks for location permission and refreshes current coordinates.
- * Remaps Apple Simulator San Francisco → Malolos, Bulacan automatically.
- *
- * By default, every mount refreshes GPS (unless the traveler set a manual city),
- * so maps always show the actual “where am I” position.
+ * Manual city picks are kept; otherwise GPS is refreshed on mount.
+ * Does not force Malolos — use the location picker for that.
  */
 export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean }) {
   const auto = options?.auto ?? true;
@@ -56,8 +53,10 @@ export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean 
   useEffect(() => {
     if (coords) {
       setStatus('ready');
+    } else if (mode === 'none') {
+      setStatus('idle');
     }
-  }, [coords]);
+  }, [coords, mode]);
 
   useEffect(() => {
     if (!auto || !hasHydrated || didAutoAsk.current) {
@@ -65,18 +64,19 @@ export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean 
     }
     didAutoAsk.current = true;
 
-    // Wipe any persisted Simulator SF stub immediately after hydration.
-    if (replaceSimulatorSanFranciscoIfNeeded()) {
-      setStatus('ready');
-    }
-
     const state = useLocationStore.getState();
     if (state.mode === 'manual' && state.coords) {
       setStatus('ready');
       return;
     }
 
-    // Always refresh GPS so maps reflect the traveler's actual position.
+    // Refresh GPS so maps reflect the traveler's actual position.
+    // Skip when location was explicitly cleared (mode none, no coords).
+    if (state.mode === 'none' && !state.coords) {
+      setStatus('idle');
+      return;
+    }
+
     if (refresh || !state.coords) {
       void locate();
       return;

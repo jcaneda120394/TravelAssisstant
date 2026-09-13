@@ -241,7 +241,7 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     setBusy(true);
     setError(null);
     try {
-      // Remaps Simulator San Francisco → Bulacan automatically.
+      // Uses real device/simulator GPS — does not force Malolos.
       await getCurrentPosition();
       onChanged?.();
       onClose();
@@ -274,7 +274,7 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
             <Card className="mb-4">
               <AppText muted className="mb-3 text-sm">
                 With location permission on, we use your precise GPS and reverse-geocode the exact
-                city/area. On iOS Simulator, SF GPS is remapped to Malolos, Bulacan.
+                city/area. Malolos is only used when you tap that button (handy on the simulator).
               </AppText>
               <Button
                 label="Use Malolos, Bulacan"
@@ -293,9 +293,21 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
                 <Button
                   label="Clear saved location"
                   variant="ghost"
+                  loading={busy}
                   onPress={() => {
-                    void clearSavedLocation();
-                    onChanged?.();
+                    void (async () => {
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        await clearSavedLocation();
+                        onChanged?.();
+                        onClose();
+                      } catch (err) {
+                        setError(getErrorMessage(err));
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
                   }}
                 />
               </View>

@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { PlaceCard } from '@/components/cards/place-card';
 import { PlaceGrid } from '@/components/cards/place-grid';
@@ -237,30 +238,18 @@ export function HomeScreen() {
               onPress={() => setCurrencyPickerOpen(true)}
               accessibilityRole="button"
               accessibilityLabel="Change display currency"
-              className={`mt-3 rounded-2xl border border-white/25 bg-white/16 px-3.5 py-3 ${
-                isDesktop ? 'max-w-xl' : 'self-stretch'
-              }`}
+              className="mt-3 flex-row items-center gap-1.5 self-start rounded-full border border-white/30 bg-white/15 px-3 py-1.5"
               testID="home-change-currency"
             >
-              <View className="flex-row items-center justify-between gap-3">
-                <View className="flex-1">
-                  <AppText inverse className="text-xs font-sans-semibold uppercase tracking-wide text-white/75">
-                    Display currency
-                  </AppText>
-                  <AppText inverse className="mt-1 text-base font-sans-semibold text-white">
-                    {formatCurrencyWithSymbol(currency)}
-                    {preferences?.budget_tier ? ` · ${labelize(preferences.budget_tier)}` : ''}
-                  </AppText>
-                  <AppText inverse className="mt-0.5 text-xs text-white/70">
-                    Prices for hotels, food, and places use this currency
-                  </AppText>
-                </View>
-                <View className="rounded-xl bg-accent-500 px-3 py-2">
-                  <AppText inverse className="text-sm font-sans-semibold text-white">
-                    Change
-                  </AppText>
-                </View>
-              </View>
+              <AppText inverse className="text-sm font-sans-semibold text-white">
+                {formatCurrencyWithSymbol(currency)}
+              </AppText>
+              {preferences?.budget_tier ? (
+                <AppText inverse className="text-xs text-white/75">
+                  · {labelize(preferences.budget_tier)}
+                </AppText>
+              ) : null}
+              <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.9)" />
             </Pressable>
 
             <AppText inverse className="mt-2 text-xs text-white/65">

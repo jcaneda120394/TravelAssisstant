@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { fetchJson } from '@/lib/http/fetch-json';
 import { useLocationStore } from '@/stores/location-store';
@@ -6,7 +7,10 @@ import type { GeoPoint } from '@/types/domain';
 import { AppError, toAppError } from '@/lib/errors/app-error';
 import type { DestinationSuggestion } from '@/services/geo/geocode.service';
 
-/** Default travel area when Simulator GPS is Apple’s San Francisco stub. */
+/**
+ * Optional quick-pick for travelers who want Bulacan as a planning base.
+ * Not applied automatically — use "Use Malolos, Bulacan" in the location picker.
+ */
 export const HOME_LOCATION = {
   coords: { latitude: 14.8433, longitude: 120.8114 } satisfies GeoPoint,
   city: 'Malolos',
@@ -155,31 +159,23 @@ export async function applyHomeLocation(): Promise<GeoPoint> {
 }
 
 /**
- * If the store still has Apple Simulator’s San Francisco stub, replace it with Bulacan.
- * Safe to call after hydration.
+ * Legacy helper — no longer remaps SF → Malolos automatically.
+ * Precise GPS must keep real coordinates (including Simulator SF).
  */
 export function replaceSimulatorSanFranciscoIfNeeded(): boolean {
-  const state = useLocationStore.getState();
-  if (!looksLikeSanFrancisco(state.coords)) {
-    return false;
-  }
-  state.setManualLocation({
-    coords: HOME_LOCATION.coords,
-    city: HOME_LOCATION.city,
-    country: HOME_LOCATION.country,
-    label: HOME_LOCATION.label,
-  });
-  return true;
+  return false;
 }
 
 /** Fresh GPS fix — uses precise coords + detailed reverse-geocode when permission is granted. */
 export async function getCurrentPosition(): Promise<GeoPoint> {
+  const epoch = useLocationStore.getState().locationEpoch;
   try {
     const status = await requestForegroundLocation();
     if (status !== 'granted') {
-      // No GPS permission — still give a usable PH location instead of leaving the app empty.
-      await applyHomeLocation();
-      return HOME_LOCATION.coords;
+      throw new AppError(
+        'Location permission is off. Enable it in Settings, or choose a city manually.',
+        { code: 'LOCATION_DENIED' },
+      );
     }
 
     const position = await Location.getCurrentPositionAsync({
@@ -187,16 +183,10 @@ export async function getCurrentPosition(): Promise<GeoPoint> {
       mayShowUserSettingsDialog: true,
     });
 
-    let coords = {
+    const coords = {
       latitude: position.coords.latitude,
       longitude: position.coords.longitude,
     };
-
-    // Apple Simulator default (and many Expo Go stubs) sit in downtown SF.
-    if (looksLikeSanFrancisco(coords)) {
-      await applyHomeLocation();
-      return HOME_LOCATION.coords;
-    }
 
     const labeled = await labelFromCoords(coords);
 
@@ -206,17 +196,22 @@ export async function getCurrentPosition(): Promise<GeoPoint> {
       country: labeled.country,
       label: labeled.label,
       mode: 'precise',
+      epoch,
     });
+
+    // If the traveler cleared location while GPS was running, discard this write.
+    if (useLocationStore.getState().locationEpoch !== epoch) {
+      throw new AppError('Location was cleared. Tap Get my location again if you want GPS.', {
+        code: 'LOCATION_CLEARED',
+      });
+    }
 
     return coords;
   } catch (error) {
-    // Last resort: Bulacan so Explore / AI still work offline of GPS.
-    try {
-      await applyHomeLocation();
-      return HOME_LOCATION.coords;
-    } catch {
-      throw toAppError(error, 'Unable to get current location');
+    if (error instanceof AppError) {
+      throw error;
     }
+    throw toAppError(error, 'Unable to get current location');
   }
 }
 
@@ -265,6 +260,22 @@ export async function setLocationFromSuggestion(
 
 export async function clearSavedLocation(): Promise<void> {
   useLocationStore.getState().clearLocation();
+  const state = useLocationStore.getState();
+  // Force AsyncStorage so a later rehydrate cannot revive the old city.
+  await AsyncStorage.setItem(
+    'travelassistant-location',
+    JSON.stringify({
+      state: {
+        mode: 'none',
+        permissionStatus: state.permissionStatus,
+        coords: null,
+        city: null,
+        country: null,
+        label: null,
+      },
+      version: 0,
+    }),
+  );
 }
 
 export function useResolvedCoords(): GeoPoint {

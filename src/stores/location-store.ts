@@ -8,6 +8,8 @@ export type LocationMode = 'none' | 'approximate' | 'precise' | 'manual';
 
 type LocationState = {
   hasHydrated: boolean;
+  /** Bumps on clear so in-flight GPS writes are ignored. */
+  locationEpoch: number;
   mode: LocationMode;
   permissionStatus: 'unknown' | 'granted' | 'denied' | 'undetermined';
   coords: GeoPoint | null;
@@ -22,6 +24,7 @@ type LocationState = {
     country?: string | null;
     label?: string | null;
     mode?: LocationMode;
+    epoch?: number;
   }) => void;
   setManualLocation: (payload: {
     coords: GeoPoint;
@@ -34,8 +37,9 @@ type LocationState = {
 
 export const useLocationStore = create<LocationState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       hasHydrated: false,
+      locationEpoch: 0,
       mode: 'none',
       permissionStatus: 'unknown',
       coords: null,
@@ -44,18 +48,30 @@ export const useLocationStore = create<LocationState>()(
       label: null,
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
       setPermissionStatus: (permissionStatus) => set({ permissionStatus }),
-      setCurrentLocation: ({ coords, city = null, country = null, label = null, mode = 'precise' }) =>
-        set({ coords, city, country, label, mode }),
+      setCurrentLocation: ({
+        coords,
+        city = null,
+        country = null,
+        label = null,
+        mode = 'precise',
+        epoch,
+      }) => {
+        if (epoch != null && epoch !== get().locationEpoch) {
+          return;
+        }
+        set({ coords, city, country, label, mode });
+      },
       setManualLocation: ({ coords, city = null, country = null, label }) =>
         set({ coords, city, country, label, mode: 'manual' }),
       clearLocation: () =>
-        set({
+        set((state) => ({
+          locationEpoch: state.locationEpoch + 1,
           mode: 'none',
           coords: null,
           city: null,
           country: null,
           label: null,
-        }),
+        })),
     }),
     {
       name: 'travelassistant-location',

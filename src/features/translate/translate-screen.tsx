@@ -5,9 +5,10 @@ import { Alert, Image, Platform } from 'react-native';
 
 import { ChipSelect } from '@/components/forms/chip-select';
 import { TextField } from '@/components/forms/text-field';
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { LANGUAGES } from '@/constants/preferences';
 import { useAuth } from '@/hooks/use-auth';
 import { getErrorMessage } from '@/lib/errors/app-error';
@@ -88,9 +89,9 @@ export function TranslateScreen() {
 
   return (
     <Screen>
-      <ScrollView
+      <ResponsiveScrollView
+        pad="tabs"
         className="flex-1 px-5 pt-4"
-        contentContainerClassName="pb-12"
         testID="screen-translate"
       >
         <SectionHeader
@@ -192,7 +193,7 @@ export function TranslateScreen() {
             </View>
           </Card>
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

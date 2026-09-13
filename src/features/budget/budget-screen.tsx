@@ -3,11 +3,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { TextField } from '@/components/forms/text-field';
 import { ChipSelect } from '@/components/forms/chip-select';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { useAuth } from '@/hooks/use-auth';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import {
@@ -103,7 +104,7 @@ export function BudgetScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-budget">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-budget">
         <SectionHeader title="Trip budget" subtitle={`Home currency ${homeCurrency}`} />
         <Card className="mb-4">
           <AppText className="font-sans-semibold text-lg">
@@ -140,7 +141,7 @@ export function BudgetScreen() {
             </AppText>
           ))}
         </Card>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

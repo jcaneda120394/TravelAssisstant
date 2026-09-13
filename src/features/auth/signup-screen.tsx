@@ -4,10 +4,11 @@ import { Controller, useForm } from 'react-hook-form';
 import { Alert } from 'react-native';
 import { z } from 'zod';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
 import { AuthBackToHomeBar, goToGuestHome } from '@/features/auth/auth-back-to-home';
 import { getErrorMessage } from '@/lib/errors/app-error';
@@ -67,7 +68,7 @@ export function SignupScreen() {
   return (
     <Screen>
       <AuthBackToHomeBar />
-      <ScrollView className="flex-1 px-5 pt-2" contentContainerClassName="pb-10" testID="screen-signup">
+      <ResponsiveScrollView pad="keyboard" className="flex-1 px-5 pt-2" testID="screen-signup">
         <SectionHeader
           eyebrow="TravelAssistant"
           title="Create account"
@@ -142,7 +143,7 @@ export function SignupScreen() {
           </AppText>
           <Button label="Sign in" variant="ghost" onPress={() => router.push('/(auth)/login')} />
         </View>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

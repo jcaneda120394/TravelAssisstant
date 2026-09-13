@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { DatePickerField } from '@/components/forms/date-picker-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { providers } from '@/providers/registry';
 import { useLocationStore } from '@/stores/location-store';
@@ -53,7 +54,7 @@ export function WeatherScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-weather">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-weather">
         <SectionHeader title="Weather" subtitle={label} />
         {current.isLoading ? <Skeleton height={120} /> : null}
         {current.data ? (
@@ -142,7 +143,7 @@ export function WeatherScreen() {
             );
           })}
         </Card>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

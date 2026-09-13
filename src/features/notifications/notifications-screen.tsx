@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView } from '@/components/ui/primitives';
 import {
   listNotifications,
   markNotificationRead,
@@ -20,7 +20,7 @@ export function NotificationsScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-notifications">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-notifications">
         <SectionHeader
           title="Notifications"
           subtitle="Proactive alerts after permission — mock samples for now"
@@ -46,7 +46,7 @@ export function NotificationsScreen() {
             ) : null}
           </Card>
         ))}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

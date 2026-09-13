@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Modal, Pressable as RNPressable } from 'react-native';
+import { Modal, Pressable as RNPressable, useWindowDimensions } from 'react-native';
 
 import { CurrencyCountrySearch } from '@/components/forms/currency-country-search';
 import { AppText } from '@/components/ui/typography';
@@ -17,6 +17,8 @@ type Props = {
 /** Compact currency dropdown — closes immediately after a selection. */
 export function CurrencyPickerModal({ visible, currency, onClose, onSelect }: Props) {
   const scheme = useAppColorScheme();
+  const { height } = useWindowDimensions();
+  const sheetMaxHeight = Math.min(420, Math.round(height * 0.85));
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -33,7 +35,7 @@ export function CurrencyPickerModal({ visible, currency, onClose, onSelect }: Pr
               ? 'border-brand-800 bg-surface-cardDark'
               : 'border-black/8 bg-white'
           }`}
-          style={{ maxHeight: 420 }}
+          style={{ maxHeight: sheetMaxHeight }}
         >
           <View className="flex-row items-center justify-between border-b border-black/8 px-3 py-2.5 dark:border-brand-800">
             <AppText className="text-sm font-sans-semibold">Currency</AppText>

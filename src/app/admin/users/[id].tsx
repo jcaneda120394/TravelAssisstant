@@ -3,10 +3,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert } from 'react-native';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, View } from '@/components/ui/primitives';
 import { BUDGET_TIERS, LANGUAGES, WALKING_TOLERANCE } from '@/constants/preferences';
 import { theme } from '@/config/theme';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
@@ -243,7 +244,7 @@ export default function AdminUserEditScreen() {
 
   return (
     <Screen testID="admin-user-edit">
-      <ScrollView className="flex-1 px-6 py-6" contentContainerClassName="pb-16">
+      <ResponsiveScrollView className="flex-1 px-6 py-6">
         <Button label="← Back to users" variant="ghost" onPress={() => router.back()} />
         <SectionHeader
           eyebrow="Edit user"
@@ -426,7 +427,7 @@ export default function AdminUserEditScreen() {
           disabled={savePasswordMutation.isPending}
           onPress={() => saveMutation.mutate()}
         />
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

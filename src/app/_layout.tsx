@@ -21,7 +21,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import { useEffect } from 'react';
-import { useColorScheme as useSystemColorScheme, View } from 'react-native';
+import { Platform, useColorScheme as useSystemColorScheme, View } from 'react-native';
 import 'react-native-reanimated';
 
 import { OfflineBanner } from '@/components/layout/offline-banner';
@@ -84,9 +84,26 @@ function RootNavigator() {
 
   useEffect(() => {
     setColorScheme(resolved);
+    // Web: Tailwind `darkMode: 'class'` needs `dark` on <html> for dark: utilities.
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const root = document.documentElement;
+      root.classList.toggle('dark', resolved === 'dark');
+      root.style.colorScheme = resolved;
+    }
     // NativeWind's setColorScheme identity can change every render — omit from deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [resolved]);
+
+  // Web: mirror theme CSS variables onto :root so brand tokens update outside RN Web nodes.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+      return;
+    }
+    const root = document.documentElement;
+    for (const [key, value] of Object.entries(cssVars)) {
+      root.style.setProperty(key, value);
+    }
+  }, [cssVars]);
 
   const navTheme =
     resolved === 'dark'

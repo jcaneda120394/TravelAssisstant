@@ -14,7 +14,7 @@ type Props = {
 };
 
 /**
- * Centers and constrains content on desktop web; no-ops on mobile/native.
+ * Centers and constrains content on desktop/tablet; phones keep full width.
  */
 export function PageContainer({
   children,
@@ -23,9 +23,9 @@ export function PageContainer({
   fullBleed = false,
   testID,
 }: Props) {
-  const { isDesktop, contentMaxWidth, pagePaddingX } = useResponsiveLayout();
+  const { isDesktop, isTablet, contentMaxWidth, pagePaddingX } = useResponsiveLayout();
 
-  if (!isDesktop || fullBleed) {
+  if (fullBleed || (!isDesktop && !isTablet)) {
     return (
       <View className={className} style={style} testID={testID}>
         {children}
@@ -33,15 +33,18 @@ export function PageContainer({
     );
   }
 
+  const padX = isDesktop ? pagePaddingX : 0;
+  const scrollbarClearance = isDesktop ? 8 : 0;
+
   return (
     <View
       className={`w-full self-center ${className}`}
       style={[
         {
           maxWidth: contentMaxWidth,
-          paddingLeft: pagePaddingX,
+          paddingLeft: padX,
           // Slightly more on the right so content never sits under the web scrollbar.
-          paddingRight: pagePaddingX + 8,
+          paddingRight: padX + scrollbarClearance,
           width: '100%',
         },
         style,

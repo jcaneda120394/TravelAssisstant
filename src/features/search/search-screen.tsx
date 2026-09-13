@@ -2,11 +2,12 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { PlaceCard } from '@/components/cards/place-card';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, View } from '@/components/ui/primitives';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useAuth } from '@/hooks/use-auth';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
@@ -53,7 +54,7 @@ export function SearchScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-search">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-search">
         <SectionHeader title="Search" subtitle="Places and saved trips" />
         <TextField
           label="Search"
@@ -94,7 +95,7 @@ export function SearchScreen() {
             <PlaceCard key={place.id} place={place} />
           ))}
         </View>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

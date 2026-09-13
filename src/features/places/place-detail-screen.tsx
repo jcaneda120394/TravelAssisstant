@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Image, Linking } from 'react-native';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { PlacePhotoGallery } from '@/components/places/place-photo-gallery';
 import { TextField } from '@/components/forms/text-field';
 import { SaveTripModal } from '@/components/trips/save-trip-modal';
@@ -10,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, View } from '@/components/ui/primitives';
 import { requireAuthToSave } from '@/features/auth/require-auth';
 import { useAuth } from '@/hooks/use-auth';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
@@ -367,7 +368,7 @@ export function PlaceDetailScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 pt-0" contentContainerClassName="pb-10" testID="screen-place">
+      <ResponsiveScrollView className="flex-1 pt-0" testID="screen-place">
         <View className="px-5 pt-4">
           <AppText className="text-[28px] font-sans-bold leading-8">
             {title}
@@ -687,7 +688,7 @@ export function PlaceDetailScreen() {
           />
         </View>
         </View>
-      </ScrollView>
+      </ResponsiveScrollView>
 
       <SaveTripModal
         visible={saveTripOpen}

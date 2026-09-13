@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 /** Sidebar / multi-column shell — keep above phone landscape widths. */
 const DESKTOP_MIN = 1024;
 const WIDE_MIN = 1280;
+const TABLET_MIN = 600;
 const COMPACT_MAX = 400;
 
 export type ResponsiveLayout = {
@@ -13,16 +14,21 @@ export type ResponsiveLayout = {
   height: number;
   isDesktop: boolean;
   isWide: boolean;
+  isTablet: boolean;
   /** Narrow phone web — prefer icon-first chrome. */
   isCompact: boolean;
   contentMaxWidth: number;
   placeColumns: 1 | 2 | 3;
   sidebarWidth: number;
   pagePaddingX: number;
+  /** Horizontal content gutter for phone/tablet. */
+  contentGutter: number;
   /** Bottom tab bar total height (0 on desktop). */
   tabBarHeight: number;
   /** Recommended ScrollView bottom padding so content clears tabs + FAB. */
   scrollBottomPad: number;
+  /** Stack screens (no tab bar) — clears home indicator. */
+  stackBottomPad: number;
 };
 
 function usePrefersCoarsePointer(): boolean {
@@ -54,7 +60,8 @@ export function useResponsiveLayout(): ResponsiveLayout {
     const isDesktop = isWeb && width >= DESKTOP_MIN && !coarsePointer;
     const isWide = width >= WIDE_MIN;
     const isCompact = width < COMPACT_MAX;
-    const placeColumns: 1 | 2 | 3 = !isDesktop ? 1 : isWide ? 3 : 2;
+    const isTablet = !isDesktop && width >= TABLET_MIN;
+    const placeColumns: 1 | 2 | 3 = isDesktop ? (isWide ? 3 : 2) : isTablet ? 2 : 1;
 
     const safeBottom = Math.max(insets.bottom, 0);
     let tabBarHeight = 0;
@@ -62,16 +69,16 @@ export function useResponsiveLayout(): ResponsiveLayout {
       if (Platform.OS === 'ios') {
         tabBarHeight = 49 + Math.max(safeBottom, 20);
       } else if (isWeb) {
-        // Mobile browsers: labels + icons + home-indicator / URL bar inset.
-        tabBarHeight = (isCompact ? 56 : 64) + Math.max(safeBottom, 8);
+        tabBarHeight = (isCompact ? 56 : isTablet ? 60 : 64) + Math.max(safeBottom, 8);
       } else {
         tabBarHeight = 56 + Math.max(safeBottom, 8);
       }
     }
 
-    // Clear tab bar + floating AI button.
     const fabClearance = isDesktop ? 24 : 72;
-    const scrollBottomPad = isDesktop ? 40 : tabBarHeight + fabClearance;
+    const scrollBottomPad = isDesktop ? 48 : tabBarHeight + fabClearance;
+    const stackBottomPad = Math.max(safeBottom, 12) + (isDesktop ? 32 : 28);
+    const contentGutter = isDesktop ? 0 : isCompact ? 16 : 20;
 
     return {
       isWeb,
@@ -79,13 +86,16 @@ export function useResponsiveLayout(): ResponsiveLayout {
       height,
       isDesktop,
       isWide,
+      isTablet,
       isCompact,
-      contentMaxWidth: isWide ? 1120 : 960,
+      contentMaxWidth: isWide ? 1120 : isDesktop ? 960 : isTablet ? 720 : width,
       placeColumns,
-      sidebarWidth: 232,
+      sidebarWidth: isWide ? 248 : 232,
       pagePaddingX: isDesktop ? (isWide ? 36 : 28) : 0,
+      contentGutter,
       tabBarHeight,
       scrollBottomPad,
+      stackBottomPad,
     };
   }, [coarsePointer, height, insets.bottom, isWeb, width]);
 }

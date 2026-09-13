@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ActivityIndicator, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
@@ -183,6 +184,7 @@ const QUICK_PICKS: DestinationSuggestion[] = [
 
 export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
   const scheme = useAppColorScheme();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,7 +232,10 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-black/40">
-        <View className="max-h-[90%] rounded-t-3xl bg-white px-5 pb-8 pt-4 dark:bg-surface-cardDark">
+        <View
+          className="max-h-[90%] rounded-t-3xl bg-white px-5 pt-4 dark:bg-surface-cardDark"
+          style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+        >
           <View className="mb-3 flex-row items-center justify-between">
             <SectionHeader
               title="Set your location"

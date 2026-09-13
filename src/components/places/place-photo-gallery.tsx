@@ -1,14 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback, useRef, useState } from 'react';
 import {
-  Dimensions,
   Image,
   Modal,
   Platform,
   Pressable as RNPressable,
   ScrollView as RNScrollView,
   Text as RNText,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/typography';
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
@@ -103,10 +104,11 @@ function GalleryArrow({
 
 export function PlacePhotoGallery({ photos, loading, placeName }: Props) {
   const scheme = useAppColorScheme();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<RNScrollView>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [index, setIndex] = useState(0);
-  const windowWidth = Dimensions.get('window').width;
+  const { width: windowWidth } = useWindowDimensions();
   const cardWidth = Math.min(windowWidth - 40, 320);
   const photoHeight = Math.round(cardWidth * 0.72);
   const step = cardWidth + GAP;
@@ -247,7 +249,9 @@ export function PlacePhotoGallery({ photos, loading, placeName }: Props) {
             flex: 1,
             backgroundColor: 'rgba(0,0,0,0.92)',
             justifyContent: 'center',
-            padding: 16,
+            paddingTop: Math.max(insets.top, 16),
+            paddingBottom: Math.max(insets.bottom, 16),
+            paddingHorizontal: 16,
           }}
         >
           <RNPressable

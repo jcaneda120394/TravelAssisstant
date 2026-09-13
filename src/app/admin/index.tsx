@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { fetchAdminOverview } from '@/services/admin/admin.service';
 
@@ -26,7 +27,7 @@ export default function AdminOverviewScreen() {
 
   return (
     <Screen testID="admin-overview">
-      <ScrollView className="flex-1 px-6 py-6" contentContainerClassName="pb-12">
+      <ResponsiveScrollView className="flex-1 px-6 py-6">
         <SectionHeader
           eyebrow="Dashboard"
           title="Overview"
@@ -46,7 +47,7 @@ export default function AdminOverviewScreen() {
           <StatCard label="Public reviews" value={data?.publicReviews ?? 0} />
           <StatCard label="Photos" value={data?.photos ?? 0} />
         </View>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

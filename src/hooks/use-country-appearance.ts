@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { Platform } from 'react-native';
 
 import type { ThemeColors } from '@/config/theme';
 import { theme as baseTheme } from '@/config/theme';
@@ -15,13 +14,10 @@ import {
 
 export function useCountryAppearance() {
   const scheme = useAppColorScheme();
-  const followCountryThemePref = useThemeStore((state) => state.followCountryTheme);
+  const followCountryTheme = useThemeStore((state) => state.followCountryTheme);
   const country = useLocationStore((state) => state.country);
   const city = useLocationStore((state) => state.city);
   const label = useLocationStore((state) => state.label);
-
-  // Web stays on the casual (default) palette — light/dark only, no country themes.
-  const followCountryTheme = Platform.OS === 'web' ? false : followCountryThemePref;
 
   const locationHint = country || label || city;
   const cityHint = city || label;
@@ -53,8 +49,8 @@ export function useCountryAppearance() {
     cssVars,
     countryTheme,
     followCountryTheme,
-    /** True when country themes are available (native only). */
-    countryThemesSupported: Platform.OS !== 'web',
+    /** Country themes are available on native and web. */
+    countryThemesSupported: true,
     locationLabel: label || [city, country].filter(Boolean).join(', ') || null,
   };
 }

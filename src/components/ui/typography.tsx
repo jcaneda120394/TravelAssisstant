@@ -61,11 +61,11 @@ export function Screen({
   fullBleed?: boolean;
 }) {
   const scheme = useAppColorScheme();
-  const { isDesktop } = useResponsiveLayout();
+  const { isDesktop, isTablet } = useResponsiveLayout();
   const bg = scheme === 'dark' ? 'bg-surface-dark' : 'bg-surface-light';
 
   const body =
-    unsafe || fullBleed || !isDesktop ? (
+    unsafe || fullBleed || (!isDesktop && !isTablet) ? (
       children
     ) : (
       <PageContainer className="flex-1">{children}</PageContainer>

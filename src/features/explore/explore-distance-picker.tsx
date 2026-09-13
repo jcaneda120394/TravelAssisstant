@@ -109,7 +109,7 @@ export function ExploreDistancePicker({
           flexWrap: 'nowrap',
           alignItems: 'center',
           gap: 8,
-          paddingRight: 4,
+          paddingRight: 20,
         }}
       >
         {PRIMARY_DISTANCES.map((option) => {

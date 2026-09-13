@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { useAuth } from '@/hooks/use-auth';
 import { getErrorMessage, toAppError } from '@/lib/errors/app-error';
 import { signInWithEmail, signOut } from '@/services/auth/auth.service';
@@ -61,7 +62,7 @@ export default function AdminLoginScreen() {
 
   return (
     <Screen testID="admin-login" fullBleed>
-      <ScrollView className="flex-1" contentContainerClassName="items-center px-5 py-10">
+      <ResponsiveScrollView className="flex-1" contentContainerClassName="items-center px-5 py-10">
         <View className="w-full max-w-md">
           <SectionHeader
             eyebrow="Operators"
@@ -120,7 +121,7 @@ export default function AdminLoginScreen() {
             </View>
           </Card>
         </View>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

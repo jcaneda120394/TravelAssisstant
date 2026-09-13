@@ -2,12 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { Linking } from 'react-native';
 import { useState } from 'react';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { CountrySelect } from '@/components/forms/country-select';
 import { DisplayPriceText } from '@/components/currency/display-price-text';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { useAuth } from '@/hooks/use-auth';
 import { providers } from '@/providers/registry';
 import { analytics } from '@/lib/analytics';
@@ -26,7 +27,7 @@ export function EsimScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-esim">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-esim">
         <SectionHeader title="eSIM finder" subtitle="Live catalog plans with partner purchase links" />
         <CountrySelect label="Destination country" value={country} onChange={setCountry} />
 
@@ -72,7 +73,7 @@ export function EsimScreen() {
             <AppText muted>No plans listed for this country yet.</AppText>
           ) : null}
         </View>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

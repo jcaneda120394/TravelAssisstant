@@ -2,12 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { CurrencySearchField } from '@/components/forms/currency-search-field';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, View } from '@/components/ui/primitives';
 import { formatFxCurrencyLabel } from '@/constants/fx-currencies';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
@@ -163,7 +164,7 @@ export function CurrencyScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-currency">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-currency">
         <SectionHeader
           eyebrow="Live FX"
           title="Currency converter"
@@ -292,7 +293,7 @@ export function CurrencyScreen() {
           Mid-market estimates from {sourceLabel}. Bank / card rates include fees and may differ.
           Confirm before sending money or booking.
         </AppText>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

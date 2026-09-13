@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { CityAutocomplete } from '@/components/forms/city-autocomplete';
 import { MapLayersControl } from '@/components/maps/map-layers-control';
 import { Button } from '@/components/ui/button';
@@ -375,9 +376,8 @@ export function DirectionsScreen() {
 
   return (
     <Screen>
-      <ScrollView
+      <ResponsiveScrollView
         className="flex-1 px-5 pt-4"
-        contentContainerClassName="pb-10"
         testID="screen-directions"
       >
         <SectionHeader
@@ -458,7 +458,7 @@ export function DirectionsScreen() {
             fitToCoordinates={userAdjustedZoom ? undefined : path}
           />
           <MapLayersControl testID="directions-layers-control" />
-          <View pointerEvents="box-none" className="absolute bottom-4 right-4 gap-2">
+          <View pointerEvents="box-none" className="absolute bottom-4 left-4 gap-2">
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Zoom in"
@@ -508,7 +508,12 @@ export function DirectionsScreen() {
         {!navigating ? (
           <>
             {/* Mode strip with times */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-4"
+              contentContainerStyle={{ paddingRight: 20 }}
+            >
               <View className="flex-row">
                 {visibleModeTabs.map((tab) => {
                   const duration = modeDurations.get(tab.id);
@@ -725,7 +730,7 @@ export function DirectionsScreen() {
             />
           </View>
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

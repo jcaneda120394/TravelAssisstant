@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import {
   deleteAdminSpot,
@@ -46,7 +47,7 @@ export default function AdminSpotsScreen() {
 
   return (
     <Screen testID="admin-spots">
-      <ScrollView className="flex-1 px-6 py-6" contentContainerClassName="pb-12">
+      <ResponsiveScrollView className="flex-1 px-6 py-6">
         <SectionHeader
           eyebrow="Travel Guide"
           title="Spots moderation"
@@ -104,7 +105,7 @@ export default function AdminSpotsScreen() {
             </View>
           </Card>
         ))}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

@@ -3,6 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { TextField } from '@/components/forms/text-field';
 import { DatePickerField } from '@/components/forms/date-picker-field';
 import { DestinationAutocomplete } from '@/components/forms/destination-autocomplete';
@@ -591,9 +592,8 @@ export function TripDetailScreen() {
 
   return (
     <Screen>
-      <ScrollView
+      <ResponsiveScrollView
         className="flex-1 px-5 pt-4"
-        contentContainerClassName="pb-12"
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         testID="screen-trip"
@@ -898,7 +898,11 @@ export function TripDetailScreen() {
                     {week.label}
                   </AppText>
                 ) : null}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingRight: 20 }}
+            >
                   <View className="flex-row gap-2">
                     {week.days.map((item) => {
                       const active = item === day;
@@ -989,7 +993,12 @@ export function TripDetailScreen() {
                 title="Day map"
                 subtitle={`${formatDayLabel(day)} · ${mapMarkers.length} pinned stops`}
               />
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="mb-3"
+                contentContainerStyle={{ paddingRight: 20 }}
+              >
                 <View className="flex-row gap-2">
                   {tripDays.map((item) => (
                     <Pressable
@@ -1105,7 +1114,7 @@ export function TripDetailScreen() {
             </View>
           </Card>
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

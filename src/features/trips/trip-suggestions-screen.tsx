@@ -3,12 +3,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { CityAutocomplete } from '@/components/forms/city-autocomplete';
 import { DatePickerField } from '@/components/forms/date-picker-field';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, View } from '@/components/ui/primitives';
 import { requireAuthToSave } from '@/features/auth/require-auth';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useAuth } from '@/hooks/use-auth';
@@ -87,16 +88,16 @@ function SuggestionCard({
         Highlights: {template.highlights.slice(0, 4).join(' · ')}
       </AppText>
       <View className="mt-3 flex-row flex-wrap gap-2">
-        <View className="min-w-[100px] flex-1">
+        <View className="min-w-0 basis-[46%] flex-1">
           <Button label="View" variant="secondary" onPress={onView} />
         </View>
-        <View className="min-w-[100px] flex-1">
+        <View className="min-w-0 basis-[46%] flex-1">
           <Button label="Customize" variant="secondary" onPress={onCustomize} />
         </View>
-        <View className="min-w-[100px] flex-1">
+        <View className="min-w-0 basis-[46%] flex-1">
           <Button label="Use this trip" loading={using} onPress={onUse} />
         </View>
-        <View className="min-w-[100px] flex-1">
+        <View className="min-w-0 basis-[46%] flex-1">
           <Button label="Save" variant="ghost" loading={using} onPress={onSave} />
         </View>
       </View>
@@ -227,7 +228,7 @@ export function TripSuggestionsScreen() {
 
     return (
       <Screen>
-        <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-12">
+        <ResponsiveScrollView className="flex-1 px-5 pt-4">
           <Button label="← All suggestions" variant="ghost" onPress={() => setViewId(null)} />
           <SectionHeader
             title={`${viewing.heroEmoji} ${viewing.name}`}
@@ -390,16 +391,15 @@ export function TripSuggestionsScreen() {
               ))}
             </Card>
           ))}
-        </ScrollView>
+        </ResponsiveScrollView>
       </Screen>
     );
   }
 
   return (
     <Screen>
-      <ScrollView
+      <ResponsiveScrollView
         className="flex-1 px-5 pt-4"
-        contentContainerClassName="pb-12"
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
         keyboardDismissMode="on-drag"
@@ -551,7 +551,7 @@ export function TripSuggestionsScreen() {
             </AppText>
           </Card>
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

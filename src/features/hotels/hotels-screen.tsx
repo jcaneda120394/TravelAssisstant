@@ -2,13 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { CityAutocomplete } from '@/components/forms/city-autocomplete';
 import { TextField } from '@/components/forms/text-field';
 import { DisplayPriceText } from '@/components/currency/display-price-text';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, View } from '@/components/ui/primitives';
 import { providers } from '@/providers/registry';
 import { analytics } from '@/lib/analytics';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
@@ -80,9 +81,8 @@ export function HotelsScreen() {
 
   return (
     <Screen>
-      <ScrollView
+      <ResponsiveScrollView
         className="flex-1 px-5 pt-4"
-        contentContainerClassName="pb-10"
         keyboardShouldPersistTaps="handled"
         testID="screen-hotels"
       >
@@ -166,7 +166,7 @@ export function HotelsScreen() {
             </AppText>
           </Pressable>
         ))}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

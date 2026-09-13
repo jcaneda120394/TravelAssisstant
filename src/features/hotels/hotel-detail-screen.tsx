@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { Button } from '@/components/ui/button';
 import { DisplayPriceText } from '@/components/currency/display-price-text';
 import { EmptyState } from '@/components/feedback/states';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView } from '@/components/ui/primitives';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { providers } from '@/providers/registry';
 
@@ -33,7 +33,7 @@ export function HotelDetailScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4">
         <SectionHeader title={hotel.name} subtitle={hotel.address} />
         <Card className="mb-4">
           <AppText muted>
@@ -71,7 +71,7 @@ export function HotelDetailScreen() {
             })
           }
         />
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

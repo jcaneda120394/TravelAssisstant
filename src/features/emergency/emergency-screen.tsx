@@ -3,13 +3,14 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { PlaceCard } from '@/components/cards/place-card';
 import { CountrySelect } from '@/components/forms/country-select';
 import { LocationPickerModal } from '@/components/location/location-picker-modal';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { useAuth } from '@/hooks/use-auth';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import {
@@ -78,7 +79,7 @@ export function EmergencyScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-emergency">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-emergency">
         <SectionHeader
           title="Emergency"
           subtitle="Medical help near your set location · police & embassy by country"
@@ -207,7 +208,7 @@ export function EmergencyScreen() {
           variant="ghost"
           onPress={() => router.push('/assistant')}
         />
-      </ScrollView>
+      </ResponsiveScrollView>
 
       <LocationPickerModal
         visible={pickerOpen}

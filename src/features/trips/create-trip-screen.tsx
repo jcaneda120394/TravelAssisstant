@@ -2,13 +2,15 @@ import { useMutation } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { DatePickerField } from '@/components/forms/date-picker-field';
 import { DestinationAutocomplete } from '@/components/forms/destination-autocomplete';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, View } from '@/components/ui/primitives';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useAuth } from '@/hooks/use-auth';
 import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
@@ -71,6 +73,7 @@ export function CreateTripScreen() {
   const router = useRouter();
   const { user, preferences } = useAuth();
   const scheme = useAppColorScheme();
+  const insets = useSafeAreaInsets();
   const draft = useCreateTripStore();
   const step = CREATE_TRIP_STEPS[draft.stepIndex] ?? 'destination';
 
@@ -147,7 +150,7 @@ export function CreateTripScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-28" keyboardShouldPersistTaps="handled">
+      <ResponsiveScrollView pad="keyboard" className="flex-1 px-5 pt-4" keyboardShouldPersistTaps="handled">
         <SectionHeader title="Create Trip" subtitle="Guided planner · resume anytime" />
         <StepperBar index={draft.stepIndex} total={CREATE_TRIP_STEPS.length} />
         <Card className="mb-4">
@@ -508,12 +511,13 @@ export function CreateTripScreen() {
             </View>
           ) : null}
         </Card>
-      </ScrollView>
+      </ResponsiveScrollView>
 
       <View
-        className={`absolute bottom-0 left-0 right-0 border-t px-5 py-4 ${
+        className={`absolute bottom-0 left-0 right-0 border-t px-5 pt-4 ${
           scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-black/8 bg-white'
         }`}
+        style={{ paddingBottom: Math.max(insets.bottom, 16) }}
       >
         <View className="flex-row gap-2">
           {draft.stepIndex > 0 ? (

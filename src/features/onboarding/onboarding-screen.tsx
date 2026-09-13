@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { ChipSelect } from '@/components/forms/chip-select';
 import { CompanionTravelFields } from '@/components/forms/companion-travel-fields';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import {
   ACCESSIBILITY_OPTIONS,
   BUDGET_TIERS,
@@ -248,9 +249,8 @@ export function OnboardingScreen() {
 
   return (
     <Screen>
-      <ScrollView
+      <ResponsiveScrollView
         className="flex-1 px-5 pt-4"
-        contentContainerClassName="pb-12"
         testID="screen-onboarding"
       >
         <View className="mb-3 flex-row items-center justify-between gap-3">
@@ -510,7 +510,7 @@ export function OnboardingScreen() {
             {labelize(draft.budget_tier)}
           </AppText>
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

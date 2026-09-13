@@ -86,10 +86,8 @@ export function HomeScreen() {
         : EXPO_MENU_GUTTER_ANDROID;
   const destinationHint = country || label || '';
   const gradient = useMemo(
-    () =>
-      // Web always uses the casual (default) hero gradient.
-      getDestinationTravelGradient(scheme, isWeb ? null : destinationHint, isWeb ? null : label),
-    [scheme, isWeb, destinationHint, label],
+    () => getDestinationTravelGradient(scheme, destinationHint, label),
+    [scheme, destinationHint, label],
   );
 
   const refreshNearby = () => {

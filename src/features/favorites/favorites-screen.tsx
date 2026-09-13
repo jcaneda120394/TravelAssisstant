@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { PlaceCard } from '@/components/cards/place-card';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView } from '@/components/ui/primitives';
 import { useAuth } from '@/hooks/use-auth';
 import {
   createCollection,
@@ -32,7 +32,7 @@ export function FavoritesScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-favorites">
+      <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-favorites">
         <SectionHeader title="Favorites" subtitle="Saved places and collections" />
 
         <Card className="mb-4">
@@ -63,7 +63,7 @@ export function FavoritesScreen() {
         {(savedQuery.data?.length ?? 0) === 0 ? (
           <EmptyState title="No saved places" description="Save places from Explore or Place details." />
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

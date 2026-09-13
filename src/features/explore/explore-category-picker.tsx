@@ -222,7 +222,7 @@ export function ExploreCategoryPicker({ value, onChange }: Props) {
           flexWrap: 'nowrap',
           alignItems: 'center',
           gap: 8,
-          paddingRight: 4,
+          paddingRight: 20,
         }}
       >
         {PRIMARY_CATEGORIES.map((option) => {

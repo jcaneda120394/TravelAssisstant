@@ -3,10 +3,11 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { View } from '@/components/ui/primitives';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import {
   deleteAdminTrip,
@@ -55,7 +56,7 @@ export default function AdminTripsScreen() {
 
   return (
     <Screen testID="admin-trips">
-      <ScrollView className="flex-1 px-6 py-6" contentContainerClassName="pb-12">
+      <ResponsiveScrollView className="flex-1 px-6 py-6">
         <SectionHeader
           eyebrow="Trips"
           title="All trips"
@@ -160,7 +161,7 @@ export default function AdminTripsScreen() {
             </View>
           </Card>
         ))}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

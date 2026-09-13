@@ -174,7 +174,7 @@ export function MapScreen() {
               mapHeight={mapHeight}
             />
             <MapLayersControl testID="map-layers-control" />
-            <View pointerEvents="box-none" className="absolute bottom-4 right-4 gap-2">
+            <View pointerEvents="box-none" className="absolute bottom-4 left-4 gap-2">
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Zoom in"

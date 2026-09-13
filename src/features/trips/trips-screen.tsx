@@ -11,11 +11,11 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
+import { Pressable, View } from '@/components/ui/primitives';
 import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
 import { useAuth } from '@/hooks/use-auth';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
-import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { createTrip, deleteTrip, listTrips } from '@/services/trips/trips.service';
 import { analytics } from '@/lib/analytics';
 import { getErrorMessage } from '@/lib/errors/app-error';
@@ -28,7 +28,6 @@ export function TripsScreen() {
   const { user, preferences } = useAuth();
   const { currency } = useDisplayCurrency();
   const scheme = useAppColorScheme();
-  const { scrollBottomPad } = useResponsiveLayout();
   const queryClient = useQueryClient();
   const label = useLocationStore((state) => state.label);
   const [showForm, setShowForm] = useState(false);
@@ -81,12 +80,7 @@ export function TripsScreen() {
 
   return (
     <Screen>
-      <ScrollView
-        className="flex-1 px-5 pt-4"
-        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
-        style={{ width: '100%', maxWidth: '100%' }}
-        testID="screen-trips"
-      >
+      <ResponsiveScrollView pad="tabs" className="flex-1 px-5 pt-4" testID="screen-trips">
         <SectionHeader
           title="Trips"
           subtitle={
@@ -268,7 +262,7 @@ export function TripsScreen() {
             description="Tap Create trip or Save trip to keep a destination plan."
           />
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
 
       <SaveTripModal
         visible={showSaveModal}

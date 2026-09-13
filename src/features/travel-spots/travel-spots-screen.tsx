@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
+import { Pressable, View } from '@/components/ui/primitives';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
-import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { rememberPlace } from '@/services/places/place-cache';
 import {
   listPublicTrips,
@@ -23,7 +23,6 @@ type Tab = 'spots' | 'trips';
 export function TravelSpotsScreen() {
   const router = useRouter();
   const scheme = useAppColorScheme();
-  const { scrollBottomPad } = useResponsiveLayout();
   const [tab, setTab] = useState<Tab>('spots');
 
   const feedQuery = useQuery({
@@ -77,12 +76,7 @@ export function TravelSpotsScreen() {
 
   return (
     <Screen>
-      <ScrollView
-        className="flex-1 px-5 pt-4"
-        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
-        style={{ width: '100%', maxWidth: '100%' }}
-        testID="screen-travel-spots"
-      >
+      <ResponsiveScrollView pad="tabs" className="flex-1 px-5 pt-4" testID="screen-travel-spots">
         <SectionHeader
           title="Travel Guide"
           subtitle="Public photos, reviews, and trip stories from travelers"
@@ -180,7 +174,7 @@ export function TravelSpotsScreen() {
         <View className="mt-2">
           <Button label="Explore places nearby" variant="secondary" onPress={() => router.push('/(tabs)/explore')} />
         </View>
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { ScrollView, View } from '@/components/ui/primitives';
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
+import { View } from '@/components/ui/primitives';
 import {
   EXPLORE_CATEGORIES,
   ExploreCategoryPicker,
@@ -68,7 +69,7 @@ export function ExploreScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ category?: string | string[] }>();
   const { preferences } = useAuth();
-  const { isDesktop, scrollBottomPad } = useResponsiveLayout();
+  const { isDesktop } = useResponsiveLayout();
   const { coords, label, hasLocation } = useEnsureLocation({ auto: true });
   const [distanceOption, setDistanceOption] = useState<DistanceOption>('25000');
   const [lastPresetOption, setLastPresetOption] = useState<Exclude<DistanceOption, 'custom'>>('25000');
@@ -211,13 +212,13 @@ export function ExploreScreen() {
 
   return (
     <Screen>
-      <ScrollView
+      <ResponsiveScrollView
+        pad="tabs"
         className={`flex-1 pt-4 ${isDesktop ? '' : 'px-5'}`}
-        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
         style={
           Platform.OS === 'web'
             ? ({ width: '100%', maxWidth: '100%', touchAction: 'pan-y' } as object)
-            : { width: '100%', maxWidth: '100%' }
+            : undefined
         }
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
@@ -321,7 +322,7 @@ export function ExploreScreen() {
             description="Try another category, a larger distance, or Choose city."
           />
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
 
       <LocationPickerModal
         visible={pickerOpen}

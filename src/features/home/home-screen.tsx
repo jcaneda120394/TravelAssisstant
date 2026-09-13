@@ -17,7 +17,8 @@ import { SaveTripModal } from '@/components/trips/save-trip-modal';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { Pressable, View } from '@/components/ui/primitives';
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { env } from '@/config/env';
 import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
 import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
@@ -64,8 +65,7 @@ export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scheme = useAppColorScheme();
-  const { isDesktop, isWeb, isCompact, scrollBottomPad, contentGutter } =
-    useResponsiveLayout();
+  const { isDesktop, isWeb, isCompact, contentGutter } = useResponsiveLayout();
   const queryClient = useQueryClient();
   const { profile, preferences, user } = useAuth();
   const { currency, setCurrency } = useDisplayCurrency();
@@ -196,10 +196,9 @@ export function HomeScreen() {
   return (
     <Screen testID="screen-home" unsafe>
       <StatusBar style="light" />
-      <ScrollView
+      <ResponsiveScrollView
+        pad="tabs"
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: scrollBottomPad, maxWidth: '100%' }}
-        style={{ width: '100%', maxWidth: '100%' }}
         // Do not set overflow:'hidden' here — it blocks vertical scroll on mobile web.
       >
         <LinearGradient
@@ -537,7 +536,7 @@ export function HomeScreen() {
             ))}
           </View>
         </PageContainer>
-      </ScrollView>
+      </ResponsiveScrollView>
 
       <SaveTripModal
         visible={saveOpen}

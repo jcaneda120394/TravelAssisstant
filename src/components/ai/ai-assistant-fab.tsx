@@ -33,7 +33,7 @@ export function AiAssistantFab() {
   const { scheme, colors } = useCountryAppearance();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const { isDesktop, isWeb, sidebarWidth, contentMaxWidth, tabBarHeight, isCompact } =
+  const { isDesktop, isWeb, isTablet, sidebarWidth, contentMaxWidth, tabBarHeight, isCompact } =
     useResponsiveLayout();
   const [open, setOpen] = useState(false);
 
@@ -51,7 +51,7 @@ export function AiAssistantFab() {
 
   const layout = useMemo(() => {
     const compact = isCompact || width < 360;
-    const tablet = width >= 768 && !isCompact;
+    const tablet = isTablet;
     const fabSize = compact ? 48 : isDesktop ? 60 : tablet ? 56 : 52;
     const bottom =
       Math.max(insets.bottom, isWeb ? 8 : 4) + (isDesktop ? 24 : tabBarHeight) + (compact ? 6 : 10);
@@ -76,6 +76,7 @@ export function AiAssistantFab() {
     isDesktop,
     isWeb,
     isCompact,
+    isTablet,
     sidebarWidth,
     contentMaxWidth,
     tabBarHeight,

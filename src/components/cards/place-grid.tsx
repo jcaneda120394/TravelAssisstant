@@ -48,8 +48,12 @@ export function PlaceGrid({ children, className = '', gap = 24 }: Props) {
           key={index}
           style={{
             width: `${widthPercent}%`,
+            maxWidth: `${widthPercent}%`,
+            minWidth: 0,
             paddingHorizontal: gap / 2,
             marginBottom: gap,
+            flexGrow: 0,
+            flexShrink: 0,
           }}
         >
           {child}

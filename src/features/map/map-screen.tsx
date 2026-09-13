@@ -8,7 +8,8 @@ import { MapLayersControl } from '@/components/maps/map-layers-control';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
-import { Pressable, ScrollView, View } from '@/components/ui/primitives';
+import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
+import { Pressable, View } from '@/components/ui/primitives';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { providers } from '@/providers/registry';
 import { theme } from '@/config/theme';
@@ -28,7 +29,7 @@ const MAP_RADIUS_METERS = 25_000;
 export function MapScreen() {
   const router = useRouter();
   const scheme = useAppColorScheme();
-  const { isDesktop, isWeb, scrollBottomPad } = useResponsiveLayout();
+  const { isDesktop, isWeb } = useResponsiveLayout();
   const { coords, label, hasLocation, hasHydrated, locate, error, mode } = useEnsureLocation({
     auto: true,
     refresh: true,
@@ -106,12 +107,7 @@ export function MapScreen() {
 
   return (
     <Screen>
-      <ScrollView
-        className="flex-1 px-5 pt-4"
-        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
-        style={{ width: '100%', maxWidth: '100%' }}
-        testID="screen-map"
-      >
+      <ResponsiveScrollView pad="tabs" className="flex-1 px-5 pt-4" testID="screen-map">
         <SectionHeader
           title="Map"
           subtitle={
@@ -280,7 +276,7 @@ export function MapScreen() {
             {coords.latitude.toFixed(4)}, {coords.longitude.toFixed(4)}
           </AppText>
         ) : null}
-      </ScrollView>
+      </ResponsiveScrollView>
     </Screen>
   );
 }

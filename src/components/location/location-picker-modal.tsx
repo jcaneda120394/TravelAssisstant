@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
-import { ActivityIndicator, Modal } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Modal, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TextField } from '@/components/forms/text-field';
@@ -19,6 +19,7 @@ import {
   setLocationFromSuggestion,
 } from '@/services/location/location.service';
 import { getErrorMessage } from '@/lib/errors/app-error';
+import { notifyAlert } from '@/lib/notify-alert';
 
 type Props = {
   visible: boolean;
@@ -27,6 +28,15 @@ type Props = {
 };
 
 const QUICK_PICKS: DestinationSuggestion[] = [
+  {
+    id: 'quick-villa-belissa',
+    label: 'Villa Belissa, San Jose del Monte, Bulacan, Philippines',
+    shortName: 'Villa Belissa',
+    kind: 'place',
+    latitude: 14.842187,
+    longitude: 121.045478,
+    countryCode: 'PH',
+  },
   {
     id: 'quick-sjdm',
     label: 'San Jose del Monte, Bulacan, Philippines',
@@ -197,42 +207,66 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     staleTime: 60_000,
   });
 
+  // RN web Modal can leave body scroll locked after close — unlock explicitly.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    if (visible) return;
+    document.body.style.overflow = '';
+    document.body.style.pointerEvents = '';
+  }, [visible]);
+
   const applySuggestion = async (item: DestinationSuggestion) => {
-    if (busy) {
-      return;
-    }
+    if (busy) return;
     setBusy(true);
     setError(null);
+    // Close immediately so mobile web never sits behind a frozen sheet.
+    onClose();
     try {
       await setLocationFromSuggestion(item);
       setQuery('');
-      // Close first so mobile web never looks frozen on the sheet.
-      onClose();
-      onChanged?.();
+      requestAnimationFrame(() => {
+        onChanged?.();
+      });
     } catch (err) {
-      setError(getErrorMessage(err));
+      notifyAlert('Could not set location', getErrorMessage(err));
     } finally {
       setBusy(false);
     }
   };
 
   const applyGps = async () => {
+    if (busy) return;
     setBusy(true);
     setError(null);
+    onClose();
     try {
       await getCurrentPosition();
-      onClose();
-      onChanged?.();
+      setQuery('');
+      requestAnimationFrame(() => {
+        onChanged?.();
+      });
     } catch (err) {
-      setError(getErrorMessage(err));
+      notifyAlert('Location needed', getErrorMessage(err));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
       <View className="flex-1 justify-end bg-black/40">
+        <Pressable
+          className="flex-1"
+          onPress={onClose}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss location picker"
+        />
         <View
           className="max-h-[90%] rounded-t-3xl bg-white px-5 pt-4 dark:bg-surface-cardDark"
           style={{ paddingBottom: Math.max(insets.bottom, 24) }}
@@ -251,6 +285,8 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+            nestedScrollEnabled
+            style={Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as object) : undefined}
           >
             <Card className="mb-4">
               <AppText muted className="mb-3 text-sm">
@@ -269,14 +305,17 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
                   loading={busy}
                   onPress={() => {
                     void (async () => {
+                      if (busy) return;
                       setBusy(true);
                       setError(null);
+                      onClose();
                       try {
                         await clearSavedLocation();
-                        onChanged?.();
-                        onClose();
+                        requestAnimationFrame(() => {
+                          onChanged?.();
+                        });
                       } catch (err) {
-                        setError(getErrorMessage(err));
+                        notifyAlert('Could not clear location', getErrorMessage(err));
                       } finally {
                         setBusy(false);
                       }

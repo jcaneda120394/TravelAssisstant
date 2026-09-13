@@ -34,20 +34,58 @@ const COUNTRY_HUBS: Record<string, { city: string; latitude: number; longitude: 
 
 type NominatimReverse = {
   display_name?: string;
+  name?: string;
   address?: {
+    road?: string;
+    neighbourhood?: string;
+    quarter?: string;
+    residential?: string;
+    hamlet?: string;
+    suburb?: string;
+    city_district?: string;
     city?: string;
     town?: string;
     village?: string;
     municipality?: string;
-    suburb?: string;
-    neighbourhood?: string;
-    city_district?: string;
     county?: string;
     state?: string;
+    region?: string;
     country?: string;
     country_code?: string;
   };
 };
+
+function cleanPlaceName(value?: string | null): string | null {
+  if (!value?.trim()) return null;
+  return value
+    .replace(/\s+Subdivision\b/gi, '')
+    .replace(/\s+Village\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function uniquePlaceParts(parts: Array<string | null | undefined>): string[] {
+  const out: string[] = [];
+  for (const part of parts) {
+    if (!part) continue;
+    if (out.some((existing) => existing.toLowerCase() === part.toLowerCase())) continue;
+    out.push(part);
+  }
+  return out;
+}
+
+/**
+ * Compact UI label: keep neighbourhood + city, not trailing country/region.
+ * e.g. "Villa Belissa, San Jose del Monte, Bulacan, Philippines" → "Villa Belissa, San Jose del Monte"
+ */
+export function formatCompactLocationLabel(label: string | null | undefined): string | null {
+  if (!label?.trim()) return null;
+  const parts = uniquePlaceParts(label.split(',').map((part) => cleanPlaceName(part)));
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0]!;
+  // Prefer the most specific local names from the front of a reverse-geocode label.
+  return parts.slice(0, 2).join(', ');
+}
 
 export async function requestForegroundLocation(): Promise<Location.PermissionStatus> {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -62,44 +100,38 @@ async function labelFromCoords(coords: GeoPoint): Promise<{
   country: string | null;
   label: string;
 }> {
-  // Prefer Nominatim at neighborhood zoom so we get city+district, not only country.
+  // Zoom 18 keeps neighbourhood / subdivision names (e.g. Villa Belissa in SJDM).
   try {
     const reverse = await fetchJson<NominatimReverse>(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=16&addressdetails=1`,
-      { timeoutMs: 10_000, cacheTtlMs: 5 * 60_000 },
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1`,
+      { timeoutMs: 10_000, cacheTtlMs: 60_000 },
     );
     const a = reverse.address;
     if (a) {
-      const locality =
-        a.neighbourhood ||
-        a.suburb ||
-        a.city_district ||
-        a.city ||
-        a.town ||
-        a.village ||
-        a.municipality ||
-        a.county ||
-        a.state ||
-        null;
-      const city =
-        a.city || a.town || a.village || a.municipality || a.county || a.state || locality;
-      const country = a.country ?? null;
-      const parts = [locality, city, a.state, country].filter(
-        (part, index, arr): part is string =>
-          Boolean(part) && arr.findIndex((p) => p?.toLowerCase() === part!.toLowerCase()) === index,
+      const neighbourhood = cleanPlaceName(
+        a.neighbourhood || a.quarter || a.residential || a.hamlet || reverse.name,
       );
+      const suburb = cleanPlaceName(a.suburb || a.city_district || a.village);
+      const city = cleanPlaceName(a.city || a.town || a.municipality || a.county);
+      const state = cleanPlaceName(a.state);
+      const country = a.country ?? null;
+      const local = neighbourhood || suburb;
+      const parts = uniquePlaceParts([local, city, state, country]);
       if (parts.length > 0) {
         return {
-          city: city ?? locality,
+          city: city || local,
           country,
           label: parts.join(', '),
         };
       }
       if (reverse.display_name) {
+        const fromDisplay = uniquePlaceParts(
+          reverse.display_name.split(',').map((part) => cleanPlaceName(part)),
+        ).slice(0, 4);
         return {
-          city: city ?? locality,
+          city: city || local || fromDisplay[0] || null,
           country,
-          label: reverse.display_name.split(',').slice(0, 4).join(',').trim(),
+          label: fromDisplay.join(', '),
         };
       }
     }
@@ -111,18 +143,16 @@ async function labelFromCoords(coords: GeoPoint): Promise<{
     const places = await Location.reverseGeocodeAsync(coords);
     const first = places[0];
     if (first) {
-      const city =
-        first.district ||
-        first.city ||
-        first.subregion ||
-        first.region ||
-        first.name ||
-        null;
-      const country = first.country ?? null;
-      const parts = [first.name, city, first.region, country].filter(
-        (part, index, arr): part is string =>
-          Boolean(part) && arr.findIndex((p) => p?.toLowerCase() === part!.toLowerCase()) === index,
+      const city = cleanPlaceName(
+        first.district || first.city || first.subregion || first.region || first.name,
       );
+      const country = first.country ?? null;
+      const parts = uniquePlaceParts([
+        cleanPlaceName(first.name),
+        city,
+        cleanPlaceName(first.region),
+        country,
+      ]);
       return {
         city,
         country,
@@ -170,28 +200,46 @@ async function readBrowserGeolocation(): Promise<GeoPoint> {
       code: 'LOCATION_UNAVAILABLE',
     });
   }
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        resolve({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-      },
-      (err) => {
-        const denied = err.code === err.PERMISSION_DENIED;
-        reject(
-          new AppError(
-            denied
-              ? 'Location permission is off. Allow location for this site, or choose a city manually.'
-              : 'Unable to read your GPS. Try again or choose a city manually.',
-            { code: denied ? 'LOCATION_DENIED' : 'LOCATION_UNAVAILABLE' },
-          ),
-        );
-      },
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 },
-    );
-  });
+
+  const readOnce = (highAccuracy: boolean, timeoutMs: number, maximumAge: number) =>
+    new Promise<GeolocationPosition>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: highAccuracy,
+        timeout: timeoutMs,
+        maximumAge,
+      });
+    });
+
+  try {
+    // Fresh precise fix — never reuse a stale cached city-level estimate.
+    const pos = await readOnce(true, 20_000, 0);
+    return {
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+    };
+  } catch (err) {
+    const geoErr = err as GeolocationPositionError | undefined;
+    const denied = geoErr?.code === geoErr?.PERMISSION_DENIED;
+    if (denied) {
+      throw new AppError(
+        'Location permission is off. Allow location for this site, or choose a city manually.',
+        { code: 'LOCATION_DENIED' },
+      );
+    }
+    // One fallback with a slightly older cache before failing.
+    try {
+      const pos = await readOnce(true, 12_000, 60_000);
+      return {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+      };
+    } catch {
+      throw new AppError('Unable to read your GPS. Try again or choose a city manually.', {
+        code: 'LOCATION_UNAVAILABLE',
+        cause: err,
+      });
+    }
+  }
 }
 
 async function readDevicePosition(): Promise<GeoPoint> {
@@ -209,10 +257,10 @@ async function readDevicePosition(): Promise<GeoPoint> {
   try {
     const position = await withTimeout(
       Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
         mayShowUserSettingsDialog: true,
       }),
-      12_000,
+      20_000,
       'GPS is taking too long. Try again, or choose a city manually.',
     );
     return {
@@ -223,8 +271,8 @@ async function readDevicePosition(): Promise<GeoPoint> {
     // Last known fix is better than failing hard (simulator / weak GPS).
     try {
       const last = await Location.getLastKnownPositionAsync({
-        maxAge: 5 * 60_000,
-        requiredAccuracy: 1000,
+        maxAge: 2 * 60_000,
+        requiredAccuracy: 200,
       });
       if (last?.coords) {
         return {
@@ -273,8 +321,10 @@ export async function getCurrentPosition(): Promise<GeoPoint> {
       };
     }
 
-    // Traveler cleared location while GPS was running — discard.
+    // Traveler cleared location or picked a city while GPS was running — discard.
     if (useLocationStore.getState().locationEpoch !== epoch) {
+      const latest = useLocationStore.getState().coords;
+      if (latest) return latest;
       throw new AppError('Location was cleared. Tap Get my location again if you want GPS.', {
         code: 'LOCATION_CLEARED',
       });

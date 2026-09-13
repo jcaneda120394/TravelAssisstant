@@ -29,7 +29,10 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { providers } from '@/providers/registry';
 import { getHomeNearbyPlaces } from '@/services/places/home-nearby.service';
 import { listTrips } from '@/services/trips/trips.service';
-import { looksLikeSanFrancisco } from '@/services/location/location.service';
+import {
+  looksLikeSanFrancisco,
+  formatCompactLocationLabel,
+} from '@/services/location/location.service';
 import { getDestinationTravelGradient } from '@/utils/destination-theme';
 
 const HOME_NEARBY_LIMIT = 16;
@@ -67,9 +70,11 @@ export function HomeScreen() {
   const queryClient = useQueryClient();
   const { profile, preferences, user } = useAuth();
   const { currency, setCurrency } = useDisplayCurrency();
-  const { coords, label, country, mode, hasLocation, locate, isLocating, status, error } =
+  const { coords, label, city, country, mode, hasLocation, locate, isLocating, status, error } =
     useEnsureLocation({
       auto: true,
+      // Don't background-refresh GPS on Home — it races Change city and freezes mobile web.
+      refresh: false,
     });
   const [saveOpen, setSaveOpen] = useState(false);
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
@@ -189,14 +194,9 @@ export function HomeScreen() {
   const nextTrip = tripsQuery.data?.[0];
   const firstName = profile?.full_name?.split(' ')[0];
   const shortPlace =
-    label
-      ? label
-          .split(',')
-          .map((part) => part.trim())
-          .filter(Boolean)
-          .slice(-2)
-          .join(', ')
-      : country || null;
+    formatCompactLocationLabel(label) ||
+    (city && country ? `${city}, ${country}` : city || country) ||
+    null;
   const locationLine = hasLocation
     ? `${shortPlace ?? 'Current location'}${
         weatherQuery.data?.temperatureC != null ? ` · ${weatherQuery.data.temperatureC}°C` : ''

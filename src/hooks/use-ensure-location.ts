@@ -18,6 +18,7 @@ export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean 
   const hasHydrated = useLocationStore((state) => state.hasHydrated);
   const coords = useLocationStore((state) => state.coords);
   const label = useLocationStore((state) => state.label);
+  const city = useLocationStore((state) => state.city);
   const country = useLocationStore((state) => state.country);
   const mode = useLocationStore((state) => state.mode);
   const permissionStatus = useLocationStore((state) => state.permissionStatus);
@@ -66,29 +67,27 @@ export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean 
     didAutoAsk.current = true;
 
     const state = useLocationStore.getState();
-    if (state.mode === 'manual' && state.coords) {
+    // Keep any saved city/GPS fix. Auto-refresh was overwriting Change city picks
+    // and freezing mobile web while geolocation + the picker ran together.
+    if (state.coords) {
       setStatus('ready');
       return;
     }
-
-    // Refresh GPS so maps reflect the traveler's actual position.
-    // Skip when location was explicitly cleared (mode none, no coords).
-    if (state.mode === 'none' && !state.coords) {
+    if (state.mode === 'none') {
       setStatus('idle');
       return;
     }
-
-    if (refresh || !state.coords) {
+    if (refresh) {
       void locate();
       return;
     }
-
-    setStatus('ready');
+    setStatus('idle');
   }, [auto, hasHydrated, locate, refresh]);
 
   return {
     coords,
     label,
+    city,
     country,
     mode,
     permissionStatus,

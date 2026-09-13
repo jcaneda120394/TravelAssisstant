@@ -59,10 +59,22 @@ export const useLocationStore = create<LocationState>()(
         if (epoch != null && epoch !== get().locationEpoch) {
           return;
         }
+        // A city pick while GPS was running wins — never clobber manual.
+        if (mode !== 'manual' && get().mode === 'manual' && epoch != null) {
+          return;
+        }
         set({ coords, city, country, label, mode });
       },
       setManualLocation: ({ coords, city = null, country = null, label }) =>
-        set({ coords, city, country, label, mode: 'manual' }),
+        set((state) => ({
+          // Invalidate in-flight GPS writes so Change city always sticks.
+          locationEpoch: state.locationEpoch + 1,
+          coords,
+          city,
+          country,
+          label,
+          mode: 'manual',
+        })),
       clearLocation: () =>
         set((state) => ({
           locationEpoch: state.locationEpoch + 1,
@@ -77,7 +89,8 @@ export const useLocationStore = create<LocationState>()(
       name: 'travelassistant-location',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
-        mode: state.mode === 'precise' ? 'approximate' : state.mode,
+        // Keep precise so the UI can show neighbourhood-level labels after reload.
+        mode: state.mode,
         permissionStatus: state.permissionStatus,
         coords: state.coords,
         city: state.city,

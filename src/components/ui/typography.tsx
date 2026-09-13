@@ -96,7 +96,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 
   return (
     <View
-      className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl border px-4 py-4 ${bg} ${border} ${className}`}
+      className={`w-full min-w-0 max-w-full overflow-visible rounded-2xl border px-4 py-4 ${bg} ${border} ${className}`}
     >
       {children}
     </View>

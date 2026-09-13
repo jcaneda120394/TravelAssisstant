@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal } from 'react-native';
+import { Modal } from 'react-native';
 
 import { DatePickerField } from '@/components/forms/date-picker-field';
 import { DestinationAutocomplete } from '@/components/forms/destination-autocomplete';
@@ -16,6 +16,7 @@ import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { analytics } from '@/lib/analytics';
 import { getErrorMessage } from '@/lib/errors/app-error';
+import { notifyAlert } from '@/lib/notify-alert';
 import { addPlaceToTrip } from '@/services/itinerary/itinerary.service';
 import { createTrip, listTrips } from '@/services/trips/trips.service';
 import type { Place, Trip } from '@/types/domain';
@@ -136,7 +137,7 @@ export function SaveTripModal({
       analytics.track('trip_saved', { tripId, withPlace: Boolean(place), day: selectedDay });
       void queryClient.invalidateQueries({ queryKey: ['trips'] });
       void queryClient.invalidateQueries({ queryKey: ['itinerary', tripId] });
-      Alert.alert(
+      notifyAlert(
         'Saved to trip planner',
         place
           ? `${place.name} added on ${formatDayLabel(selectedDay)} at ${startTime}.`
@@ -145,7 +146,7 @@ export function SaveTripModal({
       onSaved?.(tripId);
       onClose();
     },
-    onError: (error) => Alert.alert('Could not save trip', getErrorMessage(error)),
+    onError: (error) => notifyAlert('Could not save trip', getErrorMessage(error)),
   });
 
   const chipClass = (active: boolean) =>

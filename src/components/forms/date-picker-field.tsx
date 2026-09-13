@@ -146,6 +146,7 @@ export function DatePickerField({
             onChange={(event: { target: { value: string } }) => commit(event.target.value)}
             aria-label={label}
             data-testid="date-picker-input"
+            className="ta-date-input"
             style={{
               position: 'absolute',
               top: 0,
@@ -159,19 +160,21 @@ export function DatePickerField({
               margin: 0,
               padding: 0,
               border: 'none',
-              opacity: 0.01,
+              opacity: 0,
               cursor: readOnly ? 'default' : 'pointer',
               boxSizing: 'border-box',
               colorScheme: scheme,
+              appearance: 'none',
+              WebkitAppearance: 'none',
             }}
           />
         </View>
       ) : null}
-      <AppText muted className="mt-1 w-full min-w-0 text-xs" numberOfLines={2}>
-        {readOnly
-          ? `View only · ${formatDayLabel(normalized)}`
-          : `Editable · ${formatDayLabel(normalized)}`}
-      </AppText>
+      {readOnly ? (
+        <AppText muted className="mt-1 w-full min-w-0 text-xs" numberOfLines={1}>
+          View only · {formatDayLabel(normalized)}
+        </AppText>
+      ) : null}
     </View>
   );
 }

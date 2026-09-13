@@ -74,6 +74,23 @@ input[type='week'] {
   box-sizing: border-box !important;
 }
 
+/* Invisible overlay date field — stretch the calendar hit target, hide chrome. */
+input.ta-date-input,
+input.ta-date-input::-webkit-calendar-picker-indicator {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  opacity: 0 !important;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Catch any leftover absolute-width children inside the app shell. */
 #root,
 #root > div {

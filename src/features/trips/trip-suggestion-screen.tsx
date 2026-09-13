@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert } from 'react-native';
 
 import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { CityAutocomplete } from '@/components/forms/city-autocomplete';
 import { ChipSelect } from '@/components/forms/chip-select';
 import { DatePickerField } from '@/components/forms/date-picker-field';
+import { PlaceSearchField } from '@/components/forms/place-search-field';
 import { TextField } from '@/components/forms/text-field';
+import { TimePickerField } from '@/components/forms/time-picker-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
@@ -18,6 +19,7 @@ import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { getErrorMessage } from '@/lib/errors/app-error';
+import { notifyAlert } from '@/lib/notify-alert';
 import { analytics } from '@/lib/analytics';
 import type { DestinationSuggestion } from '@/services/geo/geocode.service';
 import { listTrips } from '@/services/trips/trips.service';
@@ -28,7 +30,7 @@ import {
   type SuggestionStyle,
   type TripSuggestionPlan,
 } from '@/services/trips/trip-suggestion.service';
-import type { GeoPoint } from '@/types/domain';
+import type { GeoPoint, Place } from '@/types/domain';
 import { addDaysIso, defaultTripDates, eachDayBetween, formatDayLabel } from '@/utils/dates';
 
 const STYLES = ['balanced', 'sightseeing', 'foodie', 'relaxed'] as const satisfies SuggestionStyle[];
@@ -46,6 +48,10 @@ export function TripSuggestionScreen() {
   const [pickedLocation, setPickedLocation] = useState<GeoPoint | null>(null);
   const [startDate, setStartDate] = useState(defaults.startDate);
   const [endDate, setEndDate] = useState(addDaysIso(2));
+  const [arrivalTime, setArrivalTime] = useState('14:00');
+  const [departureTime, setDepartureTime] = useState('18:00');
+  const [hotelQuery, setHotelQuery] = useState('');
+  const [hotelPlace, setHotelPlace] = useState<Place | null>(null);
   const [style, setStyle] = useState<SuggestionStyle>('balanced');
   const [plan, setPlan] = useState<TripSuggestionPlan | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -78,6 +84,12 @@ export function TripSuggestionScreen() {
         (hasLocation && coords && (!city.trim() || city.trim() === (label?.split(',')[0] ?? ''))
           ? coords
           : null);
+      const preferredHotel =
+        hotelPlace &&
+        Number.isFinite(hotelPlace.latitude) &&
+        Number.isFinite(hotelPlace.longitude)
+          ? { ...hotelPlace, category: 'hotel' as const }
+          : null;
       return generateTripSuggestion({
         destinationLabel,
         location: useCoords,
@@ -86,11 +98,18 @@ export function TripSuggestionScreen() {
         currency,
         style,
         companions: preferences,
+        arrivalTime,
+        departureTime,
+        hotel: preferredHotel,
       });
     },
     onSuccess: (next) => {
       setPlan(next);
       setSelectedDay(next.days[0]?.day ?? null);
+      if (next.hotel) {
+        setHotelPlace(next.hotel);
+        setHotelQuery(next.hotel.name);
+      }
       setGenPhase('done');
       analytics.track('trip_suggestion_generated', {
         destination: next.destinationLabel,
@@ -100,7 +119,7 @@ export function TripSuggestionScreen() {
     },
     onError: (error) => {
       setGenPhase(null);
-      Alert.alert('Could not generate plan', getErrorMessage(error));
+      notifyAlert('Could not generate plan', getErrorMessage(error));
     },
   });
 
@@ -163,12 +182,12 @@ export function TripSuggestionScreen() {
         mode: saveMode,
         scope: saveScope,
       });
-      Alert.alert('Saved', 'Suggestion added to your itinerary.', [
+      notifyAlert('Saved', 'Suggestion added to your itinerary.', [
         { text: 'Stay', style: 'cancel' },
         { text: 'Open trip', onPress: () => router.replace(`/trip/${tripId}`) },
       ]);
     },
-    onError: (error) => Alert.alert('Could not save', getErrorMessage(error)),
+    onError: (error) => notifyAlert('Could not save', getErrorMessage(error)),
   });
 
   const activeDay = selectedDay ?? plan?.days[0]?.day ?? null;
@@ -194,13 +213,16 @@ export function TripSuggestionScreen() {
 
   const useMyLocation = () => {
     if (!coords) {
-      Alert.alert('Location needed', 'Enable location or search a city.');
+      notifyAlert('Location needed', 'Enable location or search a city.');
       return;
     }
     const short = label?.split(',')[0] ?? 'Near me';
     setCity(short);
     setPickedLocation(coords);
   };
+
+  const hotelNear =
+    pickedLocation ?? plan?.location ?? (hasLocation ? coords : null);
 
   return (
     <Screen>
@@ -265,6 +287,51 @@ export function TripSuggestionScreen() {
             onChange={setEndDate}
           />
 
+          <View className="mb-1 w-full min-w-0 max-w-full flex-row gap-3">
+            <View className="min-w-0 flex-1">
+              <TimePickerField
+                label="Arrival time"
+                value={arrivalTime}
+                onChange={setArrivalTime}
+              />
+            </View>
+            <View className="min-w-0 flex-1">
+              <TimePickerField
+                label="Departure time"
+                value={departureTime}
+                onChange={setDepartureTime}
+              />
+            </View>
+          </View>
+          <AppText muted className="mb-3 text-xs">
+            Arrival shifts day 1. Departure targets the last-day airport transfer window.
+          </AppText>
+
+          <PlaceSearchField
+            label="Hotel / stay (for travel times)"
+            value={hotelQuery}
+            selectedPlace={hotelPlace}
+            onChange={(next) => {
+              setHotelQuery(next);
+              if (!next.trim()) setHotelPlace(null);
+            }}
+            onSelectPlace={(place) => {
+              if (!place) {
+                setHotelPlace(null);
+                return;
+              }
+              setHotelPlace({ ...place, category: 'hotel' });
+              setHotelQuery(place.name);
+            }}
+            near={hotelNear}
+            nearLabel={city || label}
+            placeholder="Search hotel or area…"
+            testID="trip-suggestion-hotel"
+          />
+          <AppText muted className="mb-3 text-xs">
+            Optional. Used as the base for transfers and nearby stops. Leave blank to auto-pick.
+          </AppText>
+
           <AppText className="mb-2 font-sans-medium">Generation style</AppText>
           <ChipSelect
             options={STYLES}
@@ -316,6 +383,20 @@ export function TripSuggestionScreen() {
               title={plan.destinationLabel}
               subtitle={`${plan.startDate} → ${plan.endDate} · ${plan.style} · ${plan.currency}`}
             />
+            {plan.hotel ? (
+              <Card className="mb-4">
+                <SectionHeader
+                  title="Hotel base"
+                  subtitle="Travel times are routed from this stay"
+                />
+                <AppText className="font-sans-semibold">{plan.hotel.name}</AppText>
+                {plan.hotel.address ? (
+                  <AppText muted className="mt-1 text-sm">
+                    {plan.hotel.address}
+                  </AppText>
+                ) : null}
+              </Card>
+            ) : null}
             {genPhase === 'done' ? (
               <AppText muted className="mb-3 text-sm">
                 Plan ready — built from popular places and restaurants near your destination.

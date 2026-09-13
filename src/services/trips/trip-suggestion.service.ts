@@ -70,6 +70,12 @@ export type GenerateTripSuggestionInput = {
   currency?: string;
   style?: SuggestionStyle;
   companions?: CompanionPrefs | null;
+  /** Local HH:MM for first-day arrival (shifts the whole arrival schedule). */
+  arrivalTime?: string | null;
+  /** Local HH:MM for last-day departure target (schedules backward to this time). */
+  departureTime?: string | null;
+  /** Preferred hotel/base for travel-time routing; otherwise auto-picked. */
+  hotel?: Place | null;
 };
 
 function shortCity(label: string): string {
@@ -480,7 +486,7 @@ export async function generateTripSuggestion(
   );
   const restaurantsPool = tailor(restaurants);
   const shoppingPool = tailor(shopping);
-  const hotel = pickPlanHotel(hotels);
+  const hotel = input.hotel ?? pickPlanHotel(hotels);
 
   const planDays = buildRealisticItineraryDays({
     days,
@@ -493,6 +499,8 @@ export async function generateTripSuggestion(
     shopping: shoppingPool,
     withKids: Boolean(input.companions?.traveling_with_kids),
     companionNotes: companionNotes(input.companions, style),
+    arrivalTime: input.arrivalTime ?? undefined,
+    departureTime: input.departureTime ?? undefined,
   });
 
   return {

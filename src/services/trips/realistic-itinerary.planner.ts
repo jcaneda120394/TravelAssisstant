@@ -353,6 +353,10 @@ export function buildRealisticItineraryDays(input: {
   shopping: Place[];
   withKids?: boolean;
   companionNotes?: string;
+  /** HH:MM — when the traveler lands / arrives on day 1. */
+  arrivalTime?: string;
+  /** HH:MM — target airport departure window on the last day. */
+  departureTime?: string;
 }): TripSuggestionDay[] {
   const withKids = Boolean(input.withKids);
   const pace = stylePace(input.style);
@@ -362,6 +366,13 @@ export function buildRealisticItineraryDays(input: {
     : input.attractions[0]
       ? pointOf(input.attractions[0])
       : { latitude: 0, longitude: 0 };
+  const arrivalStartMin = parseTimeToMin(input.arrivalTime?.trim() || '08:00');
+  const departureTargetMin = parseTimeToMin(input.departureTime?.trim() || '18:00');
+
+  const startMinFittingEnd = (blocks: DraftBlock[], endTarget: number, fallback: number) => {
+    const total = blocks.reduce((sum, block) => sum + block.durationMin, 0);
+    return Math.max(6 * 60, Math.min(fallback, endTarget - total));
+  };
 
   const themeParks = input.attractions.filter((p) => classifyVisit(p) === 'theme_park');
   const regular = input.attractions.filter((p) => classifyVisit(p) !== 'theme_park');
@@ -402,7 +413,7 @@ export function buildRealisticItineraryDays(input: {
         title: `Arrive · ${input.cityLabel}`,
         durationMin: 15,
         notes:
-          `${input.companionNotes ?? ''} Aircraft on-block. Do not schedule sightseeing yet.`.trim(),
+          `${input.companionNotes ?? ''} On-block at ${input.arrivalTime?.trim() || 'scheduled arrival'}. Do not schedule sightseeing yet.`.trim(),
         feeLabel: 'Airport',
         roleLabel: 'Arrival',
       });
@@ -515,7 +526,7 @@ export function buildRealisticItineraryDays(input: {
 
       return {
         day,
-        items: materializeBlocks(day, parseTimeToMin('08:00'), blocks, input.currency),
+        items: materializeBlocks(day, arrivalStartMin, blocks, input.currency),
       };
     }
 
@@ -637,7 +648,12 @@ export function buildRealisticItineraryDays(input: {
       });
       return {
         day,
-        items: materializeBlocks(day, parseTimeToMin('07:30'), blocks, input.currency),
+        items: materializeBlocks(
+          day,
+          startMinFittingEnd(blocks, departureTargetMin, parseTimeToMin('07:30')),
+          blocks,
+          input.currency,
+        ),
       };
     }
 

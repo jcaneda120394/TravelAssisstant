@@ -1,5 +1,6 @@
-import { Alert } from 'react-native';
+import { Platform } from 'react-native';
 
+import { notifyAlert } from '@/lib/notify-alert';
 import { useAuthStore } from '@/stores/auth-store';
 
 type RouterLike = {
@@ -19,21 +20,27 @@ export function requireAuthToSave(
   }
 
   const action = options?.actionLabel ?? 'save this';
-  Alert.alert(
-    'Sign in required',
-    `Create an account or log in to ${action}. You can keep browsing places without signing in.`,
-    [
-      { text: 'Not now', style: 'cancel' },
-      {
-        text: 'Log in',
-        onPress: () => router.push('/(auth)/login' as never),
-      },
-      {
-        text: 'Sign up',
-        onPress: () => router.push('/(auth)/signup' as never),
-      },
-    ],
-  );
+  const message = `Create an account or log in to ${action}. You can keep browsing places without signing in.`;
+
+  if (Platform.OS === 'web') {
+    const goLogin = window.confirm(`Sign in required\n\n${message}\n\nOK = Log in · Cancel = Not now`);
+    if (goLogin) {
+      router.push('/(auth)/login' as never);
+    }
+    return false;
+  }
+
+  notifyAlert('Sign in required', message, [
+    { text: 'Not now', style: 'cancel' },
+    {
+      text: 'Log in',
+      onPress: () => router.push('/(auth)/login' as never),
+    },
+    {
+      text: 'Sign up',
+      onPress: () => router.push('/(auth)/signup' as never),
+    },
+  ]);
   return false;
 }
 

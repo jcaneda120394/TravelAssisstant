@@ -23,6 +23,36 @@ type Props = {
 
 const GAP = 12;
 
+function sourceLabel(photo: PlacePhoto): string {
+  if (photo.attribution) return photo.attribution;
+  switch (photo.source) {
+    case 'map':
+      return 'Map preview';
+    case 'place':
+      return 'Place photo';
+    case 'community':
+      return 'Traveler photo';
+    case 'google':
+      return 'Google Places';
+    case 'wikipedia':
+      return 'Wikipedia';
+    case 'commons':
+      return 'Wikimedia Commons';
+    case 'openverse':
+      return 'Openverse';
+    case 'pexels':
+      return 'Pexels';
+    case 'unsplash':
+      return 'Unsplash';
+    case 'pixabay':
+      return 'Pixabay';
+    case 'flickr':
+      return 'Flickr';
+    default:
+      return 'Photo';
+  }
+}
+
 function GalleryArrow({
   direction,
   onPress,
@@ -159,11 +189,7 @@ export function PlacePhotoGallery({ photos, loading, placeName }: Props) {
                     {photo.title ?? placeName ?? 'Photo'}
                   </RNText>
                   <AppText muted className="text-[10px]">
-                    {photo.source === 'map'
-                      ? 'Map preview'
-                      : photo.source === 'place'
-                        ? 'Place photo'
-                        : 'Wikimedia'}
+                    {sourceLabel(photo)}
                   </AppText>
                 </View>
               </Pressable>

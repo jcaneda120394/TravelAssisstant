@@ -38,9 +38,15 @@ Home, Explore, Search, Map, trips, and AI prefer **Google Places** (nearby + tex
 npx supabase secrets set GOOGLE_MAPS_API_KEY=your_key --project-ref viyzvgdvnxhddtobpyys
 npx supabase functions deploy google-places --project-ref viyzvgdvnxhddtobpyys
 npx supabase functions deploy place-photo --project-ref viyzvgdvnxhddtobpyys
+
+# Optional free stock photos (Pexels / Unsplash / Pixabay / Flickr — all free API keys)
+npx supabase secrets set PEXELS_API_KEY=... UNSPLASH_ACCESS_KEY=... PIXABAY_API_KEY=... FLICKR_API_KEY=... --project-ref viyzvgdvnxhddtobpyys
+npx supabase functions deploy stock-photos --project-ref viyzvgdvnxhddtobpyys
 ```
 
-Optional client fallback: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (restrict by HTTP referrer to your Vercel domain). Without a key, the app keeps using OSM/Photon + Wikimedia/map previews.
+Optional client fallback: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (restrict by HTTP referrer to your Vercel domain). Without a Google key, the app uses OSM/Photon + Wikimedia/Openverse (+ stock providers when configured).
+
+Optional client stock keys (if you skip Edge secrets): `EXPO_PUBLIC_PEXELS_API_KEY`, `EXPO_PUBLIC_UNSPLASH_ACCESS_KEY`, `EXPO_PUBLIC_PIXABAY_API_KEY`, `EXPO_PUBLIC_FLICKR_API_KEY`. Openverse always works with no key.
 
 Rebuild after changing env vars (`EXPO_PUBLIC_*` are inlined at build time).
 

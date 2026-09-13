@@ -29,3 +29,7 @@ verify_jwt = false
 [functions.google-places]
 # All place search (nearby, text, details, photos). Guests allowed; rate-limited.
 verify_jwt = false
+
+[functions.stock-photos]
+# Free stock/CC photos (Openverse + optional Pexels/Unsplash/Pixabay/Flickr secrets).
+verify_jwt = false

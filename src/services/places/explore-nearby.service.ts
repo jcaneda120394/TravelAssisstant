@@ -14,6 +14,7 @@ import {
 } from '@/utils/place-category-match';
 import { dropForeignLandmarkNoise } from '@/utils/place-foreign-noise';
 import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
+import { dedupePlaces } from '@/utils/dedupe-places';
 
 const LIVE_BUDGET_MS = 7_000;
 const MAX_RADIUS_METERS = 200_000;
@@ -28,16 +29,6 @@ function delay(ms: number): Promise<null> {
 
 async function raceWithBudget<T>(promise: Promise<T>, budgetMs: number): Promise<T | null> {
   return Promise.race([promise, delay(budgetMs)]);
-}
-
-function dedupe(places: Place[]): Place[] {
-  const seen = new Set<string>();
-  return places.filter((place) => {
-    const key = `${place.name.toLowerCase().trim()}|${place.latitude.toFixed(3)}|${place.longitude.toFixed(3)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 function scrubNoiseTags(place: Place): Place {
@@ -67,7 +58,7 @@ function rankNearby(
   companions: CompanionPrefs | null | undefined,
   limit: number,
 ): Place[] {
-  let merged = dedupe(places).map(scrubNoiseTags);
+  let merged = dedupePlaces(places).map(scrubNoiseTags);
   if (!env.useMockProviders) {
     merged = merged.filter((place) => place.provider !== 'mock');
   }

@@ -22,6 +22,7 @@ import {
 import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
 import { applyOsmPriceAndStars } from '@/utils/place-price-estimate';
 import { filterPlacesWithinRadius } from '@/utils/geo';
+import { dedupePlaces } from '@/utils/dedupe-places';
 
 type NominatimResult = {
   place_id: number;
@@ -690,21 +691,6 @@ function nominatimToPlace(item: NominatimResult, origin?: GeoPoint, category?: P
         : undefined,
   };
   return enrichFromTags(base, item.extratags);
-}
-
-function dedupePlaces(places: Place[]): Place[] {
-  const seen = new Set<string>();
-  return places.filter((place) => {
-    if (!place.name?.trim()) {
-      return false;
-    }
-    const key = `${place.name.toLowerCase()}|${place.latitude.toFixed(4)}|${place.longitude.toFixed(4)}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
 }
 
 

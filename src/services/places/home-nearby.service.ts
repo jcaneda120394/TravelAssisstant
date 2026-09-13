@@ -8,6 +8,7 @@ import { applyCompanionFilter, companionFilterActive } from '@/utils/companion-s
 import { filterPlacesWithinRadius } from '@/utils/geo';
 import { dropForeignLandmarkNoise } from '@/utils/place-foreign-noise';
 import { topPopularPlaces } from '@/utils/place-popularity';
+import { dedupePlaces } from '@/utils/dedupe-places';
 
 const DEFAULT_LIMIT = 18;
 const LIVE_BUDGET_MS = 6_000;
@@ -39,13 +40,7 @@ function finish(
     filterPlacesWithinRadius(withoutMocks, origin, radiusMeters),
     cityLabel,
   );
-  const seen = new Set<string>();
-  const deduped = localOnly.filter((place) => {
-    const key = `${place.name.toLowerCase()}|${place.latitude.toFixed(3)}|${place.longitude.toFixed(3)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const deduped = dedupePlaces(localOnly);
   const ranked = companionFilterActive(companions)
     ? applyCompanionFilter(deduped, companions).slice(0, limit)
     : topPopularPlaces(deduped, limit);

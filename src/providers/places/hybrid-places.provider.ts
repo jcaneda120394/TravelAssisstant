@@ -5,6 +5,7 @@ import type {
 } from '@/providers/places/places.provider';
 import type { Place } from '@/types/domain';
 import { rememberPlaces } from '@/services/places/place-cache';
+import { dedupePlaces } from '@/utils/dedupe-places';
 
 /**
  * Prefer Google Places for every lookup; fall back to OSM/Photon provider
@@ -17,16 +18,6 @@ export class HybridPlacesProvider implements PlacesProvider {
     private readonly google: PlacesProvider,
     private readonly fallback: PlacesProvider,
   ) {}
-
-  private dedupe(places: Place[]): Place[] {
-    const seen = new Set<string>();
-    return places.filter((place) => {
-      const key = `${place.name.toLowerCase().trim()}|${place.latitude.toFixed(3)}|${place.longitude.toFixed(3)}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
 
   async searchPlaces(params: SearchPlacesParams): Promise<Place[]> {
     try {
@@ -54,7 +45,7 @@ export class HybridPlacesProvider implements PlacesProvider {
 
     // Enough accurate Google hits → use them (photos already attached).
     if (google.length >= Math.min(8, limit)) {
-      const ranked = google.slice(0, limit);
+      const ranked = dedupePlaces(google).slice(0, limit);
       rememberPlaces(ranked);
       return ranked;
     }
@@ -67,7 +58,7 @@ export class HybridPlacesProvider implements PlacesProvider {
     }
 
     // Prefer Google rows first, then fill gaps from OSM/catalog.
-    const merged = this.dedupe([...google, ...fallback]).slice(0, limit);
+    const merged = dedupePlaces([...google, ...fallback]).slice(0, limit);
     rememberPlaces(merged);
     return merged;
   }

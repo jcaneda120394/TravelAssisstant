@@ -1,16 +1,33 @@
 import { fetchJson } from '@/lib/http/fetch-json';
 import { env } from '@/config/env';
 import { supabase } from '@/lib/supabase/client';
+import { searchStockPhotos } from '@/services/places/stock-photos.service';
 import type { Place, PlaceCategory } from '@/types/domain';
 import { haversineMeters } from '@/utils/geo';
 
 export type PlacePhoto = {
   url: string;
   thumbUrl?: string;
-  source: 'place' | 'google' | 'wikipedia' | 'commons' | 'openverse' | 'map' | 'community';
+  source:
+    | 'place'
+    | 'google'
+    | 'wikipedia'
+    | 'commons'
+    | 'openverse'
+    | 'pexels'
+    | 'unsplash'
+    | 'pixabay'
+    | 'flickr'
+    | 'map'
+    | 'community';
   title?: string;
+  /** Photographer / license line for gallery captions. */
+  attribution?: string;
+  photographer?: string;
   /** 0–1 relevance to the place name; map previews are 0. */
   score?: number;
+  /** Destination / mood fill (stock) rather than venue-exact. */
+  atmosphere?: boolean;
 };
 
 type WikiQueryResponse = {
@@ -209,7 +226,10 @@ function cleanMediaUrl(url: string): string {
   try {
     const parsed = new URL(url);
     // Wikimedia sometimes appends tracking params that break some clients.
-    parsed.search = '';
+    // Keep query params for Unsplash/Pexels/Pixabay CDN sizing.
+    if (/wikimedia\.org|wikipedia\.org/i.test(parsed.hostname)) {
+      parsed.search = '';
+    }
     return parsed.toString();
   } catch {
     return url;
@@ -316,49 +336,80 @@ async function commonsSearchPhotos(query: string, limit: number): Promise<PlaceP
   }
 }
 
-type OpenverseResponse = {
-  results?: Array<{
-    title?: string;
-    url?: string;
-    thumbnail?: string;
-    foreign_landing_url?: string;
-  }>;
-};
+const STOCK_SOURCES = new Set<PlacePhoto['source']>([
+  'openverse',
+  'pexels',
+  'unsplash',
+  'pixabay',
+  'flickr',
+]);
+
+function categoryPhotoHint(category: PlaceCategory): string {
+  switch (category) {
+    case 'restaurant':
+    case 'cafe':
+    case 'bakery':
+      return 'food restaurant';
+    case 'nightlife':
+      return 'nightlife bar';
+    case 'beach':
+      return 'beach coast';
+    case 'temple':
+      return 'temple shrine';
+    case 'museum':
+      return 'museum gallery';
+    case 'park':
+      return 'park garden';
+    case 'hotel':
+    case 'resort':
+      return 'hotel resort';
+    case 'market':
+      return 'market street food';
+    case 'shopping':
+    case 'mall':
+      return 'shopping street';
+    case 'viewpoint':
+      return 'viewpoint landscape';
+    default:
+      return 'travel landmark';
+  }
+}
 
 /**
- * Free Creative Commons image search (no Google billing).
- * Best for landmarks / named attractions; restaurants may still fall back to map.
+ * Soft score for destination stock photos (city / region mood).
+ * Used when venue-exact Wikimedia/Google photos are scarce.
  */
-async function openverseSearchPhotos(query: string, limit: number): Promise<PlacePhoto[]> {
-  if (!query.trim()) return [];
-  const url =
-    `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}` +
-    `&page_size=${Math.min(Math.max(limit, 1), 12)}` +
-    `&category=photograph&mature=false&filter_dead=true`;
-  try {
-    const data = await fetchJson<OpenverseResponse>(url, {
-      timeoutMs: 8_000,
-      cacheTtlMs: 30 * 60_000,
-      headers: {
-        'User-Agent': USER_AGENT,
-        Accept: 'application/json',
-      },
-    });
-    const photos: PlacePhoto[] = [];
-    for (const item of data.results ?? []) {
-      if (!item.url) continue;
-      if (ALWAYS_IRRELEVANT.test(item.title ?? '')) continue;
-      photos.push({
-        url: item.url,
-        thumbUrl: item.thumbnail ?? item.url,
-        source: 'openverse',
-        title: item.title,
-      });
-    }
-    return photos;
-  } catch {
-    return [];
+export function scoreAtmosphereRelevance(
+  place: Place,
+  photoTitle: string | undefined,
+): number {
+  const title = (photoTitle ?? '').toLowerCase();
+  if (!title.trim()) return 0.32;
+  if (isIrrelevantPhotoTitle(displayNameForSearch(place), title)) return 0;
+
+  const cityBits = significantTokens(`${cityHint(place)} ${place.address ?? ''}`);
+  const hits = cityBits.filter((bit) => title.includes(bit));
+  if (hits.some((bit) => !GEO_ONLY_TOKEN.test(bit))) {
+    return Math.min(0.72, 0.42 + hits.length * 0.08);
   }
+  if (hits.length > 0) return 0.38;
+
+  const cat = categoryPhotoHint(place.category).split(' ');
+  if (cat.some((word) => word.length >= 4 && title.includes(word))) return 0.36;
+  return 0.3;
+}
+
+function rankAtmospherePhotos(place: Place, photos: PlacePhoto[]): PlacePhoto[] {
+  return dedupePhotos(photos)
+    .map((photo) => ({
+      ...photo,
+      url: cleanMediaUrl(photo.url),
+      thumbUrl: photo.thumbUrl ? cleanMediaUrl(photo.thumbUrl) : undefined,
+      atmosphere: true,
+      score: scoreAtmosphereRelevance(place, photo.title),
+    }))
+    .filter((photo) => (photo.score ?? 0) >= 0.28)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
 
 /** Last-resort map tile — works worldwide without API keys. */
@@ -553,14 +604,18 @@ async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhot
     primaryToken,
   ].filter((q, index, arr) => q.length >= 3 && arr.indexOf(q) === index);
 
-  const batches = await Promise.all(
-    queries.flatMap((query) => [
+  const primaryQuery = queries[0] ?? name;
+
+  const batches = await Promise.all([
+    ...queries.flatMap((query) => [
       wikipediaSearchPhotos(query, limit),
       commonsSearchPhotos(query, limit),
       commonsSearchPhotos(`"${primaryToken || name}"`, limit),
-      openverseSearchPhotos(query, limit),
     ]),
-  );
+    // Free stock / CC: Openverse + optional Pexels/Unsplash/Pixabay/Flickr.
+    searchStockPhotos(primaryQuery, limit),
+    queries[1] ? searchStockPhotos(queries[1], Math.min(limit, 6)) : Promise.resolve([]),
+  ]);
 
   const ranked = rankPhotos(place, batches.flat(), 0.34);
   if (ranked.length > 0) return ranked;
@@ -569,11 +624,31 @@ async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhot
   return rankPhotos(place, batches.flat(), 0.2);
 }
 
+/** Destination mood photos when venue-exact images are thin. */
+async function searchAtmospherePhotos(place: Place, limit: number): Promise<PlacePhoto[]> {
+  const name = cleanSearchName(displayNameForSearch(place));
+  const city = cityHint(place) || place.address?.split(',')[0]?.trim() || '';
+  const hint = categoryPhotoHint(place.category);
+  const queries = [
+    [name, city, 'travel'].filter(Boolean).join(' '),
+    [city, hint].filter(Boolean).join(' '),
+    city ? `${city} travel photography` : '',
+    isFoodPlace(place) ? [city, 'local food'].filter(Boolean).join(' ') : '',
+  ].filter((q, index, arr) => q.length >= 3 && arr.indexOf(q) === index);
+
+  if (queries.length === 0) return [];
+
+  const batches = await Promise.all(
+    queries.slice(0, 3).map((query) => searchStockPhotos(query, limit)),
+  );
+  return rankAtmospherePhotos(place, batches.flat()).slice(0, limit);
+}
+
 /**
- * Resolve a few photos for a place detail screen.
- * Free Wikimedia/Openverse first; Google Places only if a key is configured.
+ * Resolve photos for a place detail screen.
+ * Wikimedia + free stock first; Google Places only if a key is configured.
  */
-export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePhoto[]> {
+export async function fetchPlacePhotos(place: Place, limit = 10): Promise<PlacePhoto[]> {
   const existing = (place.photos ?? [])
     .filter((url) => typeof url === 'string' && /^https?:\/\//i.test(url))
     .map((url) => ({ url: cleanMediaUrl(url), source: 'place' as const, score: 1 }));
@@ -599,7 +674,15 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
     if (google) googleList = [google];
   }
 
-  const merged = dedupePhotos([...existing, ...googleList, ...named, ...geo]).slice(0, limit);
+  let merged = dedupePhotos([...existing, ...googleList, ...named, ...geo]);
+
+  if (merged.length < limit) {
+    const atmosphere = await searchAtmospherePhotos(place, limit);
+    const stockOnly = atmosphere.filter((photo) => STOCK_SOURCES.has(photo.source));
+    merged = dedupePhotos([...merged, ...stockOnly]);
+  }
+
+  merged = merged.slice(0, limit);
   if (merged.length === 0) {
     return [mapPreviewPhoto(place)];
   }
@@ -630,6 +713,9 @@ export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
       );
       if (geo[0]) return geo[0];
     }
+
+    const atmosphere = await searchAtmospherePhotos(place, 6);
+    if (atmosphere[0]) return atmosphere[0];
 
     const google = await fetchGooglePlacePhoto(place, 900);
     if (google) return google;

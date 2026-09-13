@@ -1,4 +1,8 @@
-import { scorePhotoRelevance } from '@/services/places/place-photos.service';
+import {
+  scoreAtmosphereRelevance,
+  scorePhotoRelevance,
+} from '@/services/places/place-photos.service';
+import type { Place } from '@/types/domain';
 
 describe('place photo search naming', () => {
   it('strips bilingual parentheses for search', () => {
@@ -56,5 +60,26 @@ describe('scorePhotoRelevance', () => {
 
   it('does not accept a city-only match', () => {
     expect(scorePhotoRelevance("Max's Restaurant Sorsogon", 'Sorsogon City Hall')).toBe(0);
+  });
+});
+
+describe('scoreAtmosphereRelevance', () => {
+  const place = {
+    id: 'w-sapa-catcat',
+    name: 'Cat Cat Village',
+    category: 'attraction',
+    latitude: 22.323,
+    longitude: 103.832,
+    address: 'Sa Pa, Vietnam',
+  } as Place;
+
+  it('accepts destination stock titles for the city', () => {
+    expect(
+      scoreAtmosphereRelevance(place, 'Rice terraces near Sa Pa Vietnam'),
+    ).toBeGreaterThanOrEqual(0.38);
+  });
+
+  it('soft-accepts category travel photography', () => {
+    expect(scoreAtmosphereRelevance(place, 'Travel landmark viewpoint')).toBeGreaterThanOrEqual(0.3);
   });
 });

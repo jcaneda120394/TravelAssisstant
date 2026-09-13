@@ -17,6 +17,7 @@ import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { providers } from '@/providers/registry';
 import { savePlace } from '@/services/favorites/favorites.service';
 import { recallPlace, rememberPlace } from '@/services/places/place-cache';
+import { getPlaceOverview } from '@/services/places/place-overview.service';
 import { fetchPlacePhotos, type PlacePhoto } from '@/services/places/place-photos.service';
 import {
   checkInToPlace,
@@ -37,6 +38,8 @@ import { getErrorMessage } from '@/lib/errors/app-error';
 import { labelize } from '@/constants/preferences';
 import type { Place } from '@/types/domain';
 
+const OVERVIEW_PREVIEW_CHARS = 220;
+
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View className="mb-4">
@@ -44,6 +47,18 @@ function DetailRow({ label, value }: { label: string; value: string }) {
         {label}
       </AppText>
       <AppText className="text-[15px] leading-5">{value}</AppText>
+    </View>
+  );
+}
+
+function FactBullet({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="mb-3 flex-row gap-2">
+      <AppText className="mt-0.5 text-[15px] text-brand-600">•</AppText>
+      <View className="min-w-0 flex-1 flex-row flex-wrap">
+        <AppText className="text-[15px] font-sans-semibold leading-5">{label}: </AppText>
+        <AppText className="text-[15px] leading-5">{value}</AppText>
+      </View>
     </View>
   );
 }
@@ -101,6 +116,8 @@ export function PlaceDetailScreen() {
   const queryClient = useQueryClient();
   const [saveTripOpen, setSaveTripOpen] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [overviewExpanded, setOverviewExpanded] = useState(false);
+  const [factsExpanded, setFactsExpanded] = useState(false);
   const [rating, setRating] = useState(5);
   const [reviewBody, setReviewBody] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -111,6 +128,11 @@ export function PlaceDetailScreen() {
       setImageUri(null);
     }
   }, [user]);
+
+  useEffect(() => {
+    setOverviewExpanded(false);
+    setFactsExpanded(false);
+  }, [id]);
 
   const seeded = useMemo(() => {
     const fromParams = parseSnapshot(rawSnapshot);
@@ -156,7 +178,7 @@ export function PlaceDetailScreen() {
   const place = query.data ?? seeded;
 
   const photosQuery = useQuery({
-    queryKey: ['place-photos', 'v3-google', place?.id, place?.name, place?.latitude, place?.longitude],
+    queryKey: ['place-photos', 'v4-stock', place?.id, place?.name, place?.latitude, place?.longitude],
     enabled: Boolean(place?.id),
     queryFn: async () => {
       const photos = await fetchPlacePhotos(place!, 6);
@@ -200,6 +222,31 @@ export function PlaceDetailScreen() {
     }));
     return [...community, ...base];
   }, [photosQuery.data, communityPhotosQuery.data]);
+
+  const overviewThumb = useMemo(() => {
+    const first = galleryPhotos.find((photo) => photo.source !== 'map');
+    return first?.url ?? place?.photos?.[0];
+  }, [galleryPhotos, place?.photos]);
+
+  const overviewQuery = useQuery({
+    queryKey: [
+      'place-overview',
+      place?.id,
+      place?.name,
+      place?.address,
+      place?.description,
+      currency,
+      budgetTier,
+    ],
+    enabled: Boolean(place?.id),
+    queryFn: () =>
+      getPlaceOverview(place!, {
+        currency,
+        budgetTier,
+        thumbUrl: overviewThumb,
+      }),
+    staleTime: 30 * 60_000,
+  });
 
   const checkInMutation = useMutation({
     mutationFn: async () => {
@@ -302,20 +349,38 @@ export function PlaceDetailScreen() {
                   ? 'Est. day pass'
                   : 'Price';
   const visited = Boolean(visitedQuery.data);
+  const overview = overviewQuery.data;
+  const locationLine = overview?.locationLine ?? labelize(place.category);
+  const summary = overview?.summary ?? place.description?.trim() ?? '';
+  const summaryNeedsToggle = summary.length > OVERVIEW_PREVIEW_CHARS;
+  const summaryShown =
+    overviewExpanded || !summaryNeedsToggle
+      ? summary
+      : `${summary.slice(0, OVERVIEW_PREVIEW_CHARS).trim()}…`;
+  const facts = overview?.facts ?? [];
+  const previewFactCount = 3;
+  const factsNeedToggle = facts.length > previewFactCount;
+  const factsShown =
+    factsExpanded || !factsNeedToggle ? facts : facts.slice(0, previewFactCount);
+  const overviewImage = overview?.thumbUrl ?? overviewThumb;
 
   return (
     <Screen>
       <ScrollView className="flex-1 pt-0" contentContainerClassName="pb-10" testID="screen-place">
         <View className="px-5 pt-4">
-          <SectionHeader
-            title={title}
-            subtitle={`${labelize(place.category)}${
-              place.distanceMeters != null ? ` · ${formatDistanceMeters(place.distanceMeters)}` : ''
-            }${ratingText ? ` · ${ratingText}` : ''}`}
-          />
+          <AppText className="text-[28px] font-sans-bold leading-8">
+            {title}
+          </AppText>
+          <AppText muted className="mt-1 text-[15px] leading-5">
+            {locationLine}
+            {ratingText ? ` · ${ratingText}` : ''}
+            {place.distanceMeters != null
+              ? ` · ${formatDistanceMeters(place.distanceMeters)}`
+              : ''}
+          </AppText>
         </View>
 
-        <View className="mb-4">
+        <View className="mb-4 mt-4">
           <PlacePhotoGallery
             photos={galleryPhotos}
             loading={photosQuery.isLoading || photosQuery.isFetching}
@@ -325,20 +390,82 @@ export function PlaceDetailScreen() {
 
         <View className="px-5">
         <Card className="mb-4">
+          <AppText className="mb-2 text-[13px] font-sans-semibold uppercase tracking-wide text-brand-600">
+            Overview
+          </AppText>
+          {overviewQuery.isLoading && !summary ? (
+            <Skeleton height={96} />
+          ) : (
+            <View className="flex-row gap-3">
+              <View className="min-w-0 flex-1">
+                <AppText className="text-[15px] leading-6">
+                  {summaryShown || 'Details loading…'}
+                </AppText>
+                {summaryNeedsToggle ? (
+                  <Pressable
+                    onPress={() => setOverviewExpanded((open) => !open)}
+                    className="mt-2 self-start"
+                    hitSlop={8}
+                  >
+                    <AppText className="text-[14px] font-sans-semibold text-brand-600">
+                      {overviewExpanded ? 'Show less' : 'Show more'}
+                    </AppText>
+                  </Pressable>
+                ) : null}
+                {overview?.summarySource === 'wikipedia' ? (
+                  <AppText muted className="mt-2 text-[11px]">
+                    Summary from Wikipedia
+                  </AppText>
+                ) : null}
+              </View>
+              {overviewImage ? (
+                <Image
+                  source={{ uri: overviewImage }}
+                  className="h-24 w-24 rounded-2xl bg-surface-mist"
+                  resizeMode="cover"
+                  accessibilityLabel={`${title} photo`}
+                />
+              ) : null}
+            </View>
+          )}
+        </Card>
+
+        <Card className="mb-4">
+          <AppText className="mb-3 text-[17px] font-sans-semibold">
+            Quick Facts & Visitor Info
+          </AppText>
+          {overviewQuery.isLoading && facts.length === 0 ? (
+            <Skeleton height={120} />
+          ) : factsShown.length > 0 ? (
+            <View>
+              {factsShown.map((fact) => (
+                <FactBullet key={`${fact.label}-${fact.value}`} label={fact.label} value={fact.value} />
+              ))}
+              {factsNeedToggle ? (
+                <Pressable
+                  onPress={() => setFactsExpanded((open) => !open)}
+                  className="mt-1 items-center rounded-full border border-black/10 py-2.5 dark:border-brand-700"
+                >
+                  <AppText className="text-[14px] font-sans-semibold text-brand-700 dark:text-brand-200">
+                    {factsExpanded ? 'Show less' : 'Show more'}
+                  </AppText>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            <AppText muted className="text-sm">
+              Visitor details will appear as we learn more about this place.
+            </AppText>
+          )}
+        </Card>
+
+        <Card className="mb-4">
+          <SectionHeader title="Contact & details" subtitle="Hours, links, and extras" />
           <DetailRow label="Address" value={place.address ?? 'Address not listed'} />
           <DetailRow label="Open / close hours" value={hoursText} />
           {cuisineText ? <DetailRow label="Cuisine / menu style" value={cuisineText} /> : null}
           {ratingText ? <DetailRow label="Rating" value={ratingText} /> : null}
-          {priceEstimate ? (
-            <DetailRow
-              label={priceLabel}
-              value={
-                priceEstimate.isEstimate
-                  ? priceEstimate.label
-                  : priceEstimate.label
-              }
-            />
-          ) : null}
+          {priceEstimate ? <DetailRow label={priceLabel} value={priceEstimate.label} /> : null}
           {place.menuUrl ? (
             <DetailRow label="Menu" value={place.menuUrl} />
           ) : place.category === 'restaurant' || place.category === 'cafe' ? (
@@ -349,7 +476,6 @@ export function PlaceDetailScreen() {
           ) : null}
           {place.phone ? <DetailRow label="Phone" value={place.phone} /> : null}
           {place.website ? <DetailRow label="Website" value={place.website} /> : null}
-          {place.description ? <DetailRow label="Notes" value={place.description} /> : null}
           {place.tags?.length ? (
             <View className="mt-1 flex-row flex-wrap gap-2">
               {place.tags

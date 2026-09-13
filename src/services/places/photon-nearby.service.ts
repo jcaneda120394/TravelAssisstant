@@ -12,6 +12,7 @@ import {
   formatBilingualPlaceName,
   hasNonLatinScript,
 } from '@/utils/place-name';
+import { dedupePlaces } from '@/utils/dedupe-places';
 
 type PhotonFeature = {
   geometry?: { coordinates?: [number, number] };
@@ -404,18 +405,6 @@ export async function reverseCityLabel(location: GeoPoint): Promise<string | nul
   } catch {
     return null;
   }
-}
-
-function dedupePlaces(places: Place[]): Place[] {
-  const seen = new Set<string>();
-  return places.filter((place) => {
-    const key = `${place.name.toLowerCase()}|${place.latitude.toFixed(3)}|${place.longitude.toFixed(3)}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
 }
 
 /**

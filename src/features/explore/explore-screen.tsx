@@ -20,6 +20,7 @@ import { cachePlaces } from '@/services/offline/offline.service';
 import { getExploreNearbyPlaces } from '@/services/places/explore-nearby.service';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { companionFilterActive } from '@/utils/companion-suitability';
+import { dedupePlaces } from '@/utils/dedupe-places';
 import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
 
 const MIN_RADIUS_METERS = 500;
@@ -218,7 +219,7 @@ export function ExploreScreen() {
     // Trust explore nearby (already radius-filtered; may expand in sparse areas).
     // Re-clamping to the chip distance was wiping auto-expanded best-of lists.
     return sortPlacesByCategoryPopularity(
-      raw,
+      dedupePlaces(raw),
       category === 'all' ? undefined : (category as PlaceCategory),
     );
   }, [query.data, category]);

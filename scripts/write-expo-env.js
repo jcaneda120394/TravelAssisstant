@@ -3,6 +3,8 @@
  * Writes EXPO_PUBLIC_* into .env for Expo web builds on Vercel/CI.
  * Expo inlines these at export time; without a file, some CI paths leave them empty
  * and the app falls back to "Demo auth mode".
+ *
+ * Never writes service-role / JWT / secret keys into the client .env.
  */
 const fs = require('fs');
 const path = require('path');
@@ -18,9 +20,19 @@ const KEYS = [
   'EXPO_PUBLIC_SENTRY_DSN',
 ];
 
-/** Fill gaps from Vercel system env when project vars were not injected. */
+function firstNonEmpty(...keys) {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (value != null && String(value).trim() !== '') {
+      return String(value).trim();
+    }
+  }
+  return '';
+}
+
+/** Fill gaps from Vercel system env / alternate Supabase key names. */
 function ensureDefaults() {
-  if (!process.env.EXPO_PUBLIC_APP_ENV) {
+  if (!firstNonEmpty('EXPO_PUBLIC_APP_ENV')) {
     if (process.env.VERCEL_ENV === 'production') {
       process.env.EXPO_PUBLIC_APP_ENV = 'production';
     } else if (process.env.VERCEL_ENV === 'preview') {
@@ -29,11 +41,34 @@ function ensureDefaults() {
       process.env.EXPO_PUBLIC_APP_ENV = 'development';
     }
   }
-  if (!process.env.EXPO_PUBLIC_APP_NAME) {
+
+  if (!firstNonEmpty('EXPO_PUBLIC_APP_NAME')) {
     process.env.EXPO_PUBLIC_APP_NAME = 'TravelAssistant';
   }
-  if (!process.env.EXPO_PUBLIC_USE_MOCK_PROVIDERS) {
+
+  if (!firstNonEmpty('EXPO_PUBLIC_USE_MOCK_PROVIDERS')) {
     process.env.EXPO_PUBLIC_USE_MOCK_PROVIDERS = 'false';
+  }
+
+  // Some Vercel projects set empty EXPO_PUBLIC_* while SUPABASE_* / NEXT_PUBLIC_* are filled.
+  const supabaseUrl = firstNonEmpty(
+    'EXPO_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'SUPABASE_URL',
+  );
+  if (supabaseUrl) {
+    process.env.EXPO_PUBLIC_SUPABASE_URL = supabaseUrl;
+  }
+
+  const anonKey = firstNonEmpty(
+    'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_PUBLISHABLE_KEY',
+  );
+  if (anonKey) {
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = anonKey;
   }
 }
 
@@ -44,14 +79,14 @@ const missingRequired = [];
 let written = 0;
 
 for (const key of KEYS) {
-  const value = process.env[key];
-  if (value == null || value === '') {
+  const value = firstNonEmpty(key);
+  if (!value) {
     if (key === 'EXPO_PUBLIC_SUPABASE_URL' || key === 'EXPO_PUBLIC_SUPABASE_ANON_KEY') {
       missingRequired.push(key);
     }
     continue;
   }
-  const escaped = String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   lines.push(`${key}="${escaped}"`);
   written += 1;
 }
@@ -68,6 +103,9 @@ console.log(
   `[write-expo-env] context VERCEL=${process.env.VERCEL ?? ''} VERCEL_ENV=${process.env.VERCEL_ENV ?? ''} CI=${process.env.CI ?? ''}`,
 );
 console.log(`[write-expo-env] visible EXPO/SUPABASE keys: ${expoKeys.join(', ') || '(none)'}`);
+console.log(
+  `[write-expo-env] supabase url present=${Boolean(firstNonEmpty('EXPO_PUBLIC_SUPABASE_URL'))} anon present=${Boolean(firstNonEmpty('EXPO_PUBLIC_SUPABASE_ANON_KEY'))}`,
+);
 
 if (missingRequired.length) {
   console.warn(
@@ -76,10 +114,7 @@ if (missingRequired.length) {
   const onCi = process.env.VERCEL === '1' || process.env.CI === 'true';
   if (onCi) {
     console.error(
-      '[write-expo-env] Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in Vercel → Project Settings → Environment Variables for Production + Preview, then redeploy.',
-    );
-    console.error(
-      '[write-expo-env] Confirm each variable is enabled for this environment (Production / Preview / Development).',
+      '[write-expo-env] Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (or SUPABASE_URL + SUPABASE_ANON_KEY) in Vercel → Environment Variables for Production + Preview, then redeploy.',
     );
     process.exit(1);
   }

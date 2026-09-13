@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Platform, type ScrollView as RNScrollView } from 'react-native';
+import { useState } from 'react';
+import { Platform } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -202,18 +202,8 @@ function chipClass(selected: boolean, scheme: 'light' | 'dark') {
 export function ExploreCategoryPicker({ value, onChange }: Props) {
   const scheme = useAppColorScheme();
   const [moreOpen, setMoreOpen] = useState(false);
-  const chipScrollRef = useRef<RNScrollView>(null);
   const secondarySelected = !PRIMARY_SET.has(value) && value !== 'other';
   const otherSelected = value === 'other';
-
-  // Keep Other + More visible after picking a More-sheet category.
-  useEffect(() => {
-    if (!secondarySelected && !otherSelected) return;
-    const id = requestAnimationFrame(() => {
-      chipScrollRef.current?.scrollToEnd({ animated: true });
-    });
-    return () => cancelAnimationFrame(id);
-  }, [value, secondarySelected, otherSelected]);
 
   const select = (next: ExploreCategory) => {
     onChange(next);
@@ -224,93 +214,95 @@ export function ExploreCategoryPicker({ value, onChange }: Props) {
     Platform.OS === 'web' ? ({ flexShrink: 0 } as const) : undefined;
 
   return (
-    <View className="w-full" testID="explore-category-picker">
-      <ScrollView
-        ref={chipScrollRef}
-        horizontal
-        nestedScrollEnabled
-        directionalLockEnabled
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        style={
-          Platform.OS === 'web'
-            ? ({ flexGrow: 0, width: '100%', touchAction: 'pan-x' } as object)
-            : { flexGrow: 0, width: '100%' }
-        }
-        contentContainerStyle={{
-          flexDirection: 'row',
-          flexWrap: 'nowrap',
-          alignItems: 'center',
-          gap: 8,
-          paddingRight: 20,
-        }}
-      >
-        {PRIMARY_CATEGORIES.map((option) => {
-          const selected = value === option;
-          return (
-            <Pressable
-              key={option}
-              onPress={() => select(option)}
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              className={chipClass(selected, scheme)}
-              style={chipWebStyle}
-              testID={`explore-category-${option}`}
-            >
-              <AppText
-                inverse={selected}
-                className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+    <View className="w-full min-w-0 max-w-full" testID="explore-category-picker">
+      {/* Primary chips scroll; selected More-pick + Other + More stay pinned. */}
+      <View className="w-full min-w-0 flex-row items-center gap-2">
+        <ScrollView
+          horizontal
+          nestedScrollEnabled
+          directionalLockEnabled
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={
+            Platform.OS === 'web'
+              ? ({ flexGrow: 1, flexShrink: 1, minWidth: 0, touchAction: 'pan-x' } as object)
+              : { flexGrow: 1, flexShrink: 1, minWidth: 0 }
+          }
+          contentContainerStyle={{
+            flexDirection: 'row',
+            flexWrap: 'nowrap',
+            alignItems: 'center',
+            gap: 8,
+            paddingRight: 4,
+          }}
+        >
+          {PRIMARY_CATEGORIES.map((option) => {
+            const selected = value === option;
+            return (
+              <Pressable
+                key={option}
+                onPress={() => select(option)}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                className={chipClass(selected, scheme)}
+                style={chipWebStyle}
+                testID={`explore-category-${option}`}
               >
-                {PRIMARY_LABELS[option] ?? CATEGORY_LABELS[option]}
+                <AppText
+                  inverse={selected}
+                  className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+                >
+                  {PRIMARY_LABELS[option] ?? CATEGORY_LABELS[option]}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <View className="flex-row items-center gap-2" style={{ flexShrink: 0 }}>
+          {secondarySelected ? (
+            <Pressable
+              onPress={() => setMoreOpen(true)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: true }}
+              className={chipClass(true, scheme)}
+              style={chipWebStyle}
+              testID={`explore-category-selected-${value}`}
+            >
+              <AppText inverse className="text-sm font-sans-semibold">
+                {CATEGORY_LABELS[value]}
               </AppText>
             </Pressable>
-          );
-        })}
+          ) : null}
 
-        {/* Selected More-sheet category (Pharmacy, Cafe, …) — not Other, which has its own chip. */}
-        {secondarySelected ? (
+          <Pressable
+            onPress={() => select('other')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: otherSelected }}
+            className={chipClass(otherSelected, scheme)}
+            style={chipWebStyle}
+            testID="explore-category-other"
+          >
+            <AppText
+              inverse={otherSelected}
+              className={`text-sm ${otherSelected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+            >
+              Other
+            </AppText>
+          </Pressable>
+
           <Pressable
             onPress={() => setMoreOpen(true)}
             accessibilityRole="button"
-            accessibilityState={{ selected: true }}
-            className={chipClass(true, scheme)}
+            accessibilityLabel="More categories"
+            className={chipClass(false, scheme)}
             style={chipWebStyle}
-            testID={`explore-category-selected-${value}`}
+            testID="explore-category-more"
           >
-            <AppText inverse className="text-sm font-sans-semibold">
-              {CATEGORY_LABELS[value]}
-            </AppText>
+            <AppText className="text-sm font-sans-medium">More ···</AppText>
           </Pressable>
-        ) : null}
-
-        {/* Always visible — was easy to lose after picking another More category. */}
-        <Pressable
-          onPress={() => select('other')}
-          accessibilityRole="button"
-          accessibilityState={{ selected: otherSelected }}
-          className={chipClass(otherSelected, scheme)}
-          style={chipWebStyle}
-          testID="explore-category-other"
-        >
-          <AppText
-            inverse={otherSelected}
-            className={`text-sm ${otherSelected ? 'font-sans-semibold' : 'font-sans-medium'}`}
-          >
-            Other
-          </AppText>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setMoreOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="More categories"
-          className={chipClass(false, scheme)}
-          style={chipWebStyle}
-          testID="explore-category-more"
-        >
-          <AppText className="text-sm font-sans-medium">More ···</AppText>
-        </Pressable>
-      </ScrollView>
+        </View>
+      </View>
 
       <BottomSheet
         visible={moreOpen}

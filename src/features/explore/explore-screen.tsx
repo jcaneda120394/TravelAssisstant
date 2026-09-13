@@ -21,7 +21,6 @@ import { getExploreNearbyPlaces } from '@/services/places/explore-nearby.service
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { companionFilterActive } from '@/utils/companion-suitability';
 import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
-import { filterPlacesWithinRadius } from '@/utils/geo';
 
 const MIN_RADIUS_METERS = 500;
 const MAX_RADIUS_METERS = 200_000;
@@ -185,7 +184,7 @@ export function ExploreScreen() {
   const query = useQuery({
     queryKey: [
       'nearby',
-      'explore-v4',
+      'explore-v5',
       coords?.latitude,
       coords?.longitude,
       radiusMeters,
@@ -216,14 +215,13 @@ export function ExploreScreen() {
 
   const places = useMemo(() => {
     const raw = query.data ?? [];
-    if (!coords) return [];
-    // Match the selected distance (small slack for GPS rounding only).
-    const inRange = filterPlacesWithinRadius(raw, coords, radiusMeters, 200);
+    // Trust explore nearby (already radius-filtered; may expand in sparse areas).
+    // Re-clamping to the chip distance was wiping auto-expanded best-of lists.
     return sortPlacesByCategoryPopularity(
-      inRange,
+      raw,
       category === 'all' ? undefined : (category as PlaceCategory),
     );
-  }, [query.data, radiusMeters, category, coords]);
+  }, [query.data, category]);
 
   const subtitle = useMemo(() => {
     if (!hasLocation) {
@@ -237,8 +235,14 @@ export function ExploreScreen() {
     }
     const count = places.length;
     const updating = query.isFetching ? ' · updating…' : '';
-    return `${count} places near ${label ?? 'you'} · within ${formatRadiusLabel(radiusMeters)} · sorted by popularity${updating}`;
-  }, [hasLocation, label, places.length, query.isError, query.isFetching, radiusMeters]);
+    const farthest = places.reduce(
+      (max, place) => Math.max(max, place.distanceMeters ?? 0),
+      0,
+    );
+    const coverageMeters =
+      farthest > radiusMeters + 500 ? Math.ceil(farthest / 1000) * 1000 : radiusMeters;
+    return `${count} places near ${label ?? 'you'} · within ${formatRadiusLabel(coverageMeters)} · sorted by popularity${updating}`;
+  }, [hasLocation, label, places, query.isError, query.isFetching, radiusMeters]);
 
   const applyCategory = (next: ExploreCategory) => {
     setCategory(next);

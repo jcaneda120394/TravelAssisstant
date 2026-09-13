@@ -161,13 +161,15 @@ function queriesFor(category: PlaceCategory, city: string): string[] {
     case 'attraction':
     default:
       return [
-        `theme park ${c}`,
+        `tourist attraction ${c}`,
         `museum ${c}`,
         `park ${c}`,
-        `temple ${c}`,
-        `tourist attraction ${c}`,
-        `tower ${c}`,
+        `castle ${c}`,
+        `cathedral ${c}`,
         `palace ${c}`,
+        `national park ${c}`,
+        `viewpoint ${c}`,
+        `theme park ${c}`,
         `zoo ${c}`,
       ];
   }
@@ -220,13 +222,16 @@ function bareQueries(category: PlaceCategory): string[] {
         return [category.replace(/_/g, ' ')];
       }
       return [
-        'theme park',
+        'tourist attraction',
         'museum',
         'park',
-        'temple',
-        'tourist attraction',
+        'castle',
+        'cathedral',
+        'national park',
+        'palace',
         'monument',
         'viewpoint',
+        'theme park',
       ];
   }
 }
@@ -438,7 +443,7 @@ export async function searchPhotonNearby(params: {
   radiusMeters?: number;
   limit?: number;
 }): Promise<Place[]> {
-  const limit = Math.min(Math.max(params.limit ?? 15, 1), 40);
+  const limit = Math.min(Math.max(params.limit ?? 15, 1), 60);
   const searchCategory = resolveSearchCategory(params.category as PlaceCategory | undefined);
   const fallbackCategory = searchCategory;
   const radius = params.radiusMeters ?? 15_000;
@@ -462,13 +467,22 @@ export async function searchPhotonNearby(params: {
   }
 
   const queryCity = cityWithRegion.length >= 3 ? cityWithRegion : city;
-  const queryList =
-    queryCity.length >= 2
+  // Country-only / vague labels ("Spain", "Philippines") are weak — always add
+  // location-biased bare queries so any city switch still fills nearby.
+  const vagueLabel =
+    queryCity.length < 2 ||
+    /^(spain|france|japan|philippines|italy|germany|usa|united states|china|india|brazil|mexico|canada|australia|uk|united kingdom)$/i.test(
+      queryCity,
+    );
+  const cityQueries =
+    queryCity.length >= 2 && !vagueLabel
       ? queriesFor(searchCategory, queryCity).slice(0, 8)
-      : bareQueries(searchCategory).slice(0, 6);
+      : [];
+  const bare = bareQueries(searchCategory).slice(0, vagueLabel ? 10 : 6);
+  const queryList = [...new Set([...cityQueries, ...bare])].slice(0, 12);
 
   const settled = await Promise.allSettled(
-    queryList.map((query) => photonQuery(query, params.location, 8)),
+    queryList.map((query) => photonQuery(query, params.location, 10)),
   );
 
   const features = settled.flatMap((result) =>

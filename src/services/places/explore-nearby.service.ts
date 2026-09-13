@@ -17,6 +17,8 @@ import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
 
 const LIVE_BUDGET_MS = 7_000;
 const MAX_RADIUS_METERS = 200_000;
+/** Prefer at least this many hits before stopping radius expansion. */
+const MIN_SATISFYING = 12;
 
 function delay(ms: number): Promise<null> {
   return new Promise((resolve) => {
@@ -114,13 +116,13 @@ async function fetchExplorePool(params: {
 
   const lateLive = live.length ? live : await livePromise;
 
-  // Catalog uses a slightly wider soft radius so sparse towns still fill.
+  // Catalog uses a wider soft radius so sparse towns still fill after a city switch.
   const catalog = shouldBlendCatalog(category)
     ? searchCatalogNearby({
         location,
         category: category ?? 'attraction',
-        radiusMeters: Math.max(radiusMeters, 40_000),
-        limit: Math.max(40, Math.floor(limit / 2)),
+        radiusMeters: Math.max(radiusMeters, 60_000),
+        limit: Math.max(48, Math.floor(limit / 2)),
       })
     : [];
 
@@ -145,8 +147,9 @@ export async function getExploreNearbyPlaces(params: {
   const radii = Array.from(
     new Set([
       requested,
-      Math.min(MAX_RADIUS_METERS, Math.max(requested, 40_000)),
-      Math.min(MAX_RADIUS_METERS, Math.max(requested, 80_000)),
+      Math.min(MAX_RADIUS_METERS, Math.max(requested, 50_000)),
+      Math.min(MAX_RADIUS_METERS, Math.max(requested, 90_000)),
+      Math.min(MAX_RADIUS_METERS, Math.max(requested, 150_000)),
     ]),
   ).sort((a, b) => a - b);
 
@@ -168,7 +171,7 @@ export async function getExploreNearbyPlaces(params: {
       params.companions,
       limit,
     );
-    if (ranked.length >= Math.min(6, limit)) {
+    if (ranked.length >= Math.min(MIN_SATISFYING, limit)) {
       rememberPlaces(ranked);
       return ranked;
     }

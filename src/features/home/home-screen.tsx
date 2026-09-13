@@ -28,15 +28,15 @@ import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { providers } from '@/providers/registry';
 import { getHomeNearbyPlaces } from '@/services/places/home-nearby.service';
-import { filterPlacesWithinRadius } from '@/utils/geo';
 import { listTrips } from '@/services/trips/trips.service';
 import { seedProactiveNotifications } from '@/services/notifications/notifications.service';
 import { looksLikeSanFrancisco } from '@/services/location/location.service';
 import { getDestinationTravelGradient } from '@/utils/destination-theme';
 
-const HOME_NEARBY_LIMIT = 10;
-const HOME_ATTRACTION_RADIUS_M = 40_000;
-const HOME_FOOD_RADIUS_M = 25_000;
+const HOME_NEARBY_LIMIT = 16;
+/** Initial search ring — service may expand further in sparse areas. */
+const HOME_ATTRACTION_RADIUS_M = 60_000;
+const HOME_FOOD_RADIUS_M = 35_000;
 
 function greetingForNow(): string {
   const hour = new Date().getHours();
@@ -111,6 +111,7 @@ export function HomeScreen() {
   const attractionsQuery = useQuery({
     queryKey: [
       'home-attractions',
+      'v2',
       coords?.latitude,
       coords?.longitude,
       label,
@@ -135,6 +136,7 @@ export function HomeScreen() {
   const foodQuery = useQuery({
     queryKey: [
       'home-food',
+      'v2',
       coords?.latitude,
       coords?.longitude,
       label,
@@ -156,23 +158,17 @@ export function HomeScreen() {
     staleTime: 5 * 60_000,
   });
 
-  const attractions = useMemo(() => {
-    if (!coords) return [];
-    return filterPlacesWithinRadius(
-      attractionsQuery.data ?? [],
-      coords,
-      HOME_ATTRACTION_RADIUS_M,
-    ).slice(0, HOME_NEARBY_LIMIT);
-  }, [attractionsQuery.data, coords]);
+  // Trust the nearby service (it already radius-filters and may expand in sparse areas).
+  // Re-clamping to the initial ring was dropping most Discover results.
+  const attractions = useMemo(
+    () => (attractionsQuery.data ?? []).slice(0, HOME_NEARBY_LIMIT),
+    [attractionsQuery.data],
+  );
 
-  const foodPlaces = useMemo(() => {
-    if (!coords) return [];
-    return filterPlacesWithinRadius(
-      foodQuery.data ?? [],
-      coords,
-      HOME_FOOD_RADIUS_M,
-    ).slice(0, HOME_NEARBY_LIMIT);
-  }, [foodQuery.data, coords]);
+  const foodPlaces = useMemo(
+    () => (foodQuery.data ?? []).slice(0, HOME_NEARBY_LIMIT),
+    [foodQuery.data],
+  );
 
   const openExplore = (category: 'attraction' | 'restaurant') => {
     router.replace({

@@ -9,8 +9,10 @@ import { filterPlacesWithinRadius } from '@/utils/geo';
 import { dropForeignLandmarkNoise } from '@/utils/place-foreign-noise';
 import { topPopularPlaces } from '@/utils/place-popularity';
 
-const DEFAULT_LIMIT = 15;
-const LIVE_BUDGET_MS = 5_000;
+const DEFAULT_LIMIT = 18;
+const LIVE_BUDGET_MS = 6_000;
+/** Prefer at least this many local hits before stopping radius expansion. */
+const MIN_SATISFYING = 10;
 
 function delay(ms: number): Promise<null> {
   return new Promise((resolve) => {
@@ -59,53 +61,48 @@ async function fetchHomePool(params: {
   limit: number;
 }): Promise<Place[]> {
   const { location, category, cityLabel, radiusMeters, limit } = params;
+  const fetchLimit = Math.max(limit + 12, 40);
 
   const photonPromise = searchPhotonNearby({
     location,
     category,
     cityLabel,
     radiusMeters,
-    limit: Math.max(limit + 6, 24),
+    limit: fetchLimit,
   }).catch(() => [] as Place[]);
+
+  const livePromise = providers.places
+    .getNearbyPlaces({
+      location,
+      radiusMeters,
+      category,
+      limit: fetchLimit,
+      cityLabel,
+    })
+    .catch(() => [] as Place[]);
 
   const catalog = searchCatalogNearby({
     location,
     category,
-    radiusMeters,
-    limit: Math.max(limit + 10, 30),
+    radiusMeters: Math.max(radiusMeters, 50_000),
+    limit: Math.max(limit + 16, 40),
   });
 
-  try {
-    const nearby = await raceWithBudget(
-      providers.places.getNearbyPlaces({
-        location,
-        radiusMeters,
-        category,
-        limit: Math.max(limit + 6, 24),
-        cityLabel,
-      }),
-      LIVE_BUDGET_MS,
-    );
-    if (nearby && nearby.length > 0) {
-      return [...catalog, ...nearby];
-    }
-  } catch {
-    // Fall through.
-  }
+  const [nearby, photon] = await Promise.all([
+    raceWithBudget(livePromise, LIVE_BUDGET_MS).then((v) => v ?? []),
+    photonPromise,
+  ]);
 
-  const photon = await photonPromise;
-  if (photon.length > 0) {
-    return [...catalog, ...photon];
-  }
-
-  return catalog;
+  // Always merge every source. Sparse OSM must not skip Photon/catalog.
+  const lateLive = nearby.length ? nearby : await livePromise;
+  return [...catalog, ...lateLive, ...photon];
 }
 
 /**
  * Home lists for any city worldwide:
- * OSM (budgeted) → Photon → curated catalog → popularity rank.
+ * merge OSM + Photon + curated catalog, then popularity-rank.
  * Every result is distance-checked against the user's coordinates.
- * Sparse cities (e.g. Sorsogon) expand the search radius until enough local hits appear.
+ * Sparse areas expand the search radius until enough local hits appear.
  */
 export async function getHomeNearbyPlaces(params: {
   location: GeoPoint;
@@ -116,11 +113,14 @@ export async function getHomeNearbyPlaces(params: {
   companions?: CompanionPrefs | null;
 }): Promise<Place[]> {
   const limit = params.limit ?? DEFAULT_LIMIT;
-  const radii = [
-    params.radiusMeters,
-    Math.max(params.radiusMeters, 35_000),
-    Math.max(params.radiusMeters, 80_000),
-  ];
+  const radii = Array.from(
+    new Set([
+      params.radiusMeters,
+      Math.max(params.radiusMeters, 50_000),
+      Math.max(params.radiusMeters, 90_000),
+      Math.max(params.radiusMeters, 150_000),
+    ]),
+  ).sort((a, b) => a - b);
 
   let best: Place[] = [];
   for (const radius of radii) {
@@ -139,7 +139,7 @@ export async function getHomeNearbyPlaces(params: {
       params.companions,
       params.cityLabel,
     );
-    if (ranked.length >= Math.min(4, limit)) {
+    if (ranked.length >= Math.min(MIN_SATISFYING, limit)) {
       return ranked;
     }
     if (ranked.length > best.length) {

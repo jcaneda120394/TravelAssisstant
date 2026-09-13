@@ -28,6 +28,17 @@
         "EXPO_PUBLIC_USE_MOCK_PROVIDERS": "false"
       }
     },
+    "simulator": {
+      "environment": "preview",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_APP_NAME": "TravelAssistant",
+        "EXPO_PUBLIC_USE_MOCK_PROVIDERS": "false"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "environment": "production",

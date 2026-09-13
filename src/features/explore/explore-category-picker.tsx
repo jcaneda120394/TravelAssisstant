@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { Modal, Platform } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Platform, type ScrollView as RNScrollView } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { AppText } from '@/components/ui/typography';
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
@@ -55,6 +56,7 @@ export const EXPLORE_CATEGORIES = [
   'clinic',
   'police',
   'embassy',
+  'other',
   'all',
 ] as const;
 
@@ -82,6 +84,10 @@ type CategoryGroup = {
 };
 
 const CATEGORY_GROUPS: readonly CategoryGroup[] = [
+  {
+    title: 'Quick picks',
+    categories: ['other', 'all'],
+  },
   {
     title: 'Eat & drink',
     categories: ['restaurant', 'cafe', 'bakery', 'nightlife'],
@@ -170,6 +176,7 @@ export const CATEGORY_LABELS: Record<ExploreCategory, string> = {
   clinic: 'Clinic',
   police: 'Police',
   embassy: 'Embassy',
+  other: 'Other',
   all: 'All',
 };
 
@@ -195,28 +202,41 @@ function chipClass(selected: boolean, scheme: 'light' | 'dark') {
 export function ExploreCategoryPicker({ value, onChange }: Props) {
   const scheme = useAppColorScheme();
   const [moreOpen, setMoreOpen] = useState(false);
-  const primarySelected = PRIMARY_SET.has(value);
-  const moreActive = !primarySelected;
+  const chipScrollRef = useRef<RNScrollView>(null);
+  const secondarySelected = !PRIMARY_SET.has(value) && value !== 'other';
+  const otherSelected = value === 'other';
 
-  const moreChipLabel = useMemo(() => {
-    if (moreActive) {
-      return CATEGORY_LABELS[value];
-    }
-    return 'More';
-  }, [moreActive, value]);
+  // Keep Other + More visible after picking a More-sheet category.
+  useEffect(() => {
+    if (!secondarySelected && !otherSelected) return;
+    const id = requestAnimationFrame(() => {
+      chipScrollRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [value, secondarySelected, otherSelected]);
 
   const select = (next: ExploreCategory) => {
     onChange(next);
     setMoreOpen(false);
   };
 
+  const chipWebStyle =
+    Platform.OS === 'web' ? ({ flexShrink: 0 } as const) : undefined;
+
   return (
     <View className="w-full" testID="explore-category-picker">
       <ScrollView
+        ref={chipScrollRef}
         horizontal
         nestedScrollEnabled
+        directionalLockEnabled
         showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, width: '100%' }}
+        keyboardShouldPersistTaps="handled"
+        style={
+          Platform.OS === 'web'
+            ? ({ flexGrow: 0, width: '100%', touchAction: 'pan-x' } as object)
+            : { flexGrow: 0, width: '100%' }
+        }
         contentContainerStyle={{
           flexDirection: 'row',
           flexWrap: 'nowrap',
@@ -234,7 +254,7 @@ export function ExploreCategoryPicker({ value, onChange }: Props) {
               accessibilityRole="button"
               accessibilityState={{ selected }}
               className={chipClass(selected, scheme)}
-              style={Platform.OS === 'web' ? { flexShrink: 0 } : undefined}
+              style={chipWebStyle}
               testID={`explore-category-${option}`}
             >
               <AppText
@@ -246,98 +266,115 @@ export function ExploreCategoryPicker({ value, onChange }: Props) {
             </Pressable>
           );
         })}
+
+        {/* Selected More-sheet category (Pharmacy, Cafe, …) — not Other, which has its own chip. */}
+        {secondarySelected ? (
+          <Pressable
+            onPress={() => setMoreOpen(true)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: true }}
+            className={chipClass(true, scheme)}
+            style={chipWebStyle}
+            testID={`explore-category-selected-${value}`}
+          >
+            <AppText inverse className="text-sm font-sans-semibold">
+              {CATEGORY_LABELS[value]}
+            </AppText>
+          </Pressable>
+        ) : null}
+
+        {/* Always visible — was easy to lose after picking another More category. */}
+        <Pressable
+          onPress={() => select('other')}
+          accessibilityRole="button"
+          accessibilityState={{ selected: otherSelected }}
+          className={chipClass(otherSelected, scheme)}
+          style={chipWebStyle}
+          testID="explore-category-other"
+        >
+          <AppText
+            inverse={otherSelected}
+            className={`text-sm ${otherSelected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+          >
+            Other
+          </AppText>
+        </Pressable>
+
         <Pressable
           onPress={() => setMoreOpen(true)}
           accessibilityRole="button"
-          accessibilityState={{ selected: moreActive }}
-          accessibilityLabel={moreActive ? `More categories, ${CATEGORY_LABELS[value]}` : 'More categories'}
-          className={chipClass(moreActive, scheme)}
-          style={Platform.OS === 'web' ? { flexShrink: 0 } : undefined}
+          accessibilityLabel="More categories"
+          className={chipClass(false, scheme)}
+          style={chipWebStyle}
           testID="explore-category-more"
         >
-          <AppText
-            inverse={moreActive}
-            className={`text-sm ${moreActive ? 'font-sans-semibold' : 'font-sans-medium'}`}
-          >
-            {moreChipLabel}
-            {moreActive ? '' : ' ···'}
-          </AppText>
+          <AppText className="text-sm font-sans-medium">More ···</AppText>
         </Pressable>
       </ScrollView>
 
-      <Modal
+      <BottomSheet
         visible={moreOpen}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setMoreOpen(false)}
+        onClose={() => setMoreOpen(false)}
+        dismissLabel="Dismiss categories"
       >
-        <View className="flex-1 justify-end bg-black/40">
-          <View
-            className={`max-h-[80%] rounded-t-3xl px-5 pb-8 pt-4 ${
-              scheme === 'dark' ? 'bg-surface-cardDark' : 'bg-white'
-            }`}
-          >
-            <View className="mb-3 flex-row items-center justify-between">
-              <View className="flex-1 pr-3">
-                <AppText className="text-lg font-sans-semibold">Categories</AppText>
-                <AppText muted className="mt-0.5 text-xs">
-                  Browse by section — tap to filter nearby places
-                </AppText>
-              </View>
-              <Pressable onPress={() => setMoreOpen(false)} hitSlop={12}>
-                <AppText className="font-sans-semibold text-brand-700">Close</AppText>
-              </Pressable>
+        <View
+          className={`max-h-[80%] rounded-t-3xl px-5 pb-8 pt-4 ${
+            scheme === 'dark' ? 'bg-surface-cardDark' : 'bg-white'
+          }`}
+        >
+          <View className="mb-3 flex-row items-center justify-between">
+            <View className="min-w-0 flex-1 pr-3">
+              <AppText className="text-lg font-sans-semibold">Categories</AppText>
+              <AppText muted className="mt-0.5 text-xs">
+                Browse by section — tap to filter nearby places
+              </AppText>
             </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} className="mb-3">
-              <Pressable
-                onPress={() => select('all')}
-                accessibilityRole="button"
-                accessibilityState={{ selected: value === 'all' }}
-                className={`mb-4 self-start ${chipClass(value === 'all', scheme)}`}
-              >
-                <AppText
-                  inverse={value === 'all'}
-                  className={`text-sm ${value === 'all' ? 'font-sans-semibold' : 'font-sans-medium'}`}
-                >
-                  {CATEGORY_LABELS.all}
-                </AppText>
-              </Pressable>
-
-              {CATEGORY_GROUPS.map((group) => (
-                <View key={group.title} className="mb-4">
-                  <AppText muted className="mb-2 text-xs font-sans-semibold uppercase tracking-wide">
-                    {group.title}
-                  </AppText>
-                  <View className="flex-row flex-wrap gap-2">
-                    {group.categories.map((option) => {
-                      const selected = value === option;
-                      return (
-                        <Pressable
-                          key={option}
-                          onPress={() => select(option)}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          className={chipClass(selected, scheme)}
-                        >
-                          <AppText
-                            inverse={selected}
-                            className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
-                          >
-                            {CATEGORY_LABELS[option]}
-                          </AppText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
-
-            <Button label="Done" variant="secondary" onPress={() => setMoreOpen(false)} />
+            <Pressable onPress={() => setMoreOpen(false)} hitSlop={12}>
+              <AppText className="font-sans-semibold text-brand-700">Close</AppText>
+            </Pressable>
           </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            className="mb-3"
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            style={Platform.OS === 'web' ? ({ touchAction: 'pan-y' } as object) : undefined}
+          >
+            {CATEGORY_GROUPS.map((group) => (
+              <View key={group.title} className="mb-4">
+                <AppText muted className="mb-2 text-xs font-sans-semibold uppercase tracking-wide">
+                  {group.title}
+                </AppText>
+                <View className="flex-row flex-wrap gap-2">
+                  {group.categories.map((option) => {
+                    const selected = value === option;
+                    return (
+                      <Pressable
+                        key={option}
+                        onPress={() => select(option)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        className={chipClass(selected, scheme)}
+                        testID={`explore-category-sheet-${option}`}
+                      >
+                        <AppText
+                          inverse={selected}
+                          className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+                        >
+                          {CATEGORY_LABELS[option]}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+
+          <Button label="Done" variant="secondary" onPress={() => setMoreOpen(false)} />
         </View>
-      </Modal>
+      </BottomSheet>
     </View>
   );
 }

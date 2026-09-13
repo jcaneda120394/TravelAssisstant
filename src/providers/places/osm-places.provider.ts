@@ -136,7 +136,7 @@ const NOMINATIM_QUERIES: Record<PlaceCategory, string[]> = {
   hotel: ['hotel', 'resort', 'inn', 'hostel', 'guest house', 'apartment hotel'],
   hospital: ['hospital', 'medical center', 'medical centre'],
   clinic: ['clinic', 'doctors', 'health center'],
-  pharmacy: ['pharmacy', 'drugstore'],
+  pharmacy: ['pharmacy', 'drugstore', 'mercury drug', 'watsons', 'generika'],
   police: ['police station', 'police'],
   fire: ['fire station'],
   embassy: ['embassy', 'consulate'],
@@ -268,7 +268,12 @@ const CATEGORY_FILTERS: Record<PlaceCategory, string[]> = {
     'nwr["amenity"="bicycle_rental"]',
     'nwr["shop"="bicycle"]',
   ],
-  other: ['nwr["tourism"]', 'nwr["amenity"]'],
+  // Keep this narrow — bare tourism/amenity queries time out and freeze Explore.
+  other: [
+    'nwr["tourism"~"attraction|yes|artwork|information"]',
+    'nwr["historic"]',
+    'nwr["amenity"~"place_of_worship|community_centre|theatre|cinema"]',
+  ],
 };
 
 function haversineMeters(a: GeoPoint, b: GeoPoint): number {

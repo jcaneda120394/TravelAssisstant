@@ -127,6 +127,14 @@ export function placeMatchesCategory(
   if (category === 'resort') {
     return /\b(resort|villa|beach club)\b/i.test(haystack);
   }
+  if (category === 'pharmacy') {
+    return /\b(pharmacy|drugstore|drug store|mercury drug|watsons|generika|south star)\b/i.test(
+      haystack,
+    );
+  }
+  if (category === 'atm' || category === 'bank') {
+    return /\b(atm|bank|money changer|forex|fx|bureau)\b/i.test(haystack);
+  }
   if (category === 'attraction' || category === 'temple' || category === 'viewpoint') {
     if (category === 'temple' && /\b(church|parish|cathedral|basilica|shrine|ruins)\b/i.test(haystack)) {
       return true;

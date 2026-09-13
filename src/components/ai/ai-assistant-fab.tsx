@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { usePathname, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable as RNPressable,
@@ -14,6 +14,7 @@ import { Pressable, View } from '@/components/ui/primitives';
 import { useCountryAppearance } from '@/hooks/use-country-appearance';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { analytics } from '@/lib/analytics';
+import { unlockWebBodyScroll } from '@/utils/unlock-web-body';
 
 const QUICK_PROMPTS = [
   { id: 'afternoon', label: 'What should we do this afternoon?' },
@@ -35,6 +36,16 @@ export function AiAssistantFab() {
   const { isDesktop, isWeb, sidebarWidth, contentMaxWidth, tabBarHeight, isCompact } =
     useResponsiveLayout();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (open) return;
+    const t = requestAnimationFrame(() => unlockWebBodyScroll());
+    const t2 = setTimeout(() => unlockWebBodyScroll(), 50);
+    return () => {
+      cancelAnimationFrame(t);
+      clearTimeout(t2);
+    };
+  }, [open]);
 
   const onAssistantTab = pathname.includes('assistant');
 

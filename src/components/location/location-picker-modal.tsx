@@ -18,6 +18,7 @@ import {
   getCurrentPosition,
   setLocationFromSuggestion,
 } from '@/services/location/location.service';
+import { unlockWebBodyScroll } from '@/utils/unlock-web-body';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { notifyAlert } from '@/lib/notify-alert';
 
@@ -209,10 +210,13 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
 
   // RN web Modal can leave body scroll locked after close — unlock explicitly.
   useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     if (visible) return;
-    document.body.style.overflow = '';
-    document.body.style.pointerEvents = '';
+    const t = requestAnimationFrame(() => unlockWebBodyScroll());
+    const t2 = setTimeout(() => unlockWebBodyScroll(), 50);
+    return () => {
+      cancelAnimationFrame(t);
+      clearTimeout(t2);
+    };
   }, [visible]);
 
   const applySuggestion = async (item: DestinationSuggestion) => {

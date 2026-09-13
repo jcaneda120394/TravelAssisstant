@@ -17,9 +17,33 @@ import { sortPlacesByNearness } from '@/utils/place-popularity';
 import { dedupePlaces } from '@/utils/dedupe-places';
 
 const LIVE_BUDGET_MS = 7_000;
+const UTILITY_LIVE_BUDGET_MS = 9_000;
 const MAX_RADIUS_METERS = 200_000;
 /** Prefer at least this many hits before stopping radius expansion. */
 const MIN_SATISFYING = 12;
+
+const UTILITY_CATEGORIES = new Set<PlaceCategory>([
+  'pharmacy',
+  'atm',
+  'bank',
+  'convenience',
+  'laundry',
+  'hospital',
+  'clinic',
+  'police',
+  'fuel',
+  'parking',
+  'toilet',
+  'post_office',
+  'tourist_info',
+  'coworking',
+  'gym',
+]);
+
+function liveBudgetFor(category?: PlaceCategory): number {
+  if (category && UTILITY_CATEGORIES.has(category)) return UTILITY_LIVE_BUDGET_MS;
+  return LIVE_BUDGET_MS;
+}
 
 function delay(ms: number): Promise<null> {
   return new Promise((resolve) => {
@@ -42,6 +66,7 @@ function scrubNoiseTags(place: Place): Place {
 function shouldBlendCatalog(category?: PlaceCategory): boolean {
   return (
     !category ||
+    category === 'other' ||
     isSightseeingCategory(category) ||
     isFoodCategory(category) ||
     isShoppingCategory(category) ||
@@ -100,9 +125,10 @@ async function fetchExplorePool(params: {
     })
     .catch(() => [] as Place[]);
 
+  const budgetMs = liveBudgetFor(category);
   const [live, photon] = await Promise.all([
-    raceWithBudget(livePromise, LIVE_BUDGET_MS).then((v) => v ?? []),
-    raceWithBudget(photonPromise, LIVE_BUDGET_MS).then((v) => v ?? []),
+    raceWithBudget(livePromise, budgetMs).then((v) => v ?? []),
+    raceWithBudget(photonPromise, budgetMs).then((v) => v ?? []),
   ]);
 
   // Catalog soft radius — keep it near the selected distance so wrong metros
@@ -110,7 +136,7 @@ async function fetchExplorePool(params: {
   const catalog = shouldBlendCatalog(category)
     ? searchCatalogNearby({
         location,
-        category: category ?? 'attraction',
+        category: !category || category === 'other' ? 'attraction' : category,
         radiusMeters: Math.min(Math.max(radiusMeters, 12_000), 40_000),
         limit: Math.max(48, Math.floor(limit / 2)),
       })
@@ -131,12 +157,14 @@ export async function getExploreNearbyPlaces(params: {
   radiusMeters: number;
   limit?: number;
   companions?: CompanionPrefs | null;
+  signal?: AbortSignal;
 }): Promise<Place[]> {
   const limit = Math.min(Math.max(params.limit ?? 80, 20), 120);
   const requested = Math.min(Math.max(params.radiusMeters, 500), MAX_RADIUS_METERS);
   const radii = Array.from(
     new Set([
       requested,
+      Math.min(MAX_RADIUS_METERS, Math.max(requested, 25_000)),
       Math.min(MAX_RADIUS_METERS, Math.max(requested, 50_000)),
       Math.min(MAX_RADIUS_METERS, Math.max(requested, 90_000)),
       Math.min(MAX_RADIUS_METERS, Math.max(requested, 150_000)),
@@ -145,6 +173,7 @@ export async function getExploreNearbyPlaces(params: {
 
   let best: Place[] = [];
   for (const radius of radii) {
+    if (params.signal?.aborted) break;
     const pool = await fetchExplorePool({
       location: params.location,
       category: params.category,
@@ -152,6 +181,7 @@ export async function getExploreNearbyPlaces(params: {
       radiusMeters: radius,
       limit,
     });
+    if (params.signal?.aborted) break;
     const ranked = rankNearby(
       pool,
       params.location,
@@ -168,6 +198,8 @@ export async function getExploreNearbyPlaces(params: {
     if (ranked.length > best.length) {
       best = ranked;
     }
+    // Enough to show something — stop expanding so the UI stays responsive.
+    if (best.length >= 6) break;
   }
 
   rememberPlaces(best);

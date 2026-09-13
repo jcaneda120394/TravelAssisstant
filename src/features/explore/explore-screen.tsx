@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import { PlaceCard } from '@/components/cards/place-card';
 import { PlaceGrid } from '@/components/cards/place-grid';
@@ -30,6 +31,7 @@ import { getErrorMessage } from '@/lib/errors/app-error';
 import { companionFilterActive } from '@/utils/companion-suitability';
 import { dedupePlaces } from '@/utils/dedupe-places';
 import { sortPlacesByNearness } from '@/utils/place-popularity';
+import { unlockWebBodyScroll } from '@/utils/unlock-web-body';
 
 const MIN_RADIUS_METERS = 500;
 const MAX_RADIUS_METERS = 200_000;
@@ -77,6 +79,15 @@ export function ExploreScreen() {
   const [category, setCategory] = useState<ExploreCategory>(routeCategory ?? 'attraction');
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Recover from leftover RN-web Modal body locks without requiring a full refresh.
+  useFocusEffect(
+    useCallback(() => {
+      unlockWebBodyScroll();
+      const t = setTimeout(() => unlockWebBodyScroll(), 100);
+      return () => clearTimeout(t);
+    }, []),
+  );
+
   // Keep chip + query in sync with Home quick actions (Food → restaurant, Hotels → hotel).
   useEffect(() => {
     if (routeCategory && routeCategory !== category) {
@@ -119,7 +130,7 @@ export function ExploreScreen() {
   const query = useQuery({
     queryKey: [
       'nearby',
-      'explore-v8-local-area',
+      'explore-v11-scroll-unlock',
       coords?.latitude,
       coords?.longitude,
       radiusMeters,
@@ -133,16 +144,20 @@ export function ExploreScreen() {
     enabled: hasLocation && Boolean(coords),
     staleTime: 60_000,
     retry: 1,
-    // Never keep previous city's results (e.g. Shibuya) after a location change.
-    queryFn: async () => {
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) => {
+      const fetchCategory =
+        category === 'all' || category === 'other' ? undefined : (category as PlaceCategory);
       const places = await getExploreNearbyPlaces({
         location: coords!,
         radiusMeters,
-        category: category === 'all' ? undefined : (category as PlaceCategory),
+        category: fetchCategory,
         cityLabel: label,
         limit: 100,
         companions: companionFilterActive(preferences) ? preferences : null,
+        signal,
       });
+      if (signal.aborted) return places;
       await cachePlaces(places);
       return places;
     },
@@ -150,11 +165,9 @@ export function ExploreScreen() {
 
   const places = useMemo(() => {
     const raw = query.data ?? [];
-    // Trust explore nearby (already radius-filtered; may expand in sparse areas).
-    // Keep closest-first so "near you" matches the selected location.
     return sortPlacesByNearness(
       dedupePlaces(raw),
-      category === 'all' ? undefined : (category as PlaceCategory),
+      category === 'all' || category === 'other' ? undefined : (category as PlaceCategory),
     );
   }, [query.data, category]);
 
@@ -176,12 +189,19 @@ export function ExploreScreen() {
     );
     const coverageMeters =
       farthest > radiusMeters + 500 ? Math.ceil(farthest / 1000) * 1000 : radiusMeters;
-    return `${count} places near ${label ?? 'you'} · within ${formatRadiusLabel(coverageMeters)} · sorted by popularity${updating}`;
+    return `${count} places near ${label ?? 'you'} · within ${formatRadiusLabel(coverageMeters)} · nearest first${updating}`;
   }, [hasLocation, label, places, query.isError, query.isFetching, radiusMeters]);
 
   const applyCategory = (next: ExploreCategory) => {
+    if (next === category) return;
     setCategory(next);
-    router.setParams({ category: next });
+    // Expo Router on web stacks category params and can freeze/blank the header.
+    if (Platform.OS === 'web') return;
+    try {
+      router.setParams({ category: next });
+    } catch {
+      // Some navigators throw if params are unchanged mid-transition.
+    }
   };
 
   const customChipLabel =
@@ -194,14 +214,19 @@ export function ExploreScreen() {
       <ScrollView
         className={`flex-1 pt-4 ${isDesktop ? '' : 'px-5'}`}
         contentContainerStyle={{ paddingBottom: scrollBottomPad }}
-        style={{ width: '100%', maxWidth: '100%' }}
+        style={
+          Platform.OS === 'web'
+            ? ({ width: '100%', maxWidth: '100%', touchAction: 'pan-y' } as object)
+            : { width: '100%', maxWidth: '100%' }
+        }
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        scrollEventThrottle={16}
+        onScrollBeginDrag={unlockWebBodyScroll}
+        onTouchStart={Platform.OS === 'web' ? unlockWebBodyScroll : undefined}
         testID="screen-explore"
       >
-        <SectionHeader
-          eyebrow="Around you"
-          title="Explore nearby"
-          subtitle={subtitle}
-        />
+        <SectionHeader eyebrow="Around you" title="Explore nearby" subtitle={subtitle} />
 
         <View className="mb-4 flex-row gap-2">
           <View className="min-w-0 flex-1">
@@ -300,7 +325,10 @@ export function ExploreScreen() {
 
       <LocationPickerModal
         visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        onClose={() => {
+          setPickerOpen(false);
+          unlockWebBodyScroll();
+        }}
         onChanged={() => void query.refetch()}
       />
     </Screen>

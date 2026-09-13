@@ -58,6 +58,7 @@ const EXPO_MENU_GUTTER_IOS = 56;
 const EXPO_MENU_GUTTER_ANDROID = 24;
 
 export function HomeScreen() {
+  // Budget/alert chip removed — weather-only Today card.
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scheme = useAppColorScheme();

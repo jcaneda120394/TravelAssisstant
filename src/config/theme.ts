@@ -1,12 +1,13 @@
 export const theme = {
   light: {
-    background: '#EEF6F4',
+    // Near-white travel canvas (less mint wash than legacy #EEF6F4).
+    background: '#F7FAF9',
     surface: '#FFFFFF',
-    text: '#0C2422',
-    textMuted: '#4F6B67',
-    border: '#C9E4DF',
+    text: '#12201E',
+    textMuted: '#5B6F6B',
+    border: '#D6E3E0',
     primary: '#0A7C74',
-    primarySoft: '#D7F3EF',
+    primarySoft: '#E5F4F2',
     accent: '#FF6B4A',
     accentSoft: '#FFE6DF',
     sky: '#3BA7C9',
@@ -20,7 +21,7 @@ export const theme = {
     surface: '#12201E',
     text: '#E8F5F2',
     textMuted: '#9BB5B0',
-    border: '#1E3532',
+    border: '#243936',
     primary: '#2FCFC2',
     primarySoft: '#0A3F3B',
     accent: '#FF8A6A',

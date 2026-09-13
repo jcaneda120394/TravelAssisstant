@@ -135,7 +135,7 @@ export const COUNTRY_THEMES: Record<DestinationThemeId, CountryThemeDefinition> 
     brand: brandFrom('#0B8F7A', '#2BB8A0', '#045C54'),
     accent: { 300: '#F5B87A', 400: '#F0A05A', 500: '#E08A3A', 600: '#C45C26', soft: '#FFF0E0' },
     colors: {
-      light: buildColors('light', '#0B8F7A', '#E08A3A', '#EEF8F5', '#FFFFFF', '#0C2422', '#4F6B67', '#C5E8DF'),
+      light: buildColors('light', '#0B8F7A', '#E08A3A', '#F7FAF9', '#FFFFFF', '#12201E', '#5B6F6B', '#D6E3E0'),
       dark: buildColors('dark', '#2BB8A0', '#F0A05A', '#022E2A', '#0A3A34', '#E8F5F2', '#9BB5B0', '#1A4540'),
     },
     gradient: {

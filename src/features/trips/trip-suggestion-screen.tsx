@@ -361,7 +361,7 @@ export function TripSuggestionScreen() {
               </AppText>
               {dayPlan?.items.map((item, index) => (
                 <View key={item.id}>
-                  <View className="mb-3 overflow-hidden rounded-2xl border border-brand-100 dark:border-brand-800">
+                  <View className="mb-3 overflow-hidden rounded-2xl border border-black/8 dark:border-brand-800">
                     <View className="border-b border-brand-50 bg-surface-mist px-3 py-2 dark:border-brand-800 dark:bg-brand-900">
                       <AppText className="text-xs font-sans-semibold uppercase tracking-wide text-brand-700 dark:text-brand-200">
                         {item.startTime}–{item.endTime}

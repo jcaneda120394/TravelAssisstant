@@ -42,19 +42,21 @@ export function WebSidebar() {
   return (
     <View
       className={`h-full border-r ${
-        scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-brand-100 bg-white'
+        scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-black/5 bg-white'
       }`}
       style={{ width: sidebarWidth }}
       testID="web-sidebar"
     >
-      <View className="px-5 pb-4 pt-8">
-        <AppText className="font-sans-semibold text-xs uppercase tracking-[0.18em] text-accent-500">
-          Travel
+      <View className="px-5 pb-6 pt-8">
+        <AppText className="font-display-bold text-[22px] leading-7 tracking-tight">
+          {env.appName}
         </AppText>
-        <AppText className="mt-1 font-display-bold text-xl leading-7">{env.appName}</AppText>
+        <AppText muted className="mt-1 text-xs">
+          Your travel companion
+        </AppText>
       </View>
 
-      <View className="gap-1 px-3 pb-8">
+      <View className="gap-0.5 px-3 pb-8">
         {NAV_ITEMS.map((item) => {
           const active = isActivePath(pathname, item.match);
           return (
@@ -63,23 +65,30 @@ export function WebSidebar() {
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               onPress={() => router.push(item.href as never)}
-              className={`flex-row items-center gap-3 rounded-2xl px-3 py-3 ${
+              className={`flex-row items-center gap-3 rounded-xl px-3 py-2.5 ${
                 active
-                  ? 'bg-brand-600'
+                  ? scheme === 'dark'
+                    ? 'bg-brand-800'
+                    : 'bg-brand-50'
                   : scheme === 'dark'
                     ? 'hover:bg-brand-900'
-                    : 'hover:bg-brand-50'
+                    : 'hover:bg-black/5'
               }`}
               testID={`web-nav-${item.match}`}
             >
               <Ionicons
                 name={item.icon}
                 size={20}
-                color={active ? '#FFFFFF' : colors.tabIconDefault}
+                color={active ? colors.tabIconSelected : colors.tabIconDefault}
               />
               <AppText
-                inverse={active}
-                className={`font-sans-semibold ${active ? 'text-white' : ''}`}
+                className={`font-sans-medium text-[15px] ${
+                  active
+                    ? scheme === 'dark'
+                      ? 'text-ink-dark'
+                      : 'text-brand-800'
+                    : ''
+                }`}
               >
                 {item.label}
               </AppText>

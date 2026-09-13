@@ -126,7 +126,7 @@ export function WeatherScreen() {
             return (
               <View
                 key={`${day.date ?? day.fetchedAt}-${index}`}
-                className="mb-3 border-b border-brand-100 pb-3 dark:border-brand-800"
+                className="mb-3 border-b border-black/8 pb-3 dark:border-brand-800"
               >
                 <AppText className="font-sans-semibold">{dateLabel}</AppText>
                 <AppText muted className="mt-1">

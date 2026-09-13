@@ -268,7 +268,7 @@ export function CurrencyScreen() {
                       ? 'border-brand-600 bg-brand-600'
                       : scheme === 'dark'
                         ? 'border-brand-800 bg-surface-cardDark'
-                        : 'border-brand-100 bg-white'
+                        : 'border-black/8 bg-white'
                   }`}
                 >
                   <AppText inverse={selected} className="text-xs font-sans-semibold">

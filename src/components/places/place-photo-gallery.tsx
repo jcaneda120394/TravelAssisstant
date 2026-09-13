@@ -15,27 +15,24 @@ type Props = {
 export function PlacePhotoGallery({ photos, loading, placeName }: Props) {
   const scheme = useAppColorScheme();
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
-  const cardWidth = Math.min(Dimensions.get('window').width - 48, 280);
+  const windowWidth = Dimensions.get('window').width;
+  const cardWidth = Math.min(windowWidth - 40, 320);
+  const photoHeight = Math.round(cardWidth * 0.72);
 
   if (loading && photos.length === 0) {
     return (
-      <View className="mb-4">
-        <AppText className="mb-2 text-xs font-sans-semibold uppercase tracking-wide text-brand-500">
-          Photos
-        </AppText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View className="flex-row gap-3">
-            <View
-              className={`rounded-2xl ${scheme === 'dark' ? 'bg-brand-800' : 'bg-brand-100'}`}
-              style={{ width: cardWidth, height: 168 }}
-            />
-            <View
-              className={`rounded-2xl ${scheme === 'dark' ? 'bg-brand-800' : 'bg-brand-100'}`}
-              style={{ width: cardWidth, height: 168 }}
-            />
-          </View>
-        </ScrollView>
-      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-5">
+        <View className="flex-row gap-3 pr-5">
+          <View
+            className={`rounded-2xl ${scheme === 'dark' ? 'bg-brand-900' : 'bg-surface-mist'}`}
+            style={{ width: cardWidth, height: photoHeight }}
+          />
+          <View
+            className={`rounded-2xl ${scheme === 'dark' ? 'bg-brand-900' : 'bg-surface-mist'}`}
+            style={{ width: cardWidth, height: photoHeight }}
+          />
+        </View>
+      </ScrollView>
     );
   }
 
@@ -44,28 +41,23 @@ export function PlacePhotoGallery({ photos, loading, placeName }: Props) {
   }
 
   return (
-    <View className="mb-4">
-      <AppText className="mb-2 text-xs font-sans-semibold uppercase tracking-wide text-brand-500">
-        Photos
-      </AppText>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View className="flex-row gap-3 pr-2">
+    <View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-5">
+        <View className="flex-row gap-3 pr-5">
           {photos.map((photo) => (
             <Pressable
               key={photo.url}
               onPress={() => setViewerUrl(photo.url)}
-              className={`overflow-hidden rounded-2xl border ${
-                scheme === 'dark' ? 'border-brand-800 bg-brand-900' : 'border-brand-100 bg-white'
-              }`}
+              className="overflow-hidden rounded-2xl"
               style={{ width: cardWidth }}
             >
               <Image
                 source={{ uri: photo.thumbUrl ?? photo.url }}
-                style={{ width: '100%', height: 168 }}
+                style={{ width: '100%', height: photoHeight }}
                 resizeMode="cover"
                 accessibilityLabel={photo.title ?? placeName ?? 'Place photo'}
               />
-              <View className="px-3 py-2">
+              <View className="mt-2 px-0.5">
                 <RNText
                   numberOfLines={1}
                   className={`font-sans text-xs font-sans-medium ${

@@ -14,7 +14,7 @@ type Props = {
  * Responsive place card grid — 1 col mobile, 2–3 cols on desktop web.
  * Avoids negative margins that pull cards under overlay scrollbars.
  */
-export function PlaceGrid({ children, className = '', gap = 12 }: Props) {
+export function PlaceGrid({ children, className = '', gap = 16 }: Props) {
   const { placeColumns } = useResponsiveLayout();
   const items = Children.toArray(children);
 

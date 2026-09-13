@@ -8,7 +8,7 @@ type SkeletonProps = {
 
 export function Skeleton({ className = '', height = 16 }: SkeletonProps) {
   const scheme = useAppColorScheme();
-  const bg = scheme === 'dark' ? 'bg-brand-800' : 'bg-brand-100';
+  const bg = scheme === 'dark' ? 'bg-brand-900' : 'bg-surface-mist';
 
   return (
     <View

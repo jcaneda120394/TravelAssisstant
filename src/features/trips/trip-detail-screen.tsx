@@ -461,7 +461,7 @@ export function TripDetailScreen() {
     const segment = segmentsByFrom.get(item.id);
     return (
       <View key={item.id}>
-        <View className="mb-2 rounded-xl border border-brand-100 p-3 dark:border-brand-800">
+        <View className="mb-2 rounded-xl border border-black/8 p-3 dark:border-brand-800">
           <AppText className="font-sans-semibold">
             {item.startTime}–{item.endTime} · {item.title}
           </AppText>
@@ -557,7 +557,7 @@ export function TripDetailScreen() {
                   ? 'border-brand-600 bg-brand-600'
                   : scheme === 'dark'
                     ? 'border-brand-800 bg-surface-cardDark'
-                    : 'border-brand-100 bg-white'
+                    : 'border-black/8 bg-white'
               }`}
             >
               <AppText className={tab === item.id ? 'text-white' : undefined}>{item.label}</AppText>
@@ -781,7 +781,7 @@ export function TripDetailScreen() {
                   .map((member) => (
                     <View
                       key={member.id}
-                      className="mt-3 flex-row items-center justify-between gap-2 border-t border-brand-100 pt-3"
+                      className="mt-3 flex-row items-center justify-between gap-2 border-t border-black/8 pt-3"
                     >
                       <View className="flex-1">
                         <AppText className="font-sans-semibold">{member.email}</AppText>
@@ -918,7 +918,7 @@ export function TripDetailScreen() {
                           ? 'border-brand-600 bg-brand-600'
                           : scheme === 'dark'
                             ? 'border-brand-800 bg-surface-cardDark'
-                            : 'border-brand-100 bg-white'
+                            : 'border-black/8 bg-white'
                       }`}
                     >
                       <AppText className={item === day ? 'text-white' : undefined}>
@@ -954,7 +954,7 @@ export function TripDetailScreen() {
             {(staysQuery.data ?? []).map((stay) => (
               <View
                 key={stay.id}
-                className="mb-3 rounded-xl border border-brand-100 p-3 dark:border-brand-800"
+                className="mb-3 rounded-xl border border-black/8 p-3 dark:border-brand-800"
               >
                 <AppText className="font-sans-semibold">{stay.name}</AppText>
                 {stay.address || stay.city ? (

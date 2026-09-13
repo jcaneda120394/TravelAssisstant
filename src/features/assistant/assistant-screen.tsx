@@ -213,7 +213,7 @@ export function AssistantScreen() {
 
         <View
           className={`mb-3 rounded-2xl border px-3 py-2 ${
-            scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-brand-100 bg-white'
+            scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-black/8 bg-white'
           }`}
         >
           <TextInput
@@ -278,7 +278,7 @@ export function AssistantScreen() {
                 borderRadius: 22,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: scheme === 'dark' ? '#1A2E2B' : '#EEF6F4',
+                backgroundColor: scheme === 'dark' ? '#1A2E2B' : '#F7FAF9',
               }}
             >
               <Ionicons

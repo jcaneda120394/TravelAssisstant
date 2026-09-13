@@ -22,10 +22,10 @@ export function TextField({ label, error, testID, ...props }: Props) {
         testID={testID}
         placeholderTextColor={colors.textMuted}
         autoCapitalize="none"
-        className={`rounded-2xl border px-4 py-3 font-sans text-base ${
+        className={`rounded-2xl border px-4 py-3.5 font-sans text-base ${
           scheme === 'dark'
             ? 'border-brand-800 bg-surface-cardDark text-ink-dark'
-            : 'border-brand-100 bg-white text-ink-light'
+            : 'border-black/8 bg-white text-ink-light'
         } ${error ? 'border-red-400' : ''}`}
         {...props}
       />

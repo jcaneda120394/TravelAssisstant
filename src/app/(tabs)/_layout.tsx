@@ -28,15 +28,12 @@ export default function TabsLayout() {
           ? { display: 'none', height: 0 }
           : {
               backgroundColor: colors.surface,
-              borderTopColor: colors.border,
+              borderTopColor: scheme === 'dark' ? colors.border : 'rgba(18,32,30,0.08)',
               borderTopWidth: 1,
               height: Platform.OS === 'ios' ? 88 : isWeb ? 72 : 66,
               paddingTop: 8,
-              elevation: 8,
-              shadowColor: '#0A7C74',
-              shadowOpacity: scheme === 'dark' ? 0 : 0.08,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: -2 },
+              elevation: 0,
+              shadowOpacity: 0,
             },
         tabBarLabelStyle: {
           fontFamily: 'PlusJakartaSans_600SemiBold',

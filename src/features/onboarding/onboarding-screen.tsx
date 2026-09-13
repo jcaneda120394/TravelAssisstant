@@ -275,7 +275,11 @@ export function OnboardingScreen() {
           </View>
         </View>
 
-        <SectionHeader title={STEPS[step] ?? 'Onboarding'} subtitle="Personalize TravelAssistant" />
+        <SectionHeader
+          eyebrow="TravelAssistant"
+          title={STEPS[step] ?? 'Onboarding'}
+          subtitle="Personalize your travel companion"
+        />
 
         <Card className="mb-5">
           {step === 0 ? (

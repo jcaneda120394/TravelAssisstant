@@ -106,13 +106,11 @@ export function AiAssistantFab() {
             backgroundColor: colors.accent,
             opacity: pressed ? 0.9 : 1,
             transform: [{ scale: pressed ? 0.96 : 1 }],
-            shadowColor: '#C45C3A',
-            shadowOpacity: scheme === 'dark' ? 0.45 : 0.35,
-            shadowRadius: 14,
-            shadowOffset: { width: 0, height: 6 },
-            elevation: 10,
-            borderWidth: 2,
-            borderColor: scheme === 'dark' ? '#3A221C' : '#FFE6DF',
+            shadowColor: '#12201E',
+            shadowOpacity: scheme === 'dark' ? 0.35 : 0.12,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 3 },
+            elevation: 4,
           })}
         >
           <Ionicons name="sparkles" size={layout.compact ? 22 : 26} color="#FFFFFF" />
@@ -156,20 +154,19 @@ export function AiAssistantFab() {
 
             <View className="mb-1 flex-row items-start justify-between gap-3">
               <View className="flex-1">
-                <AppText className="font-sans-semibold text-xs uppercase tracking-[0.16em] text-accent-500">
+                <AppText className="font-sans-semibold text-xs uppercase tracking-[0.14em] text-accent-500">
                   Assistant
                 </AppText>
                 <AppText
-                  className={`mt-1 font-display-bold leading-7 ${
+                  className={`mt-1 font-display-bold leading-7 tracking-tight ${
                     layout.compact ? 'text-xl' : 'text-2xl'
                   }`}
                 >
                   Ask TravelAssistant AI
                 </AppText>
                 <AppText muted className={`mt-1 ${layout.compact ? 'text-sm' : 'text-[15px]'}`}>
-                  Voice or text · travel places, food, hotels & routes only
+                  Voice or text · places, food, hotels & routes
                 </AppText>
-                <View className="mt-2 h-1 w-10 rounded-full bg-accent-500" />
               </View>
               <RNPressable
                 onPress={() => setOpen(false)}
@@ -182,7 +179,7 @@ export function AiAssistantFab() {
                   borderRadius: 18,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: scheme === 'dark' ? '#1A2E2B' : '#EEF6F4',
+                  backgroundColor: scheme === 'dark' ? '#1A2E2B' : '#F7FAF9',
                 }}
               >
                 <Ionicons name="close" size={20} color={colors.textMuted} />
@@ -197,12 +194,12 @@ export function AiAssistantFab() {
                 <Pressable
                   key={item.id}
                   onPress={() => openAssistant(item.label)}
-                  className={`rounded-2xl border px-3.5 py-3 ${
+                  className={`rounded-xl border px-3.5 py-3 ${
                     layout.tablet ? 'w-[48%]' : 'w-full'
                   } ${
                     scheme === 'dark'
-                      ? 'border-brand-800 bg-brand-900/60'
-                      : 'border-brand-100 bg-surface-mist'
+                      ? 'border-brand-800 bg-transparent'
+                      : 'border-black/8 bg-white'
                   }`}
                   accessibilityRole="button"
                   accessibilityLabel={item.label}

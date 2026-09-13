@@ -18,7 +18,6 @@ import { Skeleton } from '@/components/feedback/skeleton';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
-import { QUICK_ACTIONS } from '@/constants/app';
 import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
 import { labelize } from '@/constants/preferences';
 import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
@@ -44,13 +43,12 @@ function greetingForNow(): string {
 }
 
 const HOME_ACTIONS = [
-  ...QUICK_ACTIONS,
+  { id: 'nearby', label: 'Nearby', href: '/explore', category: 'all' },
+  { id: 'food', label: 'Food', href: '/explore', category: 'restaurant' },
+  { id: 'hotels', label: 'Hotels', href: '/hotels' },
+  { id: 'map', label: 'Map', href: '/(tabs)/map' },
   { id: 'suggest', label: 'Suggest', href: '/trip-suggestion' },
-  { id: 'trips', label: 'Trips', href: '/trips' },
-  { id: 'spots', label: 'Travel Guide', href: '/(tabs)/guide' },
-  { id: 'search', label: 'Search', href: '/search' },
-  { id: 'weather', label: 'Weather', href: '/weather' },
-  { id: 'favorites', label: 'Saved', href: '/favorites' },
+  { id: 'ai', label: 'AI', href: '/(tabs)/assistant' },
 ] as const;
 
 /** Expo Go floating menu sits top-right — keep hero copy clear of it (native only). */
@@ -212,16 +210,16 @@ export function HomeScreen() {
           <PageContainer>
             <AppText
               inverse
-              className="font-sans-semibold text-xs uppercase tracking-[0.2em] text-white/85"
+              className="font-display-bold text-3xl leading-9 tracking-tight text-white"
             >
               {env.appName}
             </AppText>
-            <AppText inverse className="mt-3 font-display-bold text-[34px] leading-10">
+            <AppText inverse className="mt-3 font-sans-semibold text-lg leading-6 text-white/95">
               {greetingForNow()}
               {firstName ? `, ${firstName}` : ''}
             </AppText>
-            <AppText inverse className="mt-2 text-base leading-6 text-white/90">
-              Where to next? Discover places around you.
+            <AppText inverse className="mt-2 text-[15px] leading-6 text-white/85">
+              Discover places around you.
             </AppText>
 
             <AppText inverse className="mt-4 text-sm font-sans-medium leading-5 text-white">
@@ -463,10 +461,9 @@ export function HomeScreen() {
             }
           />
           {hasLocation && attractionsQuery.isLoading && attractions.length === 0 ? (
-            <View className="mb-4 gap-3">
-              <Skeleton height={84} />
-              <Skeleton height={84} />
-              <Skeleton height={84} />
+            <View className="mb-4 gap-4">
+              <Skeleton height={188} />
+              <Skeleton height={188} />
             </View>
           ) : null}
           {hasLocation
@@ -505,10 +502,9 @@ export function HomeScreen() {
             }
           />
           {hasLocation && foodQuery.isLoading && foodPlaces.length === 0 ? (
-            <View className="mb-4 gap-3">
-              <Skeleton height={84} />
-              <Skeleton height={84} />
-              <Skeleton height={84} />
+            <View className="mb-4 gap-4">
+              <Skeleton height={188} />
+              <Skeleton height={188} />
             </View>
           ) : null}
           {hasLocation
@@ -536,7 +532,7 @@ export function HomeScreen() {
           ) : null}
 
           <SectionHeader eyebrow="Shortcuts" title="Quick actions" />
-          <View className="mb-6 flex-row flex-wrap gap-2.5">
+          <View className="mb-6 flex-row flex-wrap gap-2">
             {HOME_ACTIONS.map((action) => (
               <Pressable
                 key={action.id}
@@ -551,15 +547,13 @@ export function HomeScreen() {
                   }
                   router.push(action.href as Href);
                 }}
-                className={`rounded-2xl border px-4 py-3 ${
+                className={`rounded-xl border px-3.5 py-2.5 ${
                   scheme === 'dark'
-                    ? 'border-brand-800 bg-surface-cardDark'
-                    : 'border-brand-100 bg-white'
+                    ? 'border-brand-800 bg-transparent'
+                    : 'border-black/8 bg-white'
                 }`}
               >
-                <AppText className="font-sans-semibold text-brand-700 dark:text-brand-200">
-                  {action.label}
-                </AppText>
+                <AppText className="font-sans-medium text-sm">{action.label}</AppText>
               </Pressable>
             ))}
           </View>

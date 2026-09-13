@@ -109,25 +109,19 @@ export function LoginScreen() {
       <AuthBackToHomeBar />
       <ScrollView className="flex-1 px-5 pt-2" contentContainerClassName="pb-10" testID="screen-login">
         <SectionHeader
+          eyebrow="TravelAssistant"
           title="Welcome back"
-          subtitle="Sign in to save trips — or go back home to keep browsing as a guest"
+          subtitle="Sign in to save trips — or browse as a guest from Home"
         />
 
         {!env.isSupabaseConfigured ? (
-          <Card className="mb-4">
-            <AppText className="font-sans-semibold">Demo auth mode</AppText>
-            <AppText muted className="mt-1">
-              Supabase is not configured. Email/password will create a local demo session so you can
-              complete onboarding.
-            </AppText>
-          </Card>
+          <AppText muted className="mb-4 text-[15px] leading-5">
+            Demo auth mode — Supabase is not configured. Email/password creates a local session.
+          </AppText>
         ) : (
-          <Card className="mb-4">
-            <AppText muted>
-              New accounts require email confirmation. After signing up, open the confirmation link,
-              then sign in here.
-            </AppText>
-          </Card>
+          <AppText muted className="mb-4 text-[15px] leading-5">
+            New accounts need email confirmation before the first sign-in.
+          </AppText>
         )}
 
         <Card className="mb-4">

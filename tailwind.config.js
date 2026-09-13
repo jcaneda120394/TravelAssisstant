@@ -53,9 +53,10 @@ module.exports = {
         'display-bold': ['Fraunces_700Bold'],
       },
       borderRadius: {
+        // Industry travel UI: soft 16–20px cards/controls (not oversized 28px blobs).
         xl: '16px',
         '2xl': '20px',
-        '3xl': '28px',
+        '3xl': '20px',
       },
     },
   },

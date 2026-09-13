@@ -28,14 +28,16 @@ export function Button({
 }: ButtonProps) {
   const scheme = useAppColorScheme();
   const { colors } = useCountryAppearance();
-  // Prefer country palette; fall back to base theme for safety.
   const spinnerColor = colors?.primary ?? theme[scheme].primary;
 
-  const base = 'flex-row items-center justify-center rounded-2xl px-4 py-3.5';
+  const base = 'flex-row items-center justify-center rounded-2xl px-5 py-3.5';
   const variants = {
     primary: 'bg-brand-600',
     accent: 'bg-accent-500',
-    secondary: scheme === 'dark' ? 'bg-brand-800' : 'bg-brand-100',
+    secondary:
+      scheme === 'dark'
+        ? 'bg-brand-900 border border-brand-800'
+        : 'bg-white border border-black/8',
     ghost: 'bg-transparent',
   } as const;
 
@@ -44,7 +46,7 @@ export function Button({
       ? 'text-white font-sans-semibold'
       : scheme === 'dark'
         ? 'text-ink-dark font-sans-semibold'
-        : 'text-brand-800 font-sans-semibold';
+        : 'text-ink-light font-sans-semibold';
 
   return (
     <Pressable

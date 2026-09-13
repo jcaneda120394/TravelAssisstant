@@ -69,6 +69,7 @@ export function SignupScreen() {
       <AuthBackToHomeBar />
       <ScrollView className="flex-1 px-5 pt-2" contentContainerClassName="pb-10" testID="screen-signup">
         <SectionHeader
+          eyebrow="TravelAssistant"
           title="Create account"
           subtitle="Save trips, preferences, and your AI travel context"
         />

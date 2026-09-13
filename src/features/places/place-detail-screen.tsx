@@ -39,11 +39,11 @@ import type { Place } from '@/types/domain';
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <View className="mb-3">
-      <AppText className="mb-1 text-xs font-sans-semibold uppercase tracking-wide text-brand-500">
+    <View className="mb-4">
+      <AppText muted className="mb-1 text-[12px] font-sans-medium uppercase tracking-wide">
         {label}
       </AppText>
-      <AppText>{value}</AppText>
+      <AppText className="text-[15px] leading-5">{value}</AppText>
     </View>
   );
 }
@@ -305,20 +305,25 @@ export function PlaceDetailScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-place">
-        <SectionHeader
-          title={title}
-          subtitle={`${labelize(place.category)}${
-            place.distanceMeters != null ? ` · ${formatDistanceMeters(place.distanceMeters)}` : ''
-          }${ratingText ? ` · ${ratingText}` : ''}`}
-        />
+      <ScrollView className="flex-1 pt-0" contentContainerClassName="pb-10" testID="screen-place">
+        <View className="px-5 pt-4">
+          <SectionHeader
+            title={title}
+            subtitle={`${labelize(place.category)}${
+              place.distanceMeters != null ? ` · ${formatDistanceMeters(place.distanceMeters)}` : ''
+            }${ratingText ? ` · ${ratingText}` : ''}`}
+          />
+        </View>
 
-        <PlacePhotoGallery
-          photos={galleryPhotos}
-          loading={photosQuery.isLoading || photosQuery.isFetching}
-          placeName={title}
-        />
+        <View className="mb-4">
+          <PlacePhotoGallery
+            photos={galleryPhotos}
+            loading={photosQuery.isLoading || photosQuery.isFetching}
+            placeName={title}
+          />
+        </View>
 
+        <View className="px-5">
         <Card className="mb-4">
           <DetailRow label="Address" value={place.address ?? 'Address not listed'} />
           <DetailRow label="Open / close hours" value={hoursText} />
@@ -350,8 +355,8 @@ export function PlaceDetailScreen() {
               {place.tags
                 .filter((tag) => !/^(house|yes|no|building|residential)$/i.test(tag))
                 .map((tag) => (
-                  <View key={tag} className="rounded-full bg-brand-100 px-3 py-1 dark:bg-brand-800">
-                    <AppText className="text-xs">{labelize(tag)}</AppText>
+                  <View key={tag} className="rounded-lg bg-surface-mist px-2.5 py-1 dark:bg-brand-800">
+                    <AppText className="text-xs font-sans-medium">{labelize(tag)}</AppText>
                   </View>
                 ))}
             </View>
@@ -460,7 +465,7 @@ export function PlaceDetailScreen() {
           {(reviewsQuery.data ?? []).map((review) => (
             <View
               key={review.id}
-              className="mb-3 border-t border-brand-100 pt-3 dark:border-brand-800"
+              className="mb-3 border-t border-black/8 pt-3 dark:border-brand-800"
             >
               <AppText className="font-sans-semibold">
                 {'★'.repeat(review.rating)}
@@ -553,6 +558,7 @@ export function PlaceDetailScreen() {
               )
             }
           />
+        </View>
         </View>
       </ScrollView>
 

@@ -47,8 +47,9 @@ export function MagicLinkScreen() {
         testID="screen-magic-link"
       >
         <SectionHeader
+          eyebrow="TravelAssistant"
           title="Magic link"
-          subtitle="Passwordless sign-in via email (requires Supabase)"
+          subtitle="Passwordless sign-in via email"
         />
 
         <Card className="mb-4">

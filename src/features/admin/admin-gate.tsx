@@ -98,7 +98,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
     <View className="h-full flex-1 flex-row" testID="admin-shell">
       <View
         className={`h-full border-r px-3 py-6 ${
-          scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-brand-100 bg-white'
+          scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-black/8 bg-white'
         }`}
         style={{ width: 220 }}
       >

@@ -11,6 +11,10 @@ type Props<T extends string> = {
   labels?: Partial<Record<T, string>>;
 };
 
+/**
+ * Category / filter strip — soft fill when active, quiet outline when idle
+ * (industry travel apps favor calm chips over heavy pill candy).
+ */
 export function ChipSelect<T extends string>({
   options,
   values,
@@ -44,12 +48,14 @@ export function ChipSelect<T extends string>({
             onPress={() => toggle(option)}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            className={`rounded-2xl px-3.5 py-2.5 border ${
+            className={`rounded-xl px-3.5 py-2.5 ${
               selected
-                ? 'bg-brand-600 border-brand-600'
+                ? scheme === 'dark'
+                  ? 'bg-brand-800'
+                  : 'bg-brand-600'
                 : scheme === 'dark'
-                  ? 'bg-surface-cardDark border-brand-800'
-                  : 'bg-white border-brand-100'
+                  ? 'bg-transparent border border-brand-800'
+                  : 'bg-transparent border border-black/8'
             }`}
           >
             <AppText

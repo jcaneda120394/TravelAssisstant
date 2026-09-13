@@ -229,7 +229,7 @@ export function TripsScreen() {
               className={`mb-3 rounded-2xl border p-4 ${
                 scheme === 'dark'
                   ? 'border-brand-800 bg-surface-cardDark'
-                  : 'border-brand-100 bg-white'
+                  : 'border-black/8 bg-white'
               }`}
             >
               <AppText className="font-sans-semibold text-lg">{trip.title}</AppText>

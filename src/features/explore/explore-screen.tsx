@@ -256,8 +256,13 @@ export function ExploreScreen() {
           subtitle={subtitle}
         />
 
-        <View className="mb-4">
-          <Button label="Choose city" onPress={() => setPickerOpen(true)} />
+        <View className="mb-4 flex-row gap-2">
+          <View className="flex-1">
+            <Button label="Choose city" variant="secondary" onPress={() => setPickerOpen(true)} />
+          </View>
+          <View className="flex-1">
+            <Button label="Map" variant="ghost" onPress={() => router.push('/map')} />
+          </View>
         </View>
 
         {!hasLocation ? (
@@ -346,23 +351,18 @@ export function ExploreScreen() {
           onChange={(values) => applyCategory(values[0] ?? 'attraction')}
         />
 
-        <View className="mt-4 mb-4 flex-row gap-2">
-          <View className="flex-1">
-            <Button label="Open map" variant="secondary" onPress={() => router.push('/map')} />
-          </View>
-          <View className="flex-1">
-            <Button
-              label="Hotel booking"
-              variant="secondary"
-              onPress={() => router.push('/hotels')}
-            />
-          </View>
+        <View className="mt-5 mb-5">
+          <Button
+            label="Browse hotels"
+            variant="secondary"
+            onPress={() => router.push('/hotels')}
+          />
         </View>
 
         {hasLocation && query.isFetching && places.length === 0 ? (
-          <View className="gap-3">
-            <Skeleton height={88} />
-            <Skeleton height={88} />
+          <View className="gap-4">
+            <Skeleton height={188} />
+            <Skeleton height={188} />
           </View>
         ) : null}
 

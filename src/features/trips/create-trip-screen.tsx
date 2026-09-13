@@ -45,7 +45,7 @@ function Chip({
           ? 'border-brand-600 bg-brand-600'
           : scheme === 'dark'
             ? 'border-brand-700 bg-surface-cardDark'
-            : 'border-brand-100 bg-white'
+            : 'border-black/8 bg-white'
       }`}
     >
       <AppText className={selected ? 'text-white' : undefined}>{label}</AppText>
@@ -512,7 +512,7 @@ export function CreateTripScreen() {
 
       <View
         className={`absolute bottom-0 left-0 right-0 border-t px-5 py-4 ${
-          scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-brand-100 bg-white'
+          scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-black/8 bg-white'
         }`}
       >
         <View className="flex-row gap-2">

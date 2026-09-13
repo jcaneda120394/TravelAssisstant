@@ -11,6 +11,7 @@ type TextProps = {
   className?: string;
   muted?: boolean;
   inverse?: boolean;
+  numberOfLines?: number;
 };
 
 export function AppText({
@@ -18,6 +19,7 @@ export function AppText({
   className = '',
   muted = false,
   inverse = false,
+  numberOfLines,
 }: TextProps) {
   const scheme = useAppColorScheme();
 
@@ -31,7 +33,12 @@ export function AppText({
   }
 
   return (
-    <Text className={`font-sans text-base ${colorClass} ${className}`}>{children}</Text>
+    <Text
+      numberOfLines={numberOfLines}
+      className={`font-sans text-base ${colorClass} ${className}`}
+    >
+      {children}
+    </Text>
   );
 }
 
@@ -82,23 +89,11 @@ export function Screen({
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   const scheme = useAppColorScheme();
   const bg = scheme === 'dark' ? 'bg-surface-cardDark' : 'bg-surface-cardLight';
-  const border = scheme === 'dark' ? 'border-brand-800' : 'border-brand-100';
+  // Hairline only — no stacked shadow (industry travel UI: photo/whitespace carry depth).
+  const border = scheme === 'dark' ? 'border-brand-800/80' : 'border-black/5';
 
   return (
-    <View
-      className={`rounded-3xl border px-4 py-4 ${bg} ${border} ${className}`}
-      style={
-        scheme === 'dark'
-          ? undefined
-          : {
-              shadowColor: '#0A7C74',
-              shadowOpacity: 0.06,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 4 },
-              elevation: 2,
-            }
-      }
-    >
+    <View className={`rounded-2xl border px-4 py-4 ${bg} ${border} ${className}`}>
       {children}
     </View>
   );
@@ -113,22 +108,15 @@ export function SectionHeader({
   subtitle?: string;
   eyebrow?: string;
 }) {
-  const scheme = useAppColorScheme();
-
   return (
-    <View className="mb-3 gap-1">
+    <View className="mb-4 gap-1">
       {eyebrow ? (
-        <AppText className="font-sans-semibold text-xs uppercase tracking-[0.16em] text-accent-500">
+        <AppText className="font-sans-semibold text-xs uppercase tracking-[0.14em] text-accent-500">
           {eyebrow}
         </AppText>
       ) : null}
-      <AppText className="font-display-bold text-2xl leading-7">{title}</AppText>
-      {subtitle ? <AppText muted className="text-[15px] leading-5">{subtitle}</AppText> : null}
-      <View
-        className={`mt-1 h-1 w-10 rounded-full ${
-          scheme === 'dark' ? 'bg-accent-400' : 'bg-accent-500'
-        }`}
-      />
+      <AppText className="font-display-bold text-[26px] leading-8 tracking-tight">{title}</AppText>
+      {subtitle ? <AppText muted className="mt-0.5 text-[15px] leading-5">{subtitle}</AppText> : null}
     </View>
   );
 }

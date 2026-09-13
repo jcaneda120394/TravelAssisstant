@@ -41,7 +41,7 @@ function Chip({
           ? 'border-brand-600 bg-brand-600'
           : scheme === 'dark'
             ? 'border-brand-700 bg-surface-cardDark'
-            : 'border-brand-100 bg-white'
+            : 'border-black/8 bg-white'
       }`}
     >
       <AppText className={selected ? 'text-white' : undefined}>{label}</AppText>
@@ -68,7 +68,7 @@ function SuggestionCard({
   return (
     <View
       className={`mb-4 rounded-2xl border p-4 ${
-        scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-brand-100 bg-white'
+        scheme === 'dark' ? 'border-brand-800 bg-surface-cardDark' : 'border-black/8 bg-white'
       }`}
     >
       <AppText className="text-3xl">{template.heroEmoji}</AppText>
@@ -330,7 +330,7 @@ export function TripSuggestionsScreen() {
             <Card key={week.label} className="mb-4">
               <SectionHeader title={week.label} />
               {week.days.map((day, idx) => (
-                <View key={`${week.offset}-${idx}`} className="mb-3 border-b border-brand-100 pb-3 dark:border-brand-800">
+                <View key={`${week.offset}-${idx}`} className="mb-3 border-b border-black/8 pb-3 dark:border-brand-800">
                   <AppText className="font-sans-semibold">
                     Day {week.offset + idx + 1} · {day.title}
                   </AppText>

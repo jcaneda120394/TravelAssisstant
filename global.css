@@ -19,14 +19,14 @@
   --color-accent-500: #ff6b4a;
   --color-accent-600: #e85433;
   --color-accent-soft: #ffe6df;
-  --color-surface-light: #eef6f4;
+  --color-surface-light: #f7faf9;
   --color-surface-dark: #071412;
   --color-surface-cardLight: #ffffff;
   --color-surface-cardDark: #12201e;
-  --color-surface-mist: #dff3ef;
-  --color-ink-light: #0c2422;
+  --color-surface-mist: #e8f3f1;
+  --color-ink-light: #12201e;
   --color-ink-dark: #e8f5f2;
-  --color-ink-mutedLight: #4f6b67;
+  --color-ink-mutedLight: #5b6f6b;
   --color-ink-mutedDark: #9bb5b0;
 }
 

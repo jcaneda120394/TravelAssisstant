@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Modal } from 'react-native';
+import { Modal, Platform } from 'react-native';
 
 import { AppText } from '@/components/ui/typography';
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
@@ -36,12 +36,22 @@ export const PRESET_LABELS: Record<(typeof PRESET_RADII)[number], string> = {
   '200000': '200km',
 };
 
-/** Common distances on the main strip — rest live under More. */
+/** Same pattern as Category: a short primary strip; everything else under More. */
 const PRIMARY_DISTANCES = ['1000', '5000', '10000', '25000', '50000'] as const satisfies ReadonlyArray<
   (typeof PRESET_RADII)[number]
 >;
 
 const PRIMARY_SET = new Set<string>(PRIMARY_DISTANCES);
+
+const DISTANCE_GROUPS: Array<{
+  title: string;
+  options: ReadonlyArray<(typeof PRESET_RADII)[number] | 'custom'>;
+}> = [
+  { title: 'Nearby', options: ['500', '1000', '2000', '3000', '5000'] },
+  { title: 'City & region', options: ['10000', '25000', '50000'] },
+  { title: 'Wide area', options: ['100000', '150000', '200000'] },
+  { title: 'Custom', options: ['custom'] },
+];
 
 function chipClass(selected: boolean, scheme: 'light' | 'dark') {
   return `rounded-full px-3.5 py-2 ${
@@ -87,48 +97,61 @@ export function ExploreDistancePicker({
   };
 
   return (
-    <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View className="flex-row gap-2 pr-1">
-          {PRIMARY_DISTANCES.map((option) => {
-            const selected = value === option;
-            return (
-              <Pressable
-                key={option}
-                onPress={() => select(option)}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                className={chipClass(selected, scheme)}
-                testID={`explore-distance-${option}`}
-              >
-                <AppText
-                  inverse={selected}
-                  className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
-                >
-                  {PRESET_LABELS[option]}
-                </AppText>
-              </Pressable>
-            );
-          })}
-          <Pressable
-            onPress={() => setMoreOpen(true)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: moreActive }}
-            accessibilityLabel={
-              moreActive ? `More distances, ${optionLabel(value, customLabel)}` : 'More distances'
-            }
-            className={chipClass(moreActive, scheme)}
-            testID="explore-distance-more"
-          >
-            <AppText
-              inverse={moreActive}
-              className={`text-sm ${moreActive ? 'font-sans-semibold' : 'font-sans-medium'}`}
+    <View className="w-full" testID="explore-distance-picker">
+      {/* Match Category: one horizontal row, not a wrapping chip grid */}
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0, width: '100%' }}
+        contentContainerStyle={{
+          flexDirection: 'row',
+          flexWrap: 'nowrap',
+          alignItems: 'center',
+          gap: 8,
+          paddingRight: 4,
+        }}
+      >
+        {PRIMARY_DISTANCES.map((option) => {
+          const selected = value === option;
+          return (
+            <Pressable
+              key={option}
+              onPress={() => select(option)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              className={chipClass(selected, scheme)}
+              style={Platform.OS === 'web' ? { flexShrink: 0 } : undefined}
+              testID={`explore-distance-${option}`}
             >
-              {moreChipLabel}
-              {moreActive ? '' : ' ···'}
-            </AppText>
-          </Pressable>
-        </View>
+              <AppText
+                inverse={selected}
+                className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+              >
+                {PRESET_LABELS[option]}
+              </AppText>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          onPress={() => setMoreOpen(true)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: moreActive }}
+          accessibilityLabel={
+            moreActive ? `More distances, ${optionLabel(value, customLabel)}` : 'More distances'
+          }
+          className={chipClass(moreActive, scheme)}
+          style={Platform.OS === 'web' ? { flexShrink: 0 } : undefined}
+          testID="explore-distance-more"
+        >
+          <AppText
+            inverse={moreActive}
+            className={`text-sm ${moreActive ? 'font-sans-semibold' : 'font-sans-medium'}`}
+          >
+            {moreChipLabel}
+            {moreActive ? '' : ' ···'}
+          </AppText>
+        </Pressable>
       </ScrollView>
 
       <Modal
@@ -156,42 +179,36 @@ export function ExploreDistancePicker({
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <View className="mb-2 flex-row flex-wrap gap-2">
-                {PRESET_RADII.map((option) => {
-                  const selected = value === option;
-                  return (
-                    <Pressable
-                      key={option}
-                      onPress={() => select(option)}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      className={chipClass(selected, scheme)}
-                      testID={`explore-distance-more-${option}`}
-                    >
-                      <AppText
-                        inverse={selected}
-                        className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
-                      >
-                        {PRESET_LABELS[option]}
-                      </AppText>
-                    </Pressable>
-                  );
-                })}
-                <Pressable
-                  onPress={() => select('custom')}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: value === 'custom' }}
-                  className={chipClass(value === 'custom', scheme)}
-                  testID="explore-distance-more-custom"
-                >
-                  <AppText
-                    inverse={value === 'custom'}
-                    className={`text-sm ${value === 'custom' ? 'font-sans-semibold' : 'font-sans-medium'}`}
-                  >
-                    {customLabel}
+              {DISTANCE_GROUPS.map((group) => (
+                <View key={group.title} className="mb-4">
+                  <AppText muted className="mb-2 text-xs font-sans-semibold uppercase tracking-wide">
+                    {group.title}
                   </AppText>
-                </Pressable>
-              </View>
+                  <View className="flex-row flex-wrap gap-2">
+                    {group.options.map((option) => {
+                      const selected = value === option;
+                      const label = optionLabel(option, customLabel);
+                      return (
+                        <Pressable
+                          key={option}
+                          onPress={() => select(option)}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          className={chipClass(selected, scheme)}
+                          testID={`explore-distance-more-${option}`}
+                        >
+                          <AppText
+                            inverse={selected}
+                            className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+                          >
+                            {label}
+                          </AppText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
             </ScrollView>
           </View>
         </View>

@@ -69,6 +69,7 @@ export function ExploreScreen() {
   const { isDesktop } = useResponsiveLayout();
   const { coords, label, hasLocation } = useEnsureLocation({ auto: true });
   const [distanceOption, setDistanceOption] = useState<DistanceOption>('25000');
+  const [lastPresetOption, setLastPresetOption] = useState<Exclude<DistanceOption, 'custom'>>('25000');
   const [customKmText, setCustomKmText] = useState('15');
   const [customError, setCustomError] = useState<string | undefined>();
   const [radiusMeters, setRadiusMeters] = useState(25_000);
@@ -95,6 +96,12 @@ export function ExploreScreen() {
     setRadiusMeters(parsed);
   };
 
+  const cancelCustomDistance = () => {
+    setCustomError(undefined);
+    setDistanceOption(lastPresetOption);
+    setRadiusMeters(Number(lastPresetOption));
+  };
+
   const selectDistance = (next: DistanceOption) => {
     setDistanceOption(next);
     setCustomError(undefined);
@@ -105,6 +112,7 @@ export function ExploreScreen() {
       }
       return;
     }
+    setLastPresetOption(next);
     setRadiusMeters(Number(next));
   };
 
@@ -233,7 +241,24 @@ export function ExploreScreen() {
             <AppText muted className="mb-3 -mt-2 text-xs">
               Any value from 0.5 km to 200 km.
             </AppText>
-            <Button label="Apply distance" variant="secondary" onPress={applyCustomDistance} />
+            <View className="flex-row gap-2">
+              <View className="flex-1">
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={cancelCustomDistance}
+                  testID="explore-custom-distance-cancel"
+                />
+              </View>
+              <View className="flex-1">
+                <Button
+                  label="Apply distance"
+                  variant="secondary"
+                  onPress={applyCustomDistance}
+                  testID="explore-custom-distance-apply"
+                />
+              </View>
+            </View>
           </View>
         ) : null}
 

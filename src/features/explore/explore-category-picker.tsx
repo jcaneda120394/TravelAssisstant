@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Modal } from 'react-native';
+import { Modal, Platform } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { AppText } from '@/components/ui/typography';
@@ -211,46 +211,58 @@ export function ExploreCategoryPicker({ value, onChange }: Props) {
   };
 
   return (
-    <View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View className="flex-row gap-2 pr-1">
-          {PRIMARY_CATEGORIES.map((option) => {
-            const selected = value === option;
-            return (
-              <Pressable
-                key={option}
-                onPress={() => select(option)}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                className={chipClass(selected, scheme)}
-                testID={`explore-category-${option}`}
-              >
-                <AppText
-                  inverse={selected}
-                  className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
-                >
-                  {PRIMARY_LABELS[option] ?? CATEGORY_LABELS[option]}
-                </AppText>
-              </Pressable>
-            );
-          })}
-          <Pressable
-            onPress={() => setMoreOpen(true)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: moreActive }}
-            accessibilityLabel={moreActive ? `More categories, ${CATEGORY_LABELS[value]}` : 'More categories'}
-            className={chipClass(moreActive, scheme)}
-            testID="explore-category-more"
-          >
-            <AppText
-              inverse={moreActive}
-              className={`text-sm ${moreActive ? 'font-sans-semibold' : 'font-sans-medium'}`}
+    <View className="w-full" testID="explore-category-picker">
+      <ScrollView
+        horizontal
+        nestedScrollEnabled
+        showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0, width: '100%' }}
+        contentContainerStyle={{
+          flexDirection: 'row',
+          flexWrap: 'nowrap',
+          alignItems: 'center',
+          gap: 8,
+          paddingRight: 4,
+        }}
+      >
+        {PRIMARY_CATEGORIES.map((option) => {
+          const selected = value === option;
+          return (
+            <Pressable
+              key={option}
+              onPress={() => select(option)}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              className={chipClass(selected, scheme)}
+              style={Platform.OS === 'web' ? { flexShrink: 0 } : undefined}
+              testID={`explore-category-${option}`}
             >
-              {moreChipLabel}
-              {moreActive ? '' : ' ···'}
-            </AppText>
-          </Pressable>
-        </View>
+              <AppText
+                inverse={selected}
+                className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+              >
+                {PRIMARY_LABELS[option] ?? CATEGORY_LABELS[option]}
+              </AppText>
+            </Pressable>
+          );
+        })}
+        <Pressable
+          onPress={() => setMoreOpen(true)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: moreActive }}
+          accessibilityLabel={moreActive ? `More categories, ${CATEGORY_LABELS[value]}` : 'More categories'}
+          className={chipClass(moreActive, scheme)}
+          style={Platform.OS === 'web' ? { flexShrink: 0 } : undefined}
+          testID="explore-category-more"
+        >
+          <AppText
+            inverse={moreActive}
+            className={`text-sm ${moreActive ? 'font-sans-semibold' : 'font-sans-medium'}`}
+          >
+            {moreChipLabel}
+            {moreActive ? '' : ' ···'}
+          </AppText>
+        </Pressable>
       </ScrollView>
 
       <Modal

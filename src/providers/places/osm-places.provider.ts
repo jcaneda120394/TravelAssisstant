@@ -124,6 +124,12 @@ const NOMINATIM_QUERIES: Record<PlaceCategory, string[]> = {
   zoo: ['zoo', 'aquarium', 'safari park', 'wildlife park'],
   nightlife: ['bar', 'nightclub', 'pub', 'karaoke', 'lounge'],
   beach: ['beach', 'seaside', 'baywalk', 'boardwalk'],
+  hot_spring: ['hot spring', 'hotspring', 'onsen', 'thermal spring', 'hot springs'],
+  cold_spring: ['cold spring', 'cold springs', 'natural spring'],
+  spring: ['spring', 'natural spring', 'hot spring', 'cold spring'],
+  lake: ['lake', 'lagoon', 'crater lake'],
+  river: ['river', 'waterfall', 'falls', 'creek'],
+  resort: ['resort', 'beach resort', 'island resort', 'eco resort'],
   spa: ['spa', 'massage', 'onsen', 'hot spring', 'wellness'],
   gym: ['gym', 'fitness center', 'fitness centre', 'sports centre', 'yoga studio'],
   hotel: ['hotel', 'resort', 'inn', 'hostel', 'guest house', 'apartment hotel'],
@@ -197,6 +203,35 @@ const CATEGORY_FILTERS: Record<PlaceCategory, string[]> = {
   zoo: ['nwr["tourism"~"zoo|aquarium"]'],
   nightlife: ['nwr["amenity"~"bar|pub|nightclub|biergarten"]'],
   beach: ['nwr["natural"="beach"]', 'nwr["leisure"~"beach_resort|swimming_area"]'],
+  hot_spring: [
+    'nwr["natural"="hot_spring"]',
+    'nwr["amenity"="public_bath"]["bath:type"="hot_spring"]',
+    'nwr["leisure"="spa"]["hot_spring"="yes"]',
+    'nwr["tourism"="hotel"]["hot_spring"="yes"]',
+  ],
+  cold_spring: [
+    'nwr["natural"="spring"]',
+    'nwr["amenity"="drinking_water"]["natural"="spring"]',
+  ],
+  spring: [
+    'nwr["natural"~"spring|hot_spring"]',
+    'nwr["amenity"="public_bath"]',
+  ],
+  lake: [
+    'nwr["natural"="water"]["water"="lake"]',
+    'nwr["landuse"="reservoir"]',
+    'nwr["name"~"Lake|Lagoon",i]',
+  ],
+  river: [
+    'nwr["waterway"~"river|stream"]',
+    'nwr["natural"="waterfall"]',
+    'nwr["waterway"="waterfall"]',
+  ],
+  resort: [
+    'nwr["tourism"~"hotel|resort|chalet"]["resort"="yes"]',
+    'nwr["leisure"="beach_resort"]',
+    'nwr["tourism"="hotel"]["name"~"Resort",i]',
+  ],
   spa: ['nwr["leisure"="spa"]', 'nwr["amenity"~"spa|public_bath"]', 'nwr["shop"="beauty"]'],
   gym: ['nwr["leisure"~"fitness_centre|sports_centre"]', 'nwr["amenity"="gym"]'],
   hotel: ['nwr["tourism"~"hotel|hostel|guest_house|motel|apartment"]'],
@@ -297,8 +332,20 @@ function inferCategory(tags: Record<string, string> = {}): PlaceCategory {
     return 'attraction';
   }
   if (tourism === 'hotel' || tourism === 'hostel' || tourism === 'guest_house' || tourism === 'motel') {
+    if (/resort/i.test(tags.name ?? '') || tags.resort === 'yes' || leisure === 'beach_resort') {
+      return 'resort';
+    }
     return 'hotel';
   }
+  if (leisure === 'beach_resort' || tourism === 'resort') return 'resort';
+  if (natural === 'hot_spring' || tags.hot_spring === 'yes') return 'hot_spring';
+  if (natural === 'spring') {
+    if (/cold/i.test(tags.name ?? '') || tags.spring_type === 'cold') return 'cold_spring';
+    return 'spring';
+  }
+  if (natural === 'water' && (tags.water === 'lake' || tags.water === 'pond')) return 'lake';
+  if (tags.waterway === 'river' || tags.waterway === 'stream') return 'river';
+  if (natural === 'waterfall' || tags.waterway === 'waterfall') return 'river';
   if (tourism === 'museum' || tourism === 'gallery') return 'museum';
   if (tourism === 'viewpoint') return 'viewpoint';
   if (tourism === 'zoo' || tourism === 'aquarium') return 'zoo';
@@ -311,7 +358,10 @@ function inferCategory(tags: Record<string, string> = {}): PlaceCategory {
   ) {
     return 'attraction';
   }
-  if (leisure === 'spa' || amenity === 'spa' || amenity === 'public_bath') return 'spa';
+  if (leisure === 'spa' || amenity === 'spa' || amenity === 'public_bath') {
+    if (/hot spring|onsen|thermal/i.test(tags.name ?? '')) return 'hot_spring';
+    return 'spa';
+  }
   if (leisure === 'fitness_centre' || leisure === 'sports_centre') return 'gym';
   if (leisure === 'park' || leisure === 'garden' || leisure === 'nature_reserve') return 'park';
   if (leisure === 'water_park') return 'attraction';
@@ -344,6 +394,13 @@ function categoryFromNominatim(item: NominatimResult): PlaceCategory {
   if (cls === 'tourism') return 'attraction';
   if (cls === 'historic') return 'attraction';
   if (cls === 'natural' && type === 'beach') return 'beach';
+  if (cls === 'natural' && type === 'hot_spring') return 'hot_spring';
+  if (cls === 'natural' && type === 'spring') return 'spring';
+  if (cls === 'natural' && (type === 'water' || type === 'lake')) return 'lake';
+  if (cls === 'waterway' && (type === 'river' || type === 'stream')) return 'river';
+  if (cls === 'waterway' && type === 'waterfall') return 'river';
+  if (cls === 'leisure' && type === 'beach_resort') return 'resort';
+  if (cls === 'tourism' && type === 'resort') return 'resort';
   if (cls === 'leisure' && ['park', 'garden', 'nature_reserve'].includes(type)) return 'park';
   if (cls === 'leisure' && ['fitness_centre', 'sports_centre'].includes(type)) return 'gym';
   if (cls === 'leisure' && type === 'water_park') return 'attraction';
@@ -696,6 +753,12 @@ const NOMINATIM_STRUCTURED: Partial<
   viewpoint: [{ tourism: 'viewpoint' }],
   zoo: [{ tourism: 'zoo' }],
   beach: [{ natural: 'beach' }],
+  hot_spring: [{ natural: 'hot_spring' }],
+  cold_spring: [{ natural: 'spring' }],
+  spring: [{ natural: 'spring' }, { natural: 'hot_spring' }],
+  lake: [{ natural: 'water' }],
+  river: [{ waterway: 'river' }, { waterway: 'waterfall' }],
+  resort: [{ leisure: 'beach_resort' }, { tourism: 'hotel' }],
   airport: [{ aeroway: 'aerodrome' }],
   tourist_info: [{ tourism: 'information' }],
   coworking: [{ amenity: 'coworking_space' }],

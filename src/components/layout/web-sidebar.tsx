@@ -16,7 +16,6 @@ const NAV_ITEMS: Array<{ href: string; label: string; match: string; icon: IconN
   { href: '/(tabs)/trips', label: 'Trips', match: 'trips', icon: 'briefcase' },
   { href: '/(tabs)/guide', label: 'Guide', match: 'guide', icon: 'book' },
   { href: '/(tabs)/map', label: 'Map', match: 'map', icon: 'map' },
-  { href: '/(tabs)/translate', label: 'Translate', match: 'translate', icon: 'scan' },
   { href: '/(tabs)/assistant', label: 'AI', match: 'assistant', icon: 'sparkles' },
   { href: '/(tabs)/profile', label: 'Profile', match: 'profile', icon: 'person' },
 ];

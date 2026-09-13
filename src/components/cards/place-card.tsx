@@ -25,7 +25,7 @@ function PlaceCardPhoto({ place }: { place: Place }) {
   const scheme = useAppColorScheme();
   const [failed, setFailed] = useState(false);
   const photoQuery = useQuery({
-    queryKey: ['place-card-photo', place.id, place.name],
+    queryKey: ['place-card-photo', 'v2', place.id, place.name, place.address],
     queryFn: () => fetchBestPlacePhoto(place),
     staleTime: 45 * 60_000,
     gcTime: 2 * 60 * 60_000,

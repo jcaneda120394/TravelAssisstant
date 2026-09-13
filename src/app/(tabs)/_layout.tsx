@@ -80,8 +80,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="translate"
         options={{
-          title: 'Translate',
-          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="scan" />,
+          href: null,
         }}
       />
       <Tabs.Screen

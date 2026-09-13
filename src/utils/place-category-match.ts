@@ -8,7 +8,21 @@ export const CATEGORY_MATCH: Record<PlaceCategory, PlaceCategory[]> = {
   restaurant: ['restaurant', 'cafe', 'bakery'],
   cafe: ['cafe', 'bakery', 'restaurant'],
   bakery: ['bakery', 'cafe'],
-  attraction: ['attraction', 'park', 'museum', 'temple', 'viewpoint', 'zoo', 'beach'],
+  attraction: [
+    'attraction',
+    'park',
+    'museum',
+    'temple',
+    'viewpoint',
+    'zoo',
+    'beach',
+    'hot_spring',
+    'cold_spring',
+    'spring',
+    'lake',
+    'river',
+    'resort',
+  ],
   shopping: ['shopping', 'mall', 'market', 'souvenir', 'convenience'],
   mall: ['mall', 'shopping'],
   park: ['park', 'attraction'],
@@ -19,9 +33,15 @@ export const CATEGORY_MATCH: Record<PlaceCategory, PlaceCategory[]> = {
   zoo: ['zoo', 'attraction'],
   nightlife: ['nightlife', 'restaurant'],
   beach: ['beach'],
-  spa: ['spa'],
+  hot_spring: ['hot_spring', 'spring', 'spa'],
+  cold_spring: ['cold_spring', 'spring'],
+  spring: ['spring', 'hot_spring', 'cold_spring'],
+  lake: ['lake', 'park'],
+  river: ['river'],
+  resort: ['resort', 'hotel', 'beach'],
+  spa: ['spa', 'hot_spring'],
   gym: ['gym'],
-  hotel: ['hotel'],
+  hotel: ['hotel', 'resort'],
   hospital: ['hospital', 'clinic'],
   clinic: ['clinic', 'hospital'],
   pharmacy: ['pharmacy'],
@@ -53,6 +73,12 @@ const SIGHTSEEING = new Set<PlaceCategory>([
   'viewpoint',
   'zoo',
   'beach',
+  'hot_spring',
+  'cold_spring',
+  'spring',
+  'lake',
+  'river',
+  'resort',
 ]);
 
 const FOOD = new Set<PlaceCategory>(['restaurant', 'cafe', 'bakery', 'nightlife']);
@@ -85,6 +111,21 @@ export function placeMatchesCategory(
     return /\b(beach|baywalk|seaside|seawall|cove|islet|island|coast|paguriran|rompeolas)\b/i.test(
       haystack,
     );
+  }
+  if (category === 'hot_spring' || category === 'spring') {
+    return /\b(hot spring|hotspring|onsen|thermal|spa spring)\b/i.test(haystack);
+  }
+  if (category === 'cold_spring') {
+    return /\b(cold spring|palogtoc|natural spring)\b/i.test(haystack);
+  }
+  if (category === 'lake') {
+    return /\b(lake|lagoon)\b/i.test(haystack);
+  }
+  if (category === 'river') {
+    return /\b(river|falls|waterfall|creek|stream)\b/i.test(haystack);
+  }
+  if (category === 'resort') {
+    return /\b(resort|villa|beach club)\b/i.test(haystack);
   }
   if (category === 'attraction' || category === 'temple' || category === 'viewpoint') {
     if (category === 'temple' && /\b(church|parish|cathedral|basilica|shrine|ruins)\b/i.test(haystack)) {

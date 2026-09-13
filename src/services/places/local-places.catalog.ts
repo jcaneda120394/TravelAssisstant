@@ -488,6 +488,12 @@ const ATTRACTION_CATEGORIES = new Set<PlaceCategory>([
   'zoo',
   'shopping',
   'beach',
+  'hot_spring',
+  'cold_spring',
+  'spring',
+  'lake',
+  'river',
+  'resort',
 ]);
 
 const FOOD_CATEGORIES = new Set<PlaceCategory>(['restaurant', 'cafe', 'nightlife']);

@@ -139,7 +139,19 @@ function queriesFor(category: PlaceCategory, city: string): string[] {
     case 'zoo':
       return [`zoo ${c}`, `aquarium ${c}`];
     case 'beach':
-      return [`beach ${c}`];
+      return [`beach ${c}`, `baywalk ${c}`, `cove ${c}`];
+    case 'hot_spring':
+      return [`hot spring ${c}`, `hotspring ${c}`, `onsen ${c}`, `thermal spring ${c}`];
+    case 'cold_spring':
+      return [`cold spring ${c}`, `natural spring ${c}`];
+    case 'spring':
+      return [`spring ${c}`, `hot spring ${c}`, `cold spring ${c}`, `natural spring ${c}`];
+    case 'lake':
+      return [`lake ${c}`, `lagoon ${c}`, `crater lake ${c}`];
+    case 'river':
+      return [`river ${c}`, `waterfall ${c}`, `falls ${c}`];
+    case 'resort':
+      return [`resort ${c}`, `beach resort ${c}`, `island resort ${c}`];
     case 'tourist_info':
       return [`tourist information ${c}`, `visitor center ${c}`];
     case 'post_office':
@@ -197,6 +209,12 @@ function bareQueries(category: PlaceCategory): string[] {
         category !== 'viewpoint' &&
         category !== 'zoo' &&
         category !== 'beach' &&
+        category !== 'hot_spring' &&
+        category !== 'cold_spring' &&
+        category !== 'spring' &&
+        category !== 'lake' &&
+        category !== 'river' &&
+        category !== 'resort' &&
         category !== 'other'
       ) {
         return [category.replace(/_/g, ' ')];
@@ -226,7 +244,23 @@ function categoryFromPhoton(
     return 'transit_station';
   }
   if (key.includes('bus_station') || type.includes('bus_station')) return 'transit_station';
-  if (key.includes('hotel') || type.includes('hotel')) return 'hotel';
+  if (key.includes('hotel') || type.includes('hotel')) {
+    if (/resort/i.test(props.name ?? '') || type.includes('resort')) return 'resort';
+    return 'hotel';
+  }
+  if (key.includes('hot_spring') || type.includes('hot_spring') || /hot spring|onsen/i.test(props.name ?? '')) {
+    return 'hot_spring';
+  }
+  if (key.includes('natural:spring') || (key.includes('spring') && type.includes('spring'))) {
+    if (/cold/i.test(props.name ?? '')) return 'cold_spring';
+    return 'spring';
+  }
+  if (key.includes('waterway') || type.includes('river') || type.includes('waterfall')) return 'river';
+  if ((key.includes('natural:water') || type.includes('lake') || type.includes('lagoon')) && /lake|lagoon/i.test(`${props.name ?? ''} ${type}`)) {
+    return 'lake';
+  }
+  if (type.includes('beach') || key.includes('beach')) return 'beach';
+  if (type.includes('resort') || key.includes('beach_resort')) return 'resort';
   if (key.includes('hospital') || type.includes('hospital')) return 'hospital';
   if (key.includes('clinic') || type.includes('clinic') || type.includes('doctors')) return 'clinic';
   if (key.includes('pharmacy') || type.includes('pharmacy')) return 'pharmacy';

@@ -40,12 +40,8 @@ function firstParam(value: string | string[] | undefined): string {
 
 function MessageBubble({
   message,
-  onSpeak,
-  primaryColor,
 }: {
   message: AIMessage;
-  onSpeak?: () => void;
-  primaryColor: string;
 }) {
   const scheme = useAppColorScheme();
   const isUser = message.role === 'user';
@@ -62,21 +58,9 @@ function MessageBubble({
         }`}
       >
         {!isUser ? (
-          <View className="mb-1.5 flex-row items-center justify-between gap-2">
-            <AppText className="text-[11px] font-sans-semibold uppercase tracking-wide text-brand-500">
-              TravelAssistant
-            </AppText>
-            {onSpeak ? (
-              <RNPressable
-                onPress={onSpeak}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Speak reply"
-              >
-                <Ionicons name="volume-high-outline" size={16} color={primaryColor} />
-              </RNPressable>
-            ) : null}
-          </View>
+          <AppText className="mb-1.5 text-[11px] font-sans-semibold uppercase tracking-wide text-brand-500">
+            TravelAssistant
+          </AppText>
         ) : null}
         <AppText className={isUser ? 'text-white' : ''} inverse={isUser}>
           {message.content}
@@ -97,7 +81,6 @@ export function AssistantScreen() {
   const [input, setInput] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [voiceReplies, setVoiceReplies] = useState(true);
   const listRef = useRef<RNScrollView>(null);
   const locationLabel = location.label ?? 'No city set';
   const stuckOnSf = looksLikeSanFrancisco(location.coords) && location.mode !== 'manual';
@@ -132,6 +115,12 @@ export function AssistantScreen() {
       createdAt: new Date().toISOString(),
     },
   ]);
+
+  const scrollToLatest = useCallback(() => {
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated: true });
+    });
+  }, []);
 
   const chatMutation = useMutation({
     mutationFn: async (prompt?: string) => {
@@ -189,10 +178,8 @@ export function AssistantScreen() {
       setError(null);
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setInput('');
-      if (voiceReplies) {
-        voice.speak(assistantMessage.content);
-      }
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+      voice.stopSpeaking();
+      scrollToLatest();
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
@@ -209,7 +196,7 @@ export function AssistantScreen() {
   return (
     <Screen edges={['top']}>
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
         testID="screen-assistant"
@@ -235,20 +222,15 @@ export function AssistantScreen() {
 
         <RNScrollView
           ref={listRef}
-          className="flex-1 px-4 pt-4"
-          contentContainerStyle={{ paddingBottom: 16, flexGrow: 1 }}
+          style={{ flex: 1, minHeight: 0 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24 }}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          keyboardDismissMode="on-drag"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator
         >
           {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              primaryColor={colors.primary}
-              onSpeak={
-                message.role === 'assistant' ? () => voice.speak(message.content) : undefined
-              }
-            />
+            <MessageBubble key={message.id} message={message} />
           ))}
           {chatMutation.isPending ? <Skeleton height={64} /> : null}
           {error ? <AppText className="mb-2 text-sm text-red-500">{error}</AppText> : null}
@@ -342,28 +324,6 @@ export function AssistantScreen() {
                 }}
               >
                 <Ionicons name={voice.listening ? 'stop' : 'mic'} size={20} color="#FFFFFF" />
-              </RNPressable>
-              <RNPressable
-                accessibilityRole="button"
-                accessibilityLabel={voiceReplies ? 'Mute spoken replies' : 'Enable spoken replies'}
-                onPress={() => {
-                  if (voiceReplies) voice.stopSpeaking();
-                  setVoiceReplies((prev) => !prev);
-                }}
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: scheme === 'dark' ? '#1A2E2B' : '#F7FAF9',
-                }}
-              >
-                <Ionicons
-                  name={voiceReplies ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'}
-                  size={18}
-                  color={voiceReplies ? colors.accent : colors.textMuted}
-                />
               </RNPressable>
               <View className="flex-1" />
               <RNPressable

@@ -74,6 +74,15 @@ function isExcluded(url: string, exclude: string[]): boolean {
 const IRRELEVANT_FOR_FOOD =
   /\b(memorial|monument|war|veteran|cemetery|grave|traveling wall|vietnam wall|battlefield|soldier|tomb)\b/i;
 
+const IRRELEVANT_FOR_LANDMARK =
+  /\b(bus|buses|jeepney|coach|transit|terminal|vehicle|truck|van|motorcycle|parking lot)\b/i;
+
+const WEAK_LANDMARK_TOKENS = new Set([
+  "church", "cathedral", "basilica", "temple", "shrine", "mosque",
+  "park", "museum", "palace", "castle", "tower", "bridge", "market",
+  "plaza", "garden", "beach", "hotel", "resort",
+]);
+
 const GEO_STOP = new Set([
   "the", "and", "vietnam", "japan", "philippines", "thailand", "indonesia",
   "city", "town", "street", "travel", "food", "dining", "interior", "shop",
@@ -98,6 +107,7 @@ function typeHints(type: string | null | undefined): string[] {
   if (t === "restaurant") return ["restaurant", "dining", "kitchen", "eatery"];
   if (t === "bakery") return ["bakery", "pastry", "bread"];
   if (t === "hotel" || t === "resort") return ["hotel", "resort", "lobby"];
+  if (t === "temple") return ["temple", "shrine", "church", "cathedral", "basilica"];
   return [];
 }
 
@@ -106,10 +116,24 @@ function relevantToPlace(
   placeName: string,
   placeType: string | null | undefined,
 ): boolean {
-  const hay = `${img.alt} ${img.searchQuery}`.toLowerCase();
+  // Alt only — searchQuery embeds the place name and would accept unrelated stock.
+  const hay = `${img.alt}`.toLowerCase();
   if (isBusiness(placeType) && IRRELEVANT_FOR_FOOD.test(hay)) return false;
+  const landmarkish =
+    !isBusiness(placeType) &&
+    /^(temple|attraction|museum|park|viewpoint|landmark|activity|beach|zoo)$/i.test(
+      String(placeType ?? ""),
+    );
+  if (landmarkish && IRRELEVANT_FOR_LANDMARK.test(hay)) return false;
+
   const tokens = significantTokens(placeName);
-  if (tokens.some((t) => hay.includes(t))) return true;
+  const distinctive = tokens.filter((t) => !WEAK_LANDMARK_TOKENS.has(t));
+  if (distinctive.length >= 1) {
+    if (distinctive.some((t) => hay.includes(t))) return true;
+  } else if (tokens.some((t) => hay.includes(t))) {
+    return true;
+  }
+
   const hints = typeHints(placeType);
   if (isBusiness(placeType) && hints.some((h) => hay.includes(h))) {
     return !IRRELEVANT_FOR_FOOD.test(hay);
@@ -410,7 +434,7 @@ function buildQueries(body: {
       : /beach/i.test(type)
       ? "beach travel"
       : /temple/i.test(type)
-      ? "temple landmark"
+      ? "church cathedral basilica temple shrine"
       : "travel landmark";
 
   const ladder = business

@@ -10,6 +10,32 @@ const BAD_TITLE =
 const IRRELEVANT_FOR_FOOD =
   /\b(memorial|monument|war|veteran|cemetery|grave|traveling wall|vietnam wall|battlefield|soldier|tomb)\b/i;
 
+/** Vehicles / transit stock — not church or landmark façades. */
+const IRRELEVANT_FOR_LANDMARK =
+  /\b(bus|buses|jeepney|coach|transit|terminal|vehicle|truck|van|motorcycle|parking lot)\b/i;
+
+/** Generic words that alone do not prove the photo is this landmark. */
+const WEAK_LANDMARK_TOKENS = new Set([
+  'church',
+  'cathedral',
+  'basilica',
+  'temple',
+  'shrine',
+  'mosque',
+  'park',
+  'museum',
+  'palace',
+  'castle',
+  'tower',
+  'bridge',
+  'market',
+  'plaza',
+  'garden',
+  'beach',
+  'hotel',
+  'resort',
+]);
+
 const GEO_STOP = new Set([
   'the',
   'and',
@@ -94,29 +120,47 @@ function typeHintTokens(type: string | null | undefined): string[] {
   if (t === 'restaurant') return ['restaurant', 'dining', 'kitchen', 'meal', 'eatery'];
   if (t === 'bakery') return ['bakery', 'pastry', 'bread', 'cake'];
   if (t === 'hotel' || t === 'resort') return ['hotel', 'resort', 'lobby', 'room'];
-  if (t === 'temple') return ['temple', 'shrine', 'pagoda'];
+  if (t === 'temple') return ['temple', 'shrine', 'pagoda', 'church', 'cathedral', 'basilica'];
   if (t === 'beach') return ['beach', 'coast', 'shore'];
   return [];
 }
 
 /**
  * True when the photo is plausibly about this place (not just the country).
+ * Uses alt/title only — never searchQuery, which embeds the place name and would
+ * make almost any stock image look "relevant".
  */
 export function isRelevantToPlace(
   candidate: TravelImageCandidate,
   placeName: string,
   placeType?: string | null,
 ): boolean {
-  const hay = `${candidate.alt} ${candidate.searchQuery}`.toLowerCase();
+  const hay = `${candidate.alt}`.toLowerCase();
   if (BAD_TITLE.test(hay)) return false;
 
   if (isBusinessPlaceType(placeType) && IRRELEVANT_FOR_FOOD.test(hay)) {
     return false;
   }
 
+  const landmarkish =
+    !isBusinessPlaceType(placeType) &&
+    /^(temple|attraction|museum|park|viewpoint|landmark|activity|beach|zoo)$/i.test(
+      placeType ?? '',
+    );
+  if (landmarkish && IRRELEVANT_FOR_LANDMARK.test(hay)) {
+    return false;
+  }
+
   const tokens = significantPlaceTokens(placeName);
+  const distinctive = tokens.filter((t) => !WEAK_LANDMARK_TOKENS.has(t));
   const strongHits = tokens.filter((t) => hay.includes(t));
-  if (strongHits.length >= 1) return true;
+
+  // Multi-word landmarks (e.g. Barasoain Church) need a distinctive token, not just "church".
+  if (distinctive.length >= 1) {
+    if (distinctive.some((t) => hay.includes(t))) return true;
+  } else if (strongHits.length >= 1) {
+    return true;
+  }
 
   // Atmosphere: allow city cafe/coffee photos when the place name itself is not in the title.
   const typeHints = typeHintTokens(placeType);
@@ -151,7 +195,11 @@ export function scoreTravelImage(
   if (queryTokens.length) score += Math.min(0.35, (queryHits / queryTokens.length) * 0.35);
 
   if (placeName) {
-    const placeHits = significantPlaceTokens(placeName).filter((t) => hay.includes(t));
+    const tokens = significantPlaceTokens(placeName);
+    const distinctive = tokens.filter((t) => !WEAK_LANDMARK_TOKENS.has(t));
+    const placeHits = (distinctive.length ? distinctive : tokens).filter((t) =>
+      candidate.alt.toLowerCase().includes(t),
+    );
     score += Math.min(0.35, placeHits.length * 0.18);
   }
 

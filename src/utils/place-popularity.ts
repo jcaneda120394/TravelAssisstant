@@ -39,13 +39,16 @@ function popularityScore(place: Place, category?: PlaceCategory | null): number 
   const tags = (place.tags ?? []).join(' ').toLowerCase();
 
   // Famous-attraction boost only when browsing sightseeing (or no category).
+  // Require real aerial/gondola names — bare "Cable Car" matches nightlife bars too.
   const allowLandmarkBoost = isSightseeingCategory(category);
   const majorLandmarkBonus =
     allowLandmarkBoost &&
-    (/disneyland|disney|ocean park|ngong ping|peak tram|victoria peak|big buddha|tian tan|po lin|star ferry|times square|eiffel|louvre|colosseum|sagrada|marina bay|gardens by the bay|tokyo skytree|senso-?ji|shibuya crossing|universal studios|theme park|cable car|aerialway|funicular|burj|opera house|central park|hyde park|tower bridge|british museum|machu picchu|great wall|forbidden city|acropolis|christ the redeemer|golden gate|petronas|angkor/i.test(
+    (/disneyland|disney|ocean park|ngong ping|peak tram|victoria peak|big buddha|tian tan|po lin|star ferry|times square|eiffel|louvre|colosseum|sagrada|marina bay|gardens by the bay|tokyo skytree|senso-?ji|shibuya crossing|universal studios|theme park|ngong ping 360|peak tram|aerial tramway|gondola|funicular|burj|opera house|central park|hyde park|tower bridge|british museum|machu picchu|great wall|forbidden city|acropolis|christ the redeemer|golden gate|petronas|angkor/i.test(
       text,
     ) ||
-      tags.includes('famous'))
+      tags.includes('famous') ||
+      (place.category === 'attraction' &&
+        /\b(aerialway|gondola|cable.?car|funicular)\b/i.test(tags)))
       ? 28
       : 0;
 

@@ -13,6 +13,7 @@ import {
 import type { GeoPoint, Place, PlaceCategory } from '@/types/domain';
 import {
   filterPlacesByCategory,
+  placeMatchesCategory,
 } from '@/utils/place-category-match';
 import {
   formatBilingualPlaceName,
@@ -76,7 +77,6 @@ const NOMINATIM_QUERIES: Record<PlaceCategory, string[]> = {
     'theme park',
     'amusement park',
     'tourist attraction',
-    'cable car',
     'museum',
     'attraction',
     'park',
@@ -625,13 +625,39 @@ function isUsefulNominatimHit(item: NominatimResult, category: PlaceCategory): b
 
   // Soft preference: keep tourism/leisure/amenity/shop hits for attractions.
   if (category === 'attraction') {
+    // Bars/restaurants named like landmarks (e.g. "Cable Car" bar) must not fill Discover.
+    if (
+      cls === 'amenity' &&
+      [
+        'bar',
+        'pub',
+        'nightclub',
+        'biergarten',
+        'restaurant',
+        'fast_food',
+        'cafe',
+        'food_court',
+        'bbq',
+        'ice_cream',
+      ].includes(type)
+    ) {
+      return false;
+    }
     if (cls === 'building' && ['house', 'apartments', 'residential', 'garage'].includes(type)) {
       return false;
     }
-    if (['tourism', 'leisure', 'amenity', 'shop', 'historic', 'natural', 'aerialway', 'railway'].includes(cls)) {
+    if (['tourism', 'leisure', 'historic', 'natural', 'aerialway'].includes(cls)) {
       return true;
     }
-    // Allow named landmarks that aren't admin / houses.
+    // Amenity only when it is a cultural/civic POI — not food/nightlife.
+    if (
+      cls === 'amenity' &&
+      ['place_of_worship', 'theatre', 'cinema', 'arts_centre', 'community_centre', 'library'].includes(
+        type,
+      )
+    ) {
+      return true;
+    }
     if (cls === 'man_made' || (cls === 'building' && !['house', 'apartments'].includes(type))) {
       return true;
     }
@@ -668,6 +694,11 @@ function nominatimToPlace(item: NominatimResult, origin?: GeoPoint, category?: P
       ? name.replace(` (${nameEnglish})`, '')
       : undefined);
 
+  // Prefer OSM's real category so nightlife/food never get forced into "attraction".
+  const derived = categoryFromNominatim(item);
+  const resolvedCategory =
+    derived !== 'other' ? derived : category && category !== 'other' ? category : 'other';
+
   const base: Place = {
     id: placeIdFromNominatim(item),
     provider: 'openstreetmap',
@@ -679,7 +710,7 @@ function nominatimToPlace(item: NominatimResult, origin?: GeoPoint, category?: P
       nameEnglish && nameOriginal && nameEnglish.trim() !== nameOriginal.trim()
         ? nameEnglish.trim()
         : undefined,
-    category: category ?? categoryFromNominatim(item),
+    category: resolvedCategory,
     latitude: point.latitude,
     longitude: point.longitude,
     address: item.display_name,
@@ -690,6 +721,11 @@ function nominatimToPlace(item: NominatimResult, origin?: GeoPoint, category?: P
         ? Math.round(Math.min(5, Math.max(1, item.importance * 8)) * 10) / 10
         : undefined,
   };
+
+  if (category && !placeMatchesCategory(base, category)) {
+    return null;
+  }
+
   return enrichFromTags(base, item.extratags);
 }
 

@@ -32,7 +32,7 @@ export function typeKeywords(type: string | null | undefined): string {
     case 'beach':
       return 'beach travel';
     case 'temple':
-      return 'temple shrine landmark';
+      return 'church cathedral basilica temple shrine';
     case 'museum':
       return 'museum landmark';
     case 'park':

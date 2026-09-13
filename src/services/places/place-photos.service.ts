@@ -60,7 +60,7 @@ const USER_AGENT = 'TravelMateAI/1.0 (https://travelmate.app; place-photos)';
 
 /** Always-junk titles (never the venue photo). */
 const ALWAYS_IRRELEVANT =
-  /\b(logo|icon|wordmark|flag|coat of arms|seal|expressway|highway|slex|nlex|skyway|tollway|diagram|svg|signage template|placeholder)\b/i;
+  /\b(logo|icon|wordmark|flag|coat of arms|seal|expressway|highway|slex|nlex|skyway|tollway|diagram|svg|signage template|placeholder|bus|buses|jeepney|coach|parking lot)\b/i;
 
 /** Theme-park titles — only junk when the place itself is NOT that park. */
 const THEME_PARK_TITLE =

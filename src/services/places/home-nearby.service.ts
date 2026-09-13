@@ -7,6 +7,7 @@ import type { CompanionPrefs } from '@/utils/companion-suitability';
 import { applyCompanionFilter, companionFilterActive } from '@/utils/companion-suitability';
 import { filterPlacesWithinRadius } from '@/utils/geo';
 import { dropForeignLandmarkNoise } from '@/utils/place-foreign-noise';
+import { filterPlacesByCategory } from '@/utils/place-category-match';
 import { topPopularPlaces } from '@/utils/place-popularity';
 import { dedupePlaces } from '@/utils/dedupe-places';
 
@@ -32,12 +33,14 @@ function finish(
   limit: number,
   companions?: CompanionPrefs | null,
   cityLabel?: string | null,
+  category?: 'attraction' | 'restaurant',
 ): Place[] {
   const withoutMocks = env.useMockProviders
     ? places
     : places.filter((place) => place.provider !== 'mock');
+  const inCategory = filterPlacesByCategory(withoutMocks, category);
   const localOnly = dropForeignLandmarkNoise(
-    filterPlacesWithinRadius(withoutMocks, origin, radiusMeters),
+    filterPlacesWithinRadius(inCategory, origin, radiusMeters),
     cityLabel,
   );
   const deduped = dedupePlaces(localOnly);
@@ -133,6 +136,7 @@ export async function getHomeNearbyPlaces(params: {
       limit,
       params.companions,
       params.cityLabel,
+      params.category,
     );
     if (ranked.length >= Math.min(MIN_SATISFYING, limit)) {
       return ranked;

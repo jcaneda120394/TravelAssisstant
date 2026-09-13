@@ -623,7 +623,7 @@ export function PlaceDetailScreen() {
 
         <View className="gap-3">
           <Button
-            label="Add to trip planner"
+            label={user ? 'Add to trip planner' : 'Sign in to add to trip planner'}
             onPress={() => {
               if (!requireAuthToSave(router, { actionLabel: 'add places to your trip planner' })) {
                 return;
@@ -632,7 +632,7 @@ export function PlaceDetailScreen() {
             }}
           />
           <Button
-            label="Save favorite"
+            label={user ? 'Save favorite' : 'Sign in to save favorite'}
             variant="secondary"
             loading={saveMutation.isPending}
             onPress={() => {

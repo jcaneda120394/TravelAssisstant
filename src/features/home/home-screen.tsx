@@ -391,7 +391,7 @@ export function HomeScreen() {
 
           {hasLocation ? (
             <Card className="mb-5">
-              <SectionHeader title="Weather" subtitle={label ?? 'Near you'} />
+              <SectionHeader title="Current Location" subtitle={label ?? 'Near you'} />
               <View
                 className={`rounded-2xl px-3 py-3 ${
                   scheme === 'dark' ? 'bg-brand-800' : 'bg-surface-mist'
@@ -402,7 +402,7 @@ export function HomeScreen() {
                     scheme === 'dark' ? 'text-brand-200' : 'text-brand-600'
                   }`}
                 >
-                  Weather
+                  Conditions
                 </AppText>
                 <AppText className="mt-1 font-sans-semibold">
                   {weatherQuery.data?.condition ??

@@ -14,6 +14,7 @@ import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
 import { useAuth } from '@/hooks/use-auth';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { createTrip, deleteTrip, listTrips } from '@/services/trips/trips.service';
 import { analytics } from '@/lib/analytics';
@@ -25,6 +26,7 @@ import { useLocationStore } from '@/stores/location-store';
 export function TripsScreen() {
   const router = useRouter();
   const { user, preferences } = useAuth();
+  const { currency } = useDisplayCurrency();
   const scheme = useAppColorScheme();
   const { scrollBottomPad } = useResponsiveLayout();
   const queryClient = useQueryClient();
@@ -59,6 +61,7 @@ export function TripsScreen() {
         destinations: destinations.map((item) => item.trim()).filter(Boolean),
         adults: preferences?.adults ?? 2,
         children: preferences?.children ?? 0,
+        homeCurrency: currency,
       });
     },
     onSuccess: (trip) => {

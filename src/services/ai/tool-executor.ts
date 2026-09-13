@@ -1,6 +1,7 @@
 import { listTrips } from '@/services/trips/trips.service';
 import { addItineraryItem, listItinerary, optimizeItineraryDay } from '@/services/itinerary/itinerary.service';
 import { addExpense, getBudget, listExpenses, summarizeExpenses } from '@/services/budget/budget.service';
+import { useCurrencyStore } from '@/stores/currency-store';
 import { useLocationStore } from '@/stores/location-store';
 import type { AIChatRequest, GeoPoint, Place, PlaceCategory, WeatherSnapshot } from '@/types/domain';
 import type { ProviderRegistry } from '@/providers/registry';
@@ -347,12 +348,13 @@ async function runTool(name: string, request: AIChatRequest): Promise<unknown> {
       if (!trips[0]) {
         return { error: 'No trip available' };
       }
+      const currency = useCurrencyStore.getState().currency || 'USD';
       return addExpense({
         tripId: trips[0].id,
         userId,
         amount: 12,
-        currency: 'USD',
-        homeCurrency: 'USD',
+        currency,
+        homeCurrency: currency,
         category: 'food',
         date: new Date().toISOString().slice(0, 10),
         notes: 'Added via AI tool',

@@ -39,6 +39,8 @@ import {
 import { setTripPublic } from '@/services/travel-spots/travel-spots.service';
 import { shareTrip } from '@/services/trips/share-trip.service';
 import { getBudget, listExpenses, summarizeExpenses, upsertBudget } from '@/services/budget/budget.service';
+import { formatMoneyAmount } from '@/utils/display-money';
+import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { ItineraryStopImage } from '@/components/trips/itinerary-stop-image';
@@ -669,7 +671,10 @@ export function TripDetailScreen() {
               <AppText muted className="mt-1">
                 Budget:{' '}
                 {budgetQuery.data?.budget
-                  ? `${budgetQuery.data.budget.currency} ${budgetQuery.data.budget.total}`
+                  ? formatMoneyAmount(
+                      budgetQuery.data.budget.total,
+                      budgetQuery.data.budget.currency || currency,
+                    )
                   : 'Not set'}
               </AppText>
               {trip.publicSummary && isViewOnly ? (
@@ -1076,20 +1081,35 @@ export function TripDetailScreen() {
 
         {tab === 'budget' ? (
           <Card className="mb-4">
-            <SectionHeader title="Budget snapshot" />
+            <SectionHeader
+              title="Budget snapshot"
+              subtitle={`Amounts in ${formatCurrencyWithSymbol(budgetQuery.data?.budget?.currency || currency)}`}
+            />
             <AppText muted>
-              Spent: {summary?.spent?.toFixed(2) ?? '0'} · Remaining:{' '}
-              {summary?.remaining == null ? 'Set a budget' : summary.remaining.toFixed(2)}
+              Spent:{' '}
+              {formatMoneyAmount(summary?.spent ?? 0, budgetQuery.data?.budget?.currency || currency)}
+              {' · '}
+              Remaining:{' '}
+              {summary?.remaining == null
+                ? 'Set a budget'
+                : formatMoneyAmount(
+                    summary.remaining,
+                    budgetQuery.data?.budget?.currency || currency,
+                  )}
             </AppText>
             {budgetQuery.data?.budget ? (
               <AppText className="mt-2">
-                Total budget: {budgetQuery.data.budget.currency} {budgetQuery.data.budget.total}
+                Total budget:{' '}
+                {formatMoneyAmount(
+                  budgetQuery.data.budget.total,
+                  budgetQuery.data.budget.currency || currency,
+                )}
               </AppText>
             ) : null}
             <View className="mt-3 gap-2">
               {canEdit ? (
                 <Button
-                  label="Set $2000 budget"
+                  label={`Set ${formatMoneyAmount(2000, currency)} budget`}
                   variant="secondary"
                   loading={ensureBudget.isPending}
                   onPress={() => ensureBudget.mutate()}

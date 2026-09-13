@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { TripBudgetLevel, TripPace, TripPlanningMode } from '@/types/domain';
 import { defaultTripDates } from '@/utils/dates';
+import { useCurrencyStore } from '@/stores/currency-store';
 
 export const CREATE_TRIP_STEPS = [
   'destination',
@@ -68,7 +69,7 @@ function freshDraft(): CreateTripDraft {
     pace: 'balanced',
     interests: [],
     budgetLevel: 'mid_range',
-    homeCurrency: 'PHP',
+    homeCurrency: useCurrencyStore.getState().currency || 'PHP',
     transportPreferences: ['public_transport', 'walking'],
     walkingTolerance: 'medium',
     hotelChoice: 'later',

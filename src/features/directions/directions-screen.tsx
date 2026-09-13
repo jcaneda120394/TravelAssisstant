@@ -15,6 +15,7 @@ import type { DestinationSuggestion } from '@/services/geo/geocode.service';
 import { DEFAULT_MAP_CENTER } from '@/services/location/location.service';
 import { cacheRoute } from '@/services/offline/offline.service';
 import { formatDistanceMeters, formatDuration } from '@/utils/format';
+import { formatMoneyAmount } from '@/utils/display-money';
 import { analytics } from '@/lib/analytics';
 import { labelize } from '@/constants/preferences';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
@@ -588,7 +589,7 @@ export function DirectionsScreen() {
                           <AppText muted className="mt-0.5">
                             {formatDistanceMeters(distance)}
                             {route.estimatedCost != null
-                              ? ` · ~${route.currency ?? ''} ${route.estimatedCost}`
+                              ? ` · ~${formatMoneyAmount(route.estimatedCost, route.currency ?? 'USD')}`
                               : ''}
                             {route.walkingDistanceMeters > 0 &&
                             primaryMode(route) !== 'walking'

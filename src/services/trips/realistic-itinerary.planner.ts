@@ -10,6 +10,7 @@ import {
   isFreeOutdoorLandmark,
   isPaidAdmissionAttraction,
 } from '@/utils/place-price-estimate';
+import { formatMoneyAmount } from '@/utils/display-money';
 
 export type VisitProfile = 'theme_park' | 'major' | 'district' | 'quick' | 'meal' | 'hotel';
 
@@ -198,7 +199,7 @@ export function estimateRealisticFee(
       const amount = fromYenEstimate(10_000, currency);
       return {
         amount,
-        feeLabel: `Est. park ticket ~${currency} ${amount.toLocaleString()} (timed tickets may apply)`,
+        feeLabel: `Est. park ticket ~${formatMoneyAmount(amount, currency)} (timed tickets may apply)`,
       };
     }
     if (isPaidAdmissionAttraction(place)) {
@@ -215,14 +216,14 @@ export function estimateRealisticFee(
 
   if (kind === 'restaurant') {
     const amount = fromYenEstimate(1_500, currency);
-    return { amount, feeLabel: `Est. meal ~${currency} ${amount.toLocaleString()}` };
+    return { amount, feeLabel: `Est. meal ~${formatMoneyAmount(amount, currency)}` };
   }
   if (kind === 'shopping') {
     return { amount: 0, feeLabel: 'Entry free · shopping spend varies' };
   }
   if (kind === 'nightlife') {
     const amount = fromYenEstimate(2_000, currency);
-    return { amount, feeLabel: `Est. evening ~${currency} ${amount.toLocaleString()}` };
+    return { amount, feeLabel: `Est. evening ~${formatMoneyAmount(amount, currency)}` };
   }
   if (kind === 'hotel') {
     return { amount: 0, feeLabel: 'Lodging (separate from day spend)' };

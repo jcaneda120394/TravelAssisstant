@@ -13,6 +13,7 @@ import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography
 import { Pressable, View } from '@/components/ui/primitives';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useAuth } from '@/hooks/use-auth';
+import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
 import { analytics } from '@/lib/analytics';
 import { getErrorMessage } from '@/lib/errors/app-error';
@@ -27,6 +28,7 @@ import {
   TRAVEL_STYLES,
   useCreateTripStore,
 } from '@/stores/create-trip-store';
+import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
 import { addDaysIso } from '@/utils/dates';
 
 function Chip({
@@ -72,9 +74,12 @@ function StepperBar({ index, total }: { index: number; total: number }) {
 export function CreateTripScreen() {
   const router = useRouter();
   const { user, preferences } = useAuth();
+  const { currency: displayCurrency } = useDisplayCurrency();
   const scheme = useAppColorScheme();
   const insets = useSafeAreaInsets();
   const draft = useCreateTripStore();
+  const setDraftField = useCreateTripStore((state) => state.setField);
+  const draftHomeCurrency = useCreateTripStore((state) => state.homeCurrency);
   const step = CREATE_TRIP_STEPS[draft.stepIndex] ?? 'destination';
 
   useFocusEffect(
@@ -83,6 +88,13 @@ export function CreateTripScreen() {
       requireAuthForTrips(router, 'create trips');
       router.replace('/(tabs)');
     }, [router, user]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!displayCurrency || draftHomeCurrency === displayCurrency) return;
+      setDraftField('homeCurrency', displayCurrency);
+    }, [displayCurrency, draftHomeCurrency, setDraftField]),
   );
 
   const createMutation = useMutation({
@@ -337,13 +349,13 @@ export function CreateTripScreen() {
                 ))}
               </View>
               <TextField
-                label="Home currency"
+                label={`Home currency (${formatCurrencyWithSymbol(draft.homeCurrency)})`}
                 value={draft.homeCurrency}
                 onChangeText={(v) => draft.setField('homeCurrency', v.toUpperCase())}
                 autoCapitalize="characters"
               />
               <TextField
-                label="Total trip budget (optional)"
+                label={`Total trip budget (optional, ${draft.homeCurrency})`}
                 value={draft.totalBudget != null ? String(draft.totalBudget) : ''}
                 onChangeText={(v) =>
                   draft.setField('totalBudget', v.trim() ? Number(v.replace(/[^\d.]/g, '')) : undefined)
@@ -352,7 +364,7 @@ export function CreateTripScreen() {
                 placeholder="e.g. 150000"
               />
               <TextField
-                label="Daily budget (optional)"
+                label={`Daily budget (optional, ${draft.homeCurrency})`}
                 value={draft.dailyBudget != null ? String(draft.dailyBudget) : ''}
                 onChangeText={(v) =>
                   draft.setField('dailyBudget', v.trim() ? Number(v.replace(/[^\d.]/g, '')) : undefined)

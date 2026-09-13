@@ -16,6 +16,7 @@ import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useLocationStore } from '@/stores/location-store';
 import { getErrorMessage } from '@/lib/errors/app-error';
+import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
 import type { GeoPoint } from '@/types/domain';
 
 export function HotelsScreen() {
@@ -88,7 +89,7 @@ export function HotelsScreen() {
       >
         <SectionHeader
           title="Hotels"
-          subtitle={`Prices in ${currency} · search by location or city`}
+          subtitle={`Prices in ${formatCurrencyWithSymbol(currency)} · search by location or city`}
         />
         <Card className="mb-4">
           <CityAutocomplete

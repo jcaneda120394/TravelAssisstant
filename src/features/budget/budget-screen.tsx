@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert } from 'react-native';
 
 import { ResponsiveScrollView } from '@/components/layout/responsive-scroll-view';
 import { TextField } from '@/components/forms/text-field';
@@ -21,7 +20,10 @@ import {
 import type { ExpenseCategory } from '@/types/domain';
 import { analytics } from '@/lib/analytics';
 import { getErrorMessage } from '@/lib/errors/app-error';
+import { notifyAlert } from '@/lib/notify-alert';
+import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
 import { labelize } from '@/constants/preferences';
+import { formatMoneyAmount } from '@/utils/display-money';
 
 const CATEGORIES = [
   'flights',
@@ -86,7 +88,7 @@ export function BudgetScreen() {
       void queryClient.invalidateQueries({ queryKey: ['budget-screen'] });
       setAmount('');
     },
-    onError: (error) => Alert.alert('Expense failed', getErrorMessage(error)),
+    onError: (error) => notifyAlert('Expense failed', getErrorMessage(error)),
   });
 
   if (activeTripId === 'none') {
@@ -105,21 +107,45 @@ export function BudgetScreen() {
   return (
     <Screen>
       <ResponsiveScrollView className="flex-1 px-5 pt-4" testID="screen-budget">
-        <SectionHeader title="Trip budget" subtitle={`Home currency ${homeCurrency}`} />
+        <SectionHeader
+          title="Trip budget"
+          subtitle={`Home currency ${formatCurrencyWithSymbol(homeCurrency)}`}
+        />
         <Card className="mb-4">
           <AppText className="font-sans-semibold text-lg">
-            Spent {summary?.spent.toFixed(2) ?? '0'} / {query.data?.budget?.total ?? '—'}
+            Spent{' '}
+            {formatMoneyAmount(summary?.spent ?? 0, query.data?.budget?.currency || homeCurrency)}
+            {' / '}
+            {query.data?.budget
+              ? formatMoneyAmount(query.data.budget.total, query.data.budget.currency || homeCurrency)
+              : '—'}
           </AppText>
           <AppText muted className="mt-1">
-            Remaining: {summary?.remaining == null ? '—' : summary.remaining.toFixed(2)}
+            Remaining:{' '}
+            {summary?.remaining == null
+              ? '—'
+              : formatMoneyAmount(
+                  summary.remaining,
+                  query.data?.budget?.currency || homeCurrency,
+                )}
           </AppText>
-          <TextField label="Trip budget total" value={budgetTotal} onChangeText={setBudgetTotal} keyboardType="decimal-pad" />
+          <TextField
+            label={`Trip budget total (${formatCurrencyWithSymbol(homeCurrency)})`}
+            value={budgetTotal}
+            onChangeText={setBudgetTotal}
+            keyboardType="decimal-pad"
+          />
           <Button label="Save budget" loading={saveBudget.isPending} onPress={() => saveBudget.mutate()} />
         </Card>
 
         <Card className="mb-4">
           <SectionHeader title="Add expense" />
-          <TextField label="Amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
+          <TextField
+            label={`Amount (${formatCurrencyWithSymbol(homeCurrency)})`}
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="decimal-pad"
+          />
           <ChipSelect
             options={CATEGORIES}
             values={[category]}
@@ -136,8 +162,8 @@ export function BudgetScreen() {
           <SectionHeader title="Recent expenses" />
           {query.data?.expenses.map((expense) => (
             <AppText key={expense.id} muted className="mb-2">
-              {expense.date} · {labelize(expense.category)} · {expense.amountHome.toFixed(2)}{' '}
-              {expense.homeCurrency}
+              {expense.date} · {labelize(expense.category)} ·{' '}
+              {formatMoneyAmount(expense.amountHome, expense.homeCurrency || homeCurrency)}
             </AppText>
           ))}
         </Card>

@@ -31,11 +31,13 @@ export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean 
     try {
       await getCurrentPosition();
       setStatus('ready');
+      return true;
     } catch (err) {
       const message = getErrorMessage(err);
       const denied = /denied|permission/i.test(message);
       setError(message);
       setStatus(denied ? 'denied' : 'error');
+      return false;
     }
   }, []);
 

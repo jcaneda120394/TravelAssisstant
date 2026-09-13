@@ -118,7 +118,21 @@ export function CityAutocomplete({
     <View className={compact ? 'z-20' : 'mb-4 z-10'} testID={testID}>
       {nearLabel && !compact ? (
         <Pressable
-          onPress={() => apply(nearLabel.split(',')[0] ?? nearLabel)}
+          onPress={() => {
+            const short = nearLabel.split(',')[0]?.trim() || nearLabel;
+            if (near && Number.isFinite(near.latitude) && Number.isFinite(near.longitude)) {
+              apply(short, {
+                id: `near-${near.latitude.toFixed(4)}-${near.longitude.toFixed(4)}`,
+                label: nearLabel,
+                shortName: short,
+                kind: 'city',
+                latitude: near.latitude,
+                longitude: near.longitude,
+              });
+              return;
+            }
+            apply(short);
+          }}
           className={`mb-3 rounded-2xl border px-3 py-2 ${
             scheme === 'dark' ? 'border-brand-700 bg-brand-900' : 'border-brand-200 bg-brand-50'
           }`}

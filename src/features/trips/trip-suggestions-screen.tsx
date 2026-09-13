@@ -25,6 +25,7 @@ import {
 import { BUDGET_LEVELS, TRAVEL_STYLES } from '@/stores/create-trip-store';
 import type { TripBudgetLevel, TripPace } from '@/types/domain';
 import { addDaysIso, eachDayBetween } from '@/utils/dates';
+import { formatMoneyAmount } from '@/utils/display-money';
 
 function Chip({
   label,
@@ -61,6 +62,7 @@ function SuggestionCard({
   onUse,
   onSave,
   using,
+  canUse,
 }: {
   template: TripTemplate;
   onView: () => void;
@@ -68,6 +70,7 @@ function SuggestionCard({
   onUse: () => void;
   onSave: () => void;
   using?: boolean;
+  canUse: boolean;
 }) {
   const scheme = useAppColorScheme();
   return (
@@ -96,12 +99,16 @@ function SuggestionCard({
         <View className="min-w-0 basis-[46%] flex-1">
           <Button label="Customize" variant="secondary" onPress={onCustomize} />
         </View>
-        <View className="min-w-0 basis-[46%] flex-1">
-          <Button label="Use this trip" loading={using} onPress={onUse} />
-        </View>
-        <View className="min-w-0 basis-[46%] flex-1">
-          <Button label="Save" variant="ghost" loading={using} onPress={onSave} />
-        </View>
+        {canUse ? (
+          <>
+            <View className="min-w-0 basis-[46%] flex-1">
+              <Button label="Use this trip" loading={using} onPress={onUse} />
+            </View>
+            <View className="min-w-0 basis-[46%] flex-1">
+              <Button label="Save" variant="ghost" loading={using} onPress={onSave} />
+            </View>
+          </>
+        ) : null}
       </View>
     </View>
   );
@@ -250,11 +257,24 @@ export function TripSuggestionsScreen() {
             ) : null}
             {viewing.estimatedBudget ? (
               <AppText muted className="mt-2 text-xs">
-                Rough estimate ({viewing.estimatedBudget.currency}): lodging{' '}
-                {viewing.estimatedBudget.accommodation.toLocaleString()}, food{' '}
-                {viewing.estimatedBudget.food.toLocaleString()}, transport{' '}
-                {viewing.estimatedBudget.transport.toLocaleString()}, attractions{' '}
-                {viewing.estimatedBudget.attractions.toLocaleString()}. Not guaranteed prices.
+                Rough estimate: lodging{' '}
+                {formatMoneyAmount(
+                  viewing.estimatedBudget.accommodation,
+                  viewing.estimatedBudget.currency,
+                )}
+                , food{' '}
+                {formatMoneyAmount(viewing.estimatedBudget.food, viewing.estimatedBudget.currency)},
+                transport{' '}
+                {formatMoneyAmount(
+                  viewing.estimatedBudget.transport,
+                  viewing.estimatedBudget.currency,
+                )}
+                , attractions{' '}
+                {formatMoneyAmount(
+                  viewing.estimatedBudget.attractions,
+                  viewing.estimatedBudget.currency,
+                )}
+                . Not guaranteed prices.
               </AppText>
             ) : null}
           </Card>
@@ -344,14 +364,20 @@ export function TripSuggestionsScreen() {
               </View>
             ) : null}
             <View className="mt-3 gap-2">
-              <Button
-                label="Use this trip"
-                loading={useMutationHook.isPending}
-                onPress={() => {
-                  if (!requireAuthToSave(router, { actionLabel: 'save this trip' })) return;
-                  useMutationHook.mutate(viewing);
-                }}
-              />
+              {user ? (
+                <Button
+                  label="Use this trip"
+                  loading={useMutationHook.isPending}
+                  onPress={() => {
+                    if (!requireAuthToSave(router, { actionLabel: 'save this trip' })) return;
+                    useMutationHook.mutate(viewing);
+                  }}
+                />
+              ) : (
+                <AppText muted className="text-sm">
+                  Sign in to use this trip and save it to your account.
+                </AppText>
+              )}
               <Button
                 label="Generate live places instead"
                 variant="secondary"
@@ -517,6 +543,7 @@ export function TripSuggestionsScreen() {
             <SuggestionCard
               key={tpl.id}
               template={tpl}
+              canUse={Boolean(user)}
               using={useMutationHook.isPending && useMutationHook.variables?.id === tpl.id}
               onView={() => {
                 setViewId(tpl.id);
@@ -549,7 +576,9 @@ export function TripSuggestionsScreen() {
         {params.fromDraft === '1' ? (
           <Card className="mt-2">
             <AppText muted className="text-sm">
-              Filters prefilled from your Create Trip draft. Customize a template, then Use this trip.
+              {user
+                ? 'Filters prefilled from your Create Trip draft. Customize a template, then Use this trip.'
+                : 'Filters prefilled from your Create Trip draft. Sign in to use a template.'}
             </AppText>
           </Card>
         ) : null}

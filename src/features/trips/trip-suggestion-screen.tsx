@@ -16,6 +16,7 @@ import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { requireAuthToSave } from '@/features/auth/require-auth';
 import { useAuth } from '@/hooks/use-auth';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
+import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { getErrorMessage } from '@/lib/errors/app-error';
@@ -23,6 +24,7 @@ import { notifyAlert } from '@/lib/notify-alert';
 import { analytics } from '@/lib/analytics';
 import type { DestinationSuggestion } from '@/services/geo/geocode.service';
 import { listTrips } from '@/services/trips/trips.service';
+import { useLocationStore } from '@/stores/location-store';
 import {
   generateTripSuggestion,
   saveSuggestionAsNewTrip,
@@ -41,7 +43,7 @@ export function TripSuggestionScreen() {
   const { user, preferences } = useAuth();
   const { currency } = useDisplayCurrency();
   const queryClient = useQueryClient();
-  const { coords, label, hasLocation } = useEnsureLocation({ auto: true });
+  const { coords, label, hasLocation, locate, isLocating } = useEnsureLocation({ auto: true });
   const defaults = useMemo(() => defaultTripDates(), []);
 
   const [city, setCity] = useState(label?.split(',')[0] ?? '');
@@ -211,14 +213,25 @@ export function TripSuggestionScreen() {
     }
   };
 
-  const useMyLocation = () => {
-    if (!coords) {
-      notifyAlert('Location needed', 'Enable location or search a city.');
+  const useMyLocation = async () => {
+    const ok = await locate();
+    const state = useLocationStore.getState();
+    if (!state.coords) {
+      notifyAlert(
+        'Location needed',
+        'Allow location access in your browser or device settings, or search a city instead.',
+      );
       return;
     }
-    const short = label?.split(',')[0] ?? 'Near me';
+    const short = state.label?.split(',')[0]?.trim() || state.city || 'Near me';
     setCity(short);
-    setPickedLocation(coords);
+    setPickedLocation({ ...state.coords });
+    if (!ok) {
+      notifyAlert(
+        'Using last known location',
+        'Could not refresh GPS right now. Destination was filled from your last saved location.',
+      );
+    }
   };
 
   const hotelNear =
@@ -263,10 +276,16 @@ export function TripSuggestionScreen() {
                 onChange={setCity}
                 onSelect={onSelectCity}
                 nearLabel={label}
+                near={coords}
                 placeholder="e.g. Hong Kong, Malolos, Tokyo"
               />
               <View className="mb-3">
-                <Button label="Use my current location" variant="secondary" onPress={useMyLocation} />
+                <Button
+                  label="Use my current location"
+                  variant="secondary"
+                  loading={isLocating}
+                  onPress={() => void useMyLocation()}
+                />
               </View>
             </>
           )}
@@ -381,7 +400,7 @@ export function TripSuggestionScreen() {
           <>
             <SectionHeader
               title={plan.destinationLabel}
-              subtitle={`${plan.startDate} → ${plan.endDate} · ${plan.style} · ${plan.currency}`}
+              subtitle={`${plan.startDate} → ${plan.endDate} · ${plan.style} · ${formatCurrencyWithSymbol(plan.currency)}`}
             />
             {plan.hotel ? (
               <Card className="mb-4">

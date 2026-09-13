@@ -8,17 +8,9 @@ import { AppError, toAppError } from '@/lib/errors/app-error';
 import type { DestinationSuggestion } from '@/services/geo/geocode.service';
 
 /**
- * Optional quick-pick for travelers who want Bulacan as a planning base.
- * Not applied automatically — use "Use Malolos, Bulacan" in the location picker.
+ * Neutral map center when no GPS/city is set yet (not applied as a user location).
  */
-export const HOME_LOCATION = {
-  coords: { latitude: 14.8433, longitude: 120.8114 } satisfies GeoPoint,
-  city: 'Malolos',
-  country: 'Philippines',
-  label: 'Malolos, Bulacan, Philippines',
-} as const;
-
-const FALLBACK: GeoPoint = HOME_LOCATION.coords;
+const FALLBACK: GeoPoint = { latitude: 14.5995, longitude: 120.9842 };
 
 /** When traveler picks a whole country, snap Discover to a major city so results aren't empty. */
 const COUNTRY_HUBS: Record<string, { city: string; latitude: number; longitude: number }> = {
@@ -147,19 +139,8 @@ async function labelFromCoords(coords: GeoPoint): Promise<{
   };
 }
 
-/** Apply Malolos / Bulacan as the active planning location. */
-export async function applyHomeLocation(): Promise<GeoPoint> {
-  useLocationStore.getState().setManualLocation({
-    coords: HOME_LOCATION.coords,
-    city: HOME_LOCATION.city,
-    country: HOME_LOCATION.country,
-    label: HOME_LOCATION.label,
-  });
-  return HOME_LOCATION.coords;
-}
-
 /**
- * Legacy helper — no longer remaps SF → Malolos automatically.
+ * Legacy helper — no longer remaps SF automatically.
  * Precise GPS must keep real coordinates (including Simulator SF).
  */
 export function replaceSimulatorSanFranciscoIfNeeded(): boolean {

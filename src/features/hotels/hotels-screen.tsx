@@ -23,7 +23,7 @@ export function HotelsScreen() {
   const { currency } = useDisplayCurrency();
   const locationLabel = useLocationStore((state) => state.label);
   const coords = useLocationStore((state) => state.coords);
-  const defaultCity = locationLabel?.split(',')[0] ?? 'Malolos';
+  const defaultCity = locationLabel?.split(',')[0] ?? 'Nearby';
   const [city, setCity] = useState(defaultCity);
   const [checkIn, setCheckIn] = useState(new Date().toISOString().slice(0, 10));
   const [checkOut, setCheckOut] = useState(

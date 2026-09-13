@@ -20,7 +20,6 @@ import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
 import { formatCurrencyWithSymbol } from '@/constants/fx-currencies';
-import { labelize } from '@/constants/preferences';
 import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
 import { useAuth } from '@/hooks/use-auth';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
@@ -217,12 +216,26 @@ export function HomeScreen() {
           }}
         >
           <PageContainer>
-            <AppText
-              inverse
-              className="font-display-bold text-3xl leading-9 tracking-tight text-white"
-            >
-              {env.appName}
-            </AppText>
+            <View className="flex-row items-start justify-between gap-3">
+              <AppText
+                inverse
+                className="flex-1 font-display-bold text-3xl leading-9 tracking-tight text-white"
+              >
+                {env.appName}
+              </AppText>
+              <Pressable
+                onPress={() => setCurrencyPickerOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Change display currency"
+                className="mt-1 flex-row items-center gap-1 rounded-full border border-white/30 bg-white/15 px-2.5 py-1"
+                testID="home-change-currency"
+              >
+                <AppText inverse className="text-xs font-sans-semibold text-white">
+                  {formatCurrencyWithSymbol(currency)}
+                </AppText>
+                <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.9)" />
+              </Pressable>
+            </View>
             <AppText inverse className="mt-3 font-sans-semibold text-lg leading-6 text-white/95">
               {greetingForNow()}
               {firstName ? `, ${firstName}` : ''}
@@ -234,23 +247,6 @@ export function HomeScreen() {
             <AppText inverse className="mt-4 text-sm font-sans-medium leading-5 text-white">
               {locationLine}
             </AppText>
-            <Pressable
-              onPress={() => setCurrencyPickerOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Change display currency"
-              className="mt-3 flex-row items-center gap-1.5 self-start rounded-full border border-white/30 bg-white/15 px-3 py-1.5"
-              testID="home-change-currency"
-            >
-              <AppText inverse className="text-sm font-sans-semibold text-white">
-                {formatCurrencyWithSymbol(currency)}
-              </AppText>
-              {preferences?.budget_tier ? (
-                <AppText inverse className="text-xs text-white/75">
-                  · {labelize(preferences.budget_tier)}
-                </AppText>
-              ) : null}
-              <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.9)" />
-            </Pressable>
 
             <AppText inverse className="mt-2 text-xs text-white/65">
               {providers.usingMocks ? 'Mock' : 'Live'} data
@@ -301,12 +297,13 @@ export function HomeScreen() {
               <SectionHeader
                 eyebrow="Simulator"
                 title="GPS is San Francisco"
-                subtitle="Your device GPS isn’t Bulacan yet"
+                subtitle="Your device GPS isn’t your real city yet"
               />
               <AppText muted className="mb-3">
-                Tap Choose city and pick Malolos / Bulacan, or set a custom simulator location.
+                Tap Choose city to search for your city, or set a custom simulator location in
+                Settings.
               </AppText>
-              <Button label="Choose Bulacan / city" onPress={() => setLocationPickerOpen(true)} />
+              <Button label="Choose city" onPress={() => setLocationPickerOpen(true)} />
             </Card>
           ) : null}
 

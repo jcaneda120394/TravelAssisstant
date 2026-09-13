@@ -11,7 +11,6 @@ type LocateStatus = 'idle' | 'loading' | 'ready' | 'denied' | 'error';
 /**
  * Asks for location permission and refreshes current coordinates.
  * Manual city picks are kept; otherwise GPS is refreshed on mount.
- * Does not force Malolos — use the location picker for that.
  */
 export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean }) {
   const auto = options?.auto ?? true;

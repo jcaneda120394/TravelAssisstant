@@ -16,7 +16,6 @@ import {
   clearSavedLocation,
   getCurrentPosition,
   setLocationFromSuggestion,
-  applyHomeLocation,
 } from '@/services/location/location.service';
 import { getErrorMessage } from '@/lib/errors/app-error';
 
@@ -34,15 +33,6 @@ const QUICK_PICKS: DestinationSuggestion[] = [
     kind: 'city',
     latitude: 14.8139,
     longitude: 121.0453,
-    countryCode: 'PH',
-  },
-  {
-    id: 'quick-malolos',
-    label: 'Malolos, Bulacan, Philippines',
-    shortName: 'Malolos',
-    kind: 'city',
-    latitude: 14.8433,
-    longitude: 120.8114,
     countryCode: 'PH',
   },
   {
@@ -223,25 +213,10 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     }
   };
 
-  const applyHome = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await applyHomeLocation();
-      onChanged?.();
-      onClose();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const applyGps = async () => {
     setBusy(true);
     setError(null);
     try {
-      // Uses real device/simulator GPS — does not force Malolos.
       await getCurrentPosition();
       onChanged?.();
       onClose();
@@ -259,7 +234,7 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
           <View className="mb-3 flex-row items-center justify-between">
             <SectionHeader
               title="Set your location"
-              subtitle="GPS or search any city worldwide"
+              subtitle="Use precise GPS or search any city"
             />
             <Pressable onPress={onClose} hitSlop={12}>
               <AppText className="font-sans-semibold text-brand-700">Close</AppText>
@@ -273,22 +248,14 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
           >
             <Card className="mb-4">
               <AppText muted className="mb-3 text-sm">
-                With location permission on, we use your precise GPS and reverse-geocode the exact
-                city/area. Malolos is only used when you tap that button (handy on the simulator).
+                With location permission on, we use your device GPS and reverse-geocode the exact
+                city or area around you.
               </AppText>
               <Button
-                label="Use Malolos, Bulacan"
+                label="Use precise device GPS"
                 loading={busy}
-                onPress={() => void applyHome()}
+                onPress={() => void applyGps()}
               />
-              <View className="mt-2">
-                <Button
-                  label="Use precise device GPS"
-                  variant="secondary"
-                  loading={busy}
-                  onPress={() => void applyGps()}
-                />
-              </View>
               <View className="mt-2">
                 <Button
                   label="Clear saved location"

@@ -211,7 +211,8 @@ export function HomeScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: scrollBottomPad, maxWidth: '100%' }}
-        style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}
+        style={{ width: '100%', maxWidth: '100%' }}
+        // Do not set overflow:'hidden' here — it blocks vertical scroll on mobile web.
       >
         <LinearGradient
           colors={[...gradient]}
@@ -273,7 +274,7 @@ export function HomeScreen() {
             >
               <View className={isDesktop ? 'min-w-0 flex-1' : 'w-full min-w-0'}>
                 <Button
-                  label="Choose city"
+                  label={hasLocation ? 'Change city' : 'Choose city'}
                   variant="secondary"
                   onPress={() => setLocationPickerOpen(true)}
                 />
@@ -454,7 +455,9 @@ export function HomeScreen() {
                   : 'Popular attractions near your location'
             }
           />
-          {hasLocation && attractionsQuery.isLoading && attractions.length === 0 ? (
+          {hasLocation &&
+          (attractionsQuery.isLoading || attractionsQuery.isFetching) &&
+          attractions.length === 0 ? (
             <View className="mb-4 gap-4">
               <Skeleton height={188} />
               <Skeleton height={188} />
@@ -495,7 +498,9 @@ export function HomeScreen() {
                   : 'Popular restaurants & cafes near your location'
             }
           />
-          {hasLocation && foodQuery.isLoading && foodPlaces.length === 0 ? (
+          {hasLocation &&
+          (foodQuery.isLoading || foodQuery.isFetching) &&
+          foodPlaces.length === 0 ? (
             <View className="mb-4 gap-4">
               <Skeleton height={188} />
               <Skeleton height={188} />

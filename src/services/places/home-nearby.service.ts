@@ -88,12 +88,12 @@ async function fetchHomePool(params: {
 
   const [nearby, photon] = await Promise.all([
     raceWithBudget(livePromise, LIVE_BUDGET_MS).then((v) => v ?? []),
-    photonPromise,
+    raceWithBudget(photonPromise, LIVE_BUDGET_MS).then((v) => v ?? []),
   ]);
 
-  // Always merge every source. Sparse OSM must not skip Photon/catalog.
-  const lateLive = nearby.length ? nearby : await livePromise;
-  return [...catalog, ...lateLive, ...photon];
+  // Never await the live provider again without a budget — a hung Places call
+  // left Home Discover stuck on loading after city changes on mobile web.
+  return [...catalog, ...nearby, ...photon];
 }
 
 /**

@@ -205,9 +205,10 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     setError(null);
     try {
       await setLocationFromSuggestion(item);
-      onChanged?.();
       setQuery('');
+      // Close first so mobile web never looks frozen on the sheet.
       onClose();
+      onChanged?.();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -220,8 +221,8 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     setError(null);
     try {
       await getCurrentPosition();
-      onChanged?.();
       onClose();
+      onChanged?.();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

@@ -137,7 +137,7 @@ export default function TabsLayout() {
   }
 
   return (
-    <View className="flex-1" style={{ minHeight: 0, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+    <View className="flex-1" style={{ minHeight: 0, width: '100%', maxWidth: '100%' }}>
       {tabs}
       <AiAssistantFab />
     </View>

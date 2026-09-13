@@ -26,20 +26,21 @@ Already set on project `travelassistant` for Production, Preview, and Developmen
 
 Optional: `EXPO_PUBLIC_POSTHOG_*`, `EXPO_PUBLIC_SENTRY_DSN`, `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`.
 
-### Place photos (Google Places)
+### Place search + photos (Google Places)
 
-Home / Explore cards prefer Google Places photos via the `place-photo` Edge Function.
+Home, Explore, Search, Map, trips, and AI prefer **Google Places** (nearby + text search + details + photos) via the `google-places` Edge Function. OSM/Photon remain as fallback when Google is unavailable.
 
 1. Enable **Places API (New)** on a Google Cloud project.
-2. Create an API key (prefer server restriction / no browser referrer for the Edge Function secret).
-3. Set the secret on Supabase:
+2. Create an API key (server key for the Edge Function secret).
+3. Set the secret and deploy:
 
 ```bash
-supabase secrets set GOOGLE_MAPS_API_KEY=your_key --project-ref viyzvgdvnxhddtobpyys
-supabase functions deploy place-photo --project-ref viyzvgdvnxhddtobpyys
+npx supabase secrets set GOOGLE_MAPS_API_KEY=your_key --project-ref viyzvgdvnxhddtobpyys
+npx supabase functions deploy google-places --project-ref viyzvgdvnxhddtobpyys
+npx supabase functions deploy place-photo --project-ref viyzvgdvnxhddtobpyys
 ```
 
-Optional client fallback: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (restrict by HTTP referrer to your Vercel domain). Without either key, cards fall back to Wikimedia / map preview.
+Optional client fallback: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (restrict by HTTP referrer to your Vercel domain). Without a key, the app keeps using OSM/Photon + Wikimedia/map previews.
 
 Rebuild after changing env vars (`EXPO_PUBLIC_*` are inlined at build time).
 

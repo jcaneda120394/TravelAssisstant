@@ -70,7 +70,7 @@ function freeEstimate(currency: string, label = 'Free entry'): PlacePriceEstimat
   };
 }
 
-function unknownEstimate(currency: string, label = 'Confirm live price on site'): PlacePriceEstimate {
+function unknownEstimate(currency: string, label = 'Price varies'): PlacePriceEstimate {
   return {
     min: 0,
     max: 0,
@@ -95,7 +95,7 @@ function rangedEstimate(
     currency: cur,
     unit,
     isEstimate: true,
-    label: `Est. ${formatAmount(min, cur)}–${formatAmount(max, cur).replace(`${cur} `, '')}${unitSuffix(unit)} · confirm live`,
+    label: `Est. ${formatAmount(min, cur)}–${formatAmount(max, cur).replace(`${cur} `, '')}${unitSuffix(unit)}`,
   };
 }
 
@@ -240,7 +240,7 @@ export function estimatePlacePrice(
       return rangedEstimate(paidAttractionBandUsd(place), cur, 'ticket');
     }
     // Unknown attraction — do not invent a ticket fee.
-    return unknownEstimate(cur, 'No ticket listed · confirm on site');
+    return unknownEstimate(cur, 'No ticket listed');
   }
 
   if (category === 'park' || category === 'beach' || category === 'temple') {
@@ -325,7 +325,7 @@ export function applyOsmPriceAndStars(
   }
 
   if (/^yes$/i.test(fee)) {
-    next = { ...next, priceRange: 'Paid entry (confirm live price)' };
+    next = { ...next, priceRange: 'Paid entry' };
     return next;
   }
 

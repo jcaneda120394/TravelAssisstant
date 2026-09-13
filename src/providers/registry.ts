@@ -12,6 +12,8 @@ import { NativeMapsProvider } from '@/providers/maps/native-maps.provider';
 import type { MapsProvider } from '@/providers/maps/maps.provider';
 import { MockPlacesProvider } from '@/providers/places/mock-places.provider';
 import { OsmPlacesProvider } from '@/providers/places/osm-places.provider';
+import { GooglePlacesProvider } from '@/providers/places/google-places.provider';
+import { HybridPlacesProvider } from '@/providers/places/hybrid-places.provider';
 import type { PlacesProvider } from '@/providers/places/places.provider';
 import { MockTransportProvider } from '@/providers/transport/mock-transport.provider';
 import { OsrmTransportProvider } from '@/providers/transport/osrm-transport.provider';
@@ -52,7 +54,8 @@ function createMockRegistry(): ProviderRegistry {
 
 function createLiveRegistry(): ProviderRegistry {
   return {
-    places: new OsmPlacesProvider(),
+    // Google Places first for every search surface; OSM/Photon fill gaps.
+    places: new HybridPlacesProvider(new GooglePlacesProvider(), new OsmPlacesProvider()),
     transport: new OsrmTransportProvider(),
     hotels: new OsmHotelProvider(),
     weather: new OpenMeteoWeatherProvider(),

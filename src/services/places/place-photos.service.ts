@@ -336,8 +336,8 @@ async function fetchGooglePlacePhoto(
     // 1) Supabase Edge Function keeps the Places API key server-side.
     if (env.isSupabaseConfigured && supabase) {
       try {
-        const { data, error } = await supabase.functions.invoke<GooglePhotoPayload>('place-photo', {
-          body,
+        const { data, error } = await supabase.functions.invoke<GooglePhotoPayload>('google-places', {
+          body: { action: 'photo', ...body },
         });
         if (!error && data?.photo?.url) {
           return {

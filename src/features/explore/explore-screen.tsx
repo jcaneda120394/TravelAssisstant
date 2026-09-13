@@ -184,7 +184,7 @@ export function ExploreScreen() {
   const query = useQuery({
     queryKey: [
       'nearby',
-      'explore-v5',
+      'explore-v6-google',
       coords?.latitude,
       coords?.longitude,
       radiusMeters,

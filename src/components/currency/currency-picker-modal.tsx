@@ -47,7 +47,7 @@ export function CurrencyPickerModal({ visible, currency, onClose, onSelect }: Pr
           />
           <AppText muted className="mb-4 text-xs leading-5">
             Selected: {formatFxCurrencyName(currency)} ({formatCurrencyWithSymbol(currency)}).
-            Estimates only — confirm live prices when booking.
+            Estimates only — check current prices when booking.
           </AppText>
           <Button label="Done" onPress={onClose} />
         </View>

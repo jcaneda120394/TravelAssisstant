@@ -198,7 +198,7 @@ export function estimateRealisticFee(
       const amount = fromYenEstimate(10_000, currency);
       return {
         amount,
-        feeLabel: `Est. park ticket ~${currency} ${amount.toLocaleString()} (confirm live price; timed tickets)`,
+        feeLabel: `Est. park ticket ~${currency} ${amount.toLocaleString()} (timed tickets may apply)`,
       };
     }
     if (isPaidAdmissionAttraction(place)) {
@@ -208,9 +208,9 @@ export function estimateRealisticFee(
       }
     }
     if (place.category === 'temple' || place.category === 'park' || place.category === 'viewpoint') {
-      return { amount: 0, feeLabel: 'Often free / small donation — confirm on site' };
+      return { amount: 0, feeLabel: 'Often free / small donation' };
     }
-    return { amount: 0, feeLabel: 'No ticket listed · confirm on site' };
+    return { amount: 0, feeLabel: 'No ticket listed' };
   }
 
   if (kind === 'restaurant') {

@@ -9,19 +9,32 @@ import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useAuth } from '@/hooks/use-auth';
+import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { providers } from '@/providers/registry';
 import { listTrips } from '@/services/trips/trips.service';
 
 export function SearchScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { coords } = useEnsureLocation({ auto: true });
   const [query, setQuery] = useState('');
   const debounced = useDebouncedValue(query, 400);
 
   const placesQuery = useQuery({
-    queryKey: ['search-places', debounced],
+    queryKey: [
+      'search-places',
+      'google-v1',
+      debounced,
+      coords?.latitude,
+      coords?.longitude,
+    ],
     enabled: debounced.trim().length > 1,
-    queryFn: () => providers.places.searchPlaces({ query: debounced, limit: 12 }),
+    queryFn: () =>
+      providers.places.searchPlaces({
+        query: debounced,
+        limit: 12,
+        location: coords ?? undefined,
+      }),
     staleTime: 60_000,
   });
 

@@ -49,10 +49,12 @@ async function searchClientFallbackProviders(
   input: GetTravelImageInput,
   queries: string[],
 ): Promise<TravelImage | null> {
-  // Keys must stay server-side — client only uses Openverse + Wikimedia.
-  for (const query of queries) {
+  // Keep client fallback short — long ladders leave itinerary UI stuck on “Loading photo…”.
+  const shortQueries = queries.slice(0, 2);
+
+  for (const query of shortQueries) {
     log('Trying Openverse:', query);
-    const openverse = await searchOpenverseImages(query, 10);
+    const openverse = await searchOpenverseImages(query, 8);
     const bestOpen = pickBestCandidate(
       openverse,
       query,
@@ -68,9 +70,9 @@ async function searchClientFallbackProviders(
     log('Openverse returned no result.');
   }
 
-  for (const query of queries) {
+  for (const query of shortQueries) {
     log('Trying Wikimedia:', query);
-    const wiki = await searchWikimediaImages(query, 10);
+    const wiki = await searchWikimediaImages(query, 8);
     const bestWiki = pickBestCandidate(
       wiki,
       query,
@@ -111,42 +113,57 @@ export async function getTravelImage(input: GetTravelImageInput): Promise<Travel
   const queries = buildImageQueryLadder(input);
   log('Search ladder:', queries.slice(0, 4).join(' | '));
 
-  if (!input.bypassCache) {
-    const memory = getMemoryTravelImage(input);
-    if (memory && (memory.provider === 'fallback' || edgeImageRelevant(memory, input))) {
-      log('Memory cache hit:', memory.provider);
-      return memory;
+  const resolve = async (): Promise<TravelImage> => {
+    if (!input.bypassCache) {
+      const memory = getMemoryTravelImage(input);
+      if (memory && (memory.provider === 'fallback' || edgeImageRelevant(memory, input))) {
+        log('Memory cache hit:', memory.provider);
+        return memory;
+      }
+      const db = await getDbTravelImage(input);
+      if (db && edgeImageRelevant(db, input)) {
+        log('Cached image:', db.provider);
+        setMemoryTravelImage(input, db);
+        return db;
+      }
     }
-    const db = await getDbTravelImage(input);
-    if (db && edgeImageRelevant(db, input)) {
-      log('Cached image:', db.provider);
-      setMemoryTravelImage(input, db);
-      return db;
+
+    const fromEdge = await resolveTravelImageViaEdge(input);
+    if (fromEdge?.url && edgeImageRelevant(fromEdge, input)) {
+      log(`${fromEdge.provider} found image (edge).`);
+      setMemoryTravelImage(input, fromEdge);
+      void saveDbTravelImage(input, fromEdge);
+      return fromEdge;
     }
-  }
+    if (fromEdge?.url) {
+      log('Edge image rejected as irrelevant to place:', input.name);
+    }
 
-  const fromEdge = await resolveTravelImageViaEdge(input);
-  if (fromEdge?.url && edgeImageRelevant(fromEdge, input)) {
-    log(`${fromEdge.provider} found image (edge).`);
-    setMemoryTravelImage(input, fromEdge);
-    void saveDbTravelImage(input, fromEdge);
-    return fromEdge;
-  }
-  if (fromEdge?.url) {
-    log('Edge image rejected as irrelevant to place:', input.name);
-  }
+    const fromClient = await searchClientFallbackProviders(input, queries);
+    if (fromClient) {
+      setMemoryTravelImage(input, fromClient);
+      void saveDbTravelImage(input, fromClient);
+      return fromClient;
+    }
 
-  const fromClient = await searchClientFallbackProviders(input, queries);
-  if (fromClient) {
-    setMemoryTravelImage(input, fromClient);
-    void saveDbTravelImage(input, fromClient);
-    return fromClient;
-  }
+    log('All providers failed — using application fallback.');
+    return buildFallbackTravelImage(input, primaryQuery);
+  };
 
-  log('All providers failed — using application fallback.');
   const fallback = buildFallbackTravelImage(input, primaryQuery);
-  setMemoryTravelImage(input, fallback);
-  return fallback;
+  try {
+    const result = await Promise.race([
+      resolve(),
+      new Promise<TravelImage>((settle) => {
+        setTimeout(() => settle(fallback), 12_000);
+      }),
+    ]);
+    setMemoryTravelImage(input, result);
+    return result;
+  } catch {
+    setMemoryTravelImage(input, fallback);
+    return fallback;
+  }
 }
 
 /**

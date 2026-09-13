@@ -1,5 +1,5 @@
 import { upsertBudget } from '@/services/budget/budget.service';
-import { addItineraryItem } from '@/services/itinerary/itinerary.service';
+import { addItineraryItemsBatch } from '@/services/itinerary/itinerary.service';
 import { upsertItineraryDay } from '@/services/trips/itinerary-days.service';
 import { addTripAccommodation } from '@/services/trips/trip-accommodations.service';
 import { replaceTripDestinations } from '@/services/trips/trip-destinations.service';
@@ -265,40 +265,45 @@ export async function materializeCanonicalTrip(
     });
   }
 
-  if (destinations.length && (!input.existingTripId || input.patchExistingTrip)) {
-    await replaceTripDestinations(
-      trip.id,
-      destinations.map((dest, order) => ({
-        label: dest.label,
-        city: dest.city,
-        country: dest.country,
-        latitude: dest.latitude,
-        longitude: dest.longitude,
-        order: dest.order ?? order,
-        arrivalDay: dest.arrivalDay,
-        departureDay: dest.departureDay,
-      })),
-    );
-  }
-
-  for (const stay of input.stays ?? []) {
-    await addTripAccommodation({
-      ...stay,
-      tripId: trip.id,
-    });
-  }
-
-  if (input.budgetTotal != null && input.budgetTotal > 0) {
-    await upsertBudget({
-      tripId: trip.id,
-      total: input.budgetTotal,
-      currency: input.budgetCurrency ?? input.tripInput.homeCurrency ?? 'USD',
-    });
-  }
+  // Destinations / stays / budget are independent once the trip row exists.
+  await Promise.all([
+    destinations.length && (!input.existingTripId || input.patchExistingTrip)
+      ? replaceTripDestinations(
+          trip.id,
+          destinations.map((dest, order) => ({
+            label: dest.label,
+            city: dest.city,
+            country: dest.country,
+            latitude: dest.latitude,
+            longitude: dest.longitude,
+            order: dest.order ?? order,
+            arrivalDay: dest.arrivalDay,
+            departureDay: dest.departureDay,
+          })),
+        )
+      : Promise.resolve(),
+    Promise.all(
+      (input.stays ?? []).map((stay) =>
+        addTripAccommodation({
+          ...stay,
+          tripId: trip.id,
+        }),
+      ),
+    ),
+    input.budgetTotal != null && input.budgetTotal > 0
+      ? upsertBudget({
+          tripId: trip.id,
+          total: input.budgetTotal,
+          currency: input.budgetCurrency ?? input.tripInput.homeCurrency ?? 'USD',
+        })
+      : Promise.resolve(),
+  ]);
 
   const createdItems: ItineraryItem[] = [];
   const days = input.days ?? [];
 
+  // One list + one multi-row insert per day (not per activity). Days stay sequential
+  // so local-db get/set for itinerary_items cannot race.
   for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
     const planDay = days[dayIndex]!;
     const day = input.dayOverride?.[dayIndex] ?? planDay.day;
@@ -313,50 +318,49 @@ export async function materializeCanonicalTrip(
       summary: planDay.summary,
     });
 
-    const dayItemIds: Array<string | undefined> = [];
-    for (const [order, activity] of planDay.activities.entries()) {
+    const payloads = planDay.activities.map((activity, order) => {
       const kind = mapSuggestionKindToItineraryKind(activity.kind);
       const confidence =
         activity.dataConfidence ??
         (kind === 'transport' || activity.notes?.includes('live_data_required')
           ? 'live_data_required'
           : 'suggested');
-      try {
-        const saved = await addItineraryItem({
-          tripId: trip.id,
-          day,
-          startTime: activity.startTime,
-          endTime: activity.endTime,
-          title: activity.title,
-          kind,
-          placeId: activity.placeId,
-          placeName: activity.placeName,
-          latitude: activity.latitude,
-          longitude: activity.longitude,
-          estimatedCost: activity.estimatedCost,
-          currency: activity.currency,
-          notes: activityNotesWithFee(activity),
-          transportSummary: activity.transportSummary,
-          priority:
-            activity.priority ??
-            (kind === 'attraction' || kind === 'hotel' ? 'recommended' : 'optional'),
-          flexibility:
-            activity.flexibility ??
-            (kind === 'airport' || kind === 'check_in' || kind === 'check_out' || kind === 'flight'
-              ? 'fixed'
-              : 'flexible'),
-          itemStatus: activity.itemStatus ?? 'planned',
-          dataConfidence: confidence,
-          order,
-        });
-        createdItems.push(saved);
-        dayItemIds[order] = saved.id;
-      } catch (error) {
-        if (error instanceof Error && /overlap/i.test(error.message)) {
-          dayItemIds[order] = undefined;
-          continue;
-        }
-        throw error;
+      return {
+        tripId: trip.id,
+        day,
+        startTime: activity.startTime,
+        endTime: activity.endTime,
+        title: activity.title,
+        kind,
+        placeId: activity.placeId,
+        placeName: activity.placeName,
+        latitude: activity.latitude,
+        longitude: activity.longitude,
+        estimatedCost: activity.estimatedCost,
+        currency: activity.currency,
+        notes: activityNotesWithFee(activity),
+        transportSummary: activity.transportSummary,
+        priority:
+          activity.priority ??
+          (kind === 'attraction' || kind === 'hotel' ? 'recommended' : 'optional'),
+        flexibility:
+          activity.flexibility ??
+          (kind === 'airport' || kind === 'check_in' || kind === 'check_out' || kind === 'flight'
+            ? 'fixed'
+            : 'flexible'),
+        itemStatus: activity.itemStatus ?? 'planned',
+        dataConfidence: confidence,
+        order,
+      };
+    });
+
+    const savedItems = await addItineraryItemsBatch(payloads, { skipOverlaps: true });
+    createdItems.push(...savedItems);
+
+    const dayItemIds: Array<string | undefined> = planDay.activities.map(() => undefined);
+    for (const item of savedItems) {
+      if (item.order >= 0 && item.order < dayItemIds.length) {
+        dayItemIds[item.order] = item.id;
       }
     }
 

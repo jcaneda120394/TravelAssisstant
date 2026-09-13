@@ -3,7 +3,7 @@ import { isUuid, useCloudStorage } from '@/lib/storage/cloud';
 import { supabase } from '@/lib/supabase/client';
 import type { ItineraryItem, Place } from '@/types/domain';
 import { toIsoDate } from '@/utils/dates';
-import { assertNoTimeOverlap, findNextFreeSlot } from '@/utils/itinerary-time';
+import { assertNoTimeOverlap, findFlexibleFreeSlot } from '@/utils/itinerary-time';
 
 const KEY = 'itinerary_items';
 
@@ -74,8 +74,126 @@ export async function listItinerary(tripId: string, day?: string): Promise<Itine
     .sort((a, b) => a.order - b.order || a.startTime.localeCompare(b.startTime));
 }
 
+type AddItineraryItemInput = Omit<ItineraryItem, 'id' | 'order'> & { order?: number };
+
+function toItineraryInsertPayload(
+  input: AddItineraryItemInput,
+  sortOrder: number,
+  includeExtensions: boolean,
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    trip_id: input.tripId,
+    day: input.day,
+    start_time: input.startTime,
+    end_time: input.endTime,
+    title: input.title,
+    place_id: input.placeId ?? null,
+    place_name: input.placeName ?? null,
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
+    estimated_cost: input.estimatedCost ?? null,
+    currency: input.currency ?? null,
+    notes: input.notes ?? null,
+    transport_summary: input.transportSummary ?? null,
+    sort_order: sortOrder,
+  };
+  if (!includeExtensions) {
+    return base;
+  }
+  return {
+    ...base,
+    item_kind: input.kind ?? 'custom',
+    priority: input.priority ?? 'recommended',
+    flexibility: input.flexibility ?? 'flexible',
+    item_status: input.itemStatus ?? 'planned',
+    data_confidence: input.dataConfidence ?? 'suggested',
+  };
+}
+
+/**
+ * Insert many items for one trip/day with a single list + single insert.
+ * When skipOverlaps is true, overlapping inputs are dropped (materialize path).
+ * Otherwise the first overlap throws, matching addItineraryItem.
+ */
+export async function addItineraryItemsBatch(
+  inputs: AddItineraryItemInput[],
+  options?: { skipOverlaps?: boolean },
+): Promise<ItineraryItem[]> {
+  if (!inputs.length) {
+    return [];
+  }
+
+  const tripId = inputs[0]!.tripId;
+  const day = inputs[0]!.day;
+  if (inputs.some((item) => item.tripId !== tripId || item.day !== day)) {
+    throw new Error('addItineraryItemsBatch requires the same tripId and day');
+  }
+
+  const existing = await listItinerary(tripId, day);
+  const accepted: AddItineraryItemInput[] = [];
+  const known: ItineraryItem[] = [...existing];
+  const skipOverlaps = options?.skipOverlaps === true;
+
+  for (const input of inputs) {
+    try {
+      assertNoTimeOverlap({
+        existing: known,
+        startTime: input.startTime,
+        endTime: input.endTime,
+      });
+    } catch (error) {
+      if (skipOverlaps && error instanceof Error && /overlap/i.test(error.message)) {
+        continue;
+      }
+      throw error;
+    }
+    accepted.push(input);
+    // Placeholder so later batch members see this slot as taken.
+    known.push({
+      ...input,
+      id: `pending-${accepted.length}`,
+      order: input.order ?? existing.length + accepted.length - 1,
+    });
+  }
+
+  if (!accepted.length) {
+    return [];
+  }
+
+  if (useCloudStorage() && isUuid(tripId) && supabase) {
+    const withExt = accepted.map((input, index) =>
+      toItineraryInsertPayload(input, input.order ?? existing.length + index, true),
+    );
+    const { data, error } = await supabase.from('itinerary_items').insert(withExt).select('*');
+    if (!error && data) {
+      return (data as ItineraryRow[]).map(mapItem);
+    }
+
+    const legacy = accepted.map((input, index) =>
+      toItineraryInsertPayload(input, input.order ?? existing.length + index, false),
+    );
+    const { data: legacyData, error: legacyError } = await supabase
+      .from('itinerary_items')
+      .insert(legacy)
+      .select('*');
+    if (legacyError) {
+      throw error ?? legacyError;
+    }
+    return (legacyData as ItineraryRow[]).map(mapItem);
+  }
+
+  const items = await dbGet<ItineraryItem[]>(KEY, []);
+  const created = accepted.map((input, index) => ({
+    ...input,
+    id: createId('itin'),
+    order: input.order ?? existing.length + index,
+  }));
+  await dbSet(KEY, [...items, ...created]);
+  return created;
+}
+
 export async function addItineraryItem(
-  input: Omit<ItineraryItem, 'id' | 'order'> & { order?: number },
+  input: AddItineraryItemInput,
 ): Promise<ItineraryItem> {
   const existing = await listItinerary(input.tripId, input.day);
   assertNoTimeOverlap({
@@ -85,48 +203,13 @@ export async function addItineraryItem(
   });
 
   if (useCloudStorage() && isUuid(input.tripId) && supabase) {
-    const payload: Record<string, unknown> = {
-      trip_id: input.tripId,
-      day: input.day,
-      start_time: input.startTime,
-      end_time: input.endTime,
-      title: input.title,
-      place_id: input.placeId ?? null,
-      place_name: input.placeName ?? null,
-      latitude: input.latitude ?? null,
-      longitude: input.longitude ?? null,
-      estimated_cost: input.estimatedCost ?? null,
-      currency: input.currency ?? null,
-      notes: input.notes ?? null,
-      transport_summary: input.transportSummary ?? null,
-      sort_order: input.order ?? existing.length,
-      item_kind: input.kind ?? 'custom',
-      priority: input.priority ?? 'recommended',
-      flexibility: input.flexibility ?? 'flexible',
-      item_status: input.itemStatus ?? 'planned',
-      data_confidence: input.dataConfidence ?? 'suggested',
-    };
+    const payload = toItineraryInsertPayload(input, input.order ?? existing.length, true);
     const { data, error } = await supabase.from('itinerary_items').insert(payload).select('*').single();
     if (error) {
       // Retry without extension columns if migration not applied.
       const { data: legacy, error: legacyError } = await supabase
         .from('itinerary_items')
-        .insert({
-          trip_id: input.tripId,
-          day: input.day,
-          start_time: input.startTime,
-          end_time: input.endTime,
-          title: input.title,
-          place_id: input.placeId ?? null,
-          place_name: input.placeName ?? null,
-          latitude: input.latitude ?? null,
-          longitude: input.longitude ?? null,
-          estimated_cost: input.estimatedCost ?? null,
-          currency: input.currency ?? null,
-          notes: input.notes ?? null,
-          transport_summary: input.transportSummary ?? null,
-          sort_order: input.order ?? existing.length,
-        })
+        .insert(toItineraryInsertPayload(input, input.order ?? existing.length, false))
         .select('*')
         .single();
       if (legacyError) {
@@ -295,7 +378,7 @@ export async function addPlaceToTrip(input: {
   let endTime = input.endTime;
 
   if (!startTime || !endTime) {
-    const slot = findNextFreeSlot(existing, 120);
+    const slot = findFlexibleFreeSlot(existing, 120);
     if (!slot) {
       throw new Error('No free time left on this day. Remove a stop or pick another day.');
     }

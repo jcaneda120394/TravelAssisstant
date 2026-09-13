@@ -5,7 +5,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { PlaceCard } from '@/components/cards/place-card';
 import { PlaceGrid } from '@/components/cards/place-grid';
 import { LocationPickerModal } from '@/components/location/location-picker-modal';
-import { ChipSelect } from '@/components/forms/chip-select';
 import { TextField } from '@/components/forms/text-field';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
@@ -17,6 +16,10 @@ import {
   ExploreCategoryPicker,
   type ExploreCategory,
 } from '@/features/explore/explore-category-picker';
+import {
+  ExploreDistancePicker,
+  type DistanceOption,
+} from '@/features/explore/explore-distance-picker';
 import { useEnsureLocation } from '@/hooks/use-ensure-location';
 import { useAuth } from '@/hooks/use-auth';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
@@ -30,37 +33,6 @@ import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
 
 const MIN_RADIUS_METERS = 500;
 const MAX_RADIUS_METERS = 200_000;
-
-const PRESET_RADII = [
-  '500',
-  '1000',
-  '2000',
-  '3000',
-  '5000',
-  '10000',
-  '25000',
-  '50000',
-  '100000',
-  '150000',
-  '200000',
-] as const;
-
-const DISTANCE_OPTIONS = [...PRESET_RADII, 'custom'] as const;
-type DistanceOption = (typeof DISTANCE_OPTIONS)[number];
-
-const PRESET_LABELS: Record<(typeof PRESET_RADII)[number], string> = {
-  '500': '500m',
-  '1000': '1km',
-  '2000': '2km',
-  '3000': '3km',
-  '5000': '5km',
-  '10000': '10km',
-  '25000': '25km',
-  '50000': '50km',
-  '100000': '100km',
-  '150000': '150km',
-  '200000': '200km',
-};
 
 function formatRadiusLabel(meters: number): string {
   if (meters < 1000) return `${Math.round(meters)}m`;
@@ -240,15 +212,10 @@ export function ExploreScreen() {
         ) : null}
 
         <AppText className="mb-2 font-sans-medium">Distance</AppText>
-        <ChipSelect
-          options={DISTANCE_OPTIONS}
-          values={[distanceOption]}
-          multiple={false}
-          labels={{
-            ...PRESET_LABELS,
-            custom: customChipLabel,
-          }}
-          onChange={(values) => selectDistance(values[0] ?? '25000')}
+        <ExploreDistancePicker
+          value={distanceOption}
+          onChange={selectDistance}
+          customLabel={customChipLabel}
         />
         {distanceOption === 'custom' ? (
           <View className="mt-3">

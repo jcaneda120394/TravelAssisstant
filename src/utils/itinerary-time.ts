@@ -123,3 +123,42 @@ export function findNextFreeSlot(
   }
   return null;
 }
+
+/**
+ * Prefer a longer gap, then shrink duration so packed AI days can still accept a stop.
+ * Last resort: append 30 minutes after the last item (up to 23:45).
+ */
+export function findFlexibleFreeSlot(
+  existing: ItineraryItem[],
+  preferredDurationMinutes = 120,
+): { startTime: string; endTime: string } | null {
+  const durations = [
+    preferredDurationMinutes,
+    90,
+    60,
+    45,
+    30,
+  ].filter((value, index, all) => value > 0 && all.indexOf(value) === index);
+
+  for (const duration of durations) {
+    const slot = findNextFreeSlot(existing, duration);
+    if (slot) return slot;
+  }
+
+  const sorted = [...existing].sort(
+    (a, b) => (timeToMinutes(a.startTime) ?? 0) - (timeToMinutes(b.startTime) ?? 0),
+  );
+  const lastEnd = sorted.reduce((max, item) => {
+    const end = timeToMinutes(item.endTime);
+    return end == null ? max : Math.max(max, end);
+  }, 9 * 60);
+  const start = Math.max(lastEnd, 9 * 60);
+  const end = start + 30;
+  if (end <= 23 * 60 + 45) {
+    return {
+      startTime: minutesToTime(start),
+      endTime: minutesToTime(end),
+    };
+  }
+  return null;
+}

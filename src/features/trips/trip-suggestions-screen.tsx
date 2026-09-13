@@ -410,17 +410,33 @@ export function TripSuggestionsScreen() {
         />
 
         <Card className="mb-4">
-          <CityAutocomplete
-            label="Destination"
-            value={destination}
-            onChange={setDestination}
-            onSelect={(next) => setDestination(next)}
-            placeholder="Search city, country, or place…"
-            near={coords}
-            nearLabel={label}
-            includePlaces
-            testID="trip-suggestions-destination"
-          />
+          {params.fromDraft === '1' && destination.trim() ? (
+            <View className="mb-4">
+              <AppText className="mb-2 font-sans-medium text-sm">Destination</AppText>
+              <View
+                className={`rounded-2xl border px-4 py-3.5 ${
+                  scheme === 'dark'
+                    ? 'border-brand-800 bg-surface-cardDark'
+                    : 'border-black/8 bg-black/[0.03]'
+                }`}
+                testID="trip-suggestions-destination-readonly"
+              >
+                <AppText className="text-base">{destination.trim()}</AppText>
+              </View>
+            </View>
+          ) : (
+            <CityAutocomplete
+              label="Destination"
+              value={destination}
+              onChange={setDestination}
+              onSelect={(next) => setDestination(next)}
+              placeholder="Search city, country, or place…"
+              near={coords}
+              nearLabel={label}
+              includePlaces
+              testID="trip-suggestions-destination"
+            />
+          )}
           <AppText muted className="mb-2 font-sans-medium">
             Trip dates
           </AppText>

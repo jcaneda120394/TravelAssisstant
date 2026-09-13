@@ -6,6 +6,7 @@ import { Alert } from 'react-native';
 import { TextField } from '@/components/forms/text-field';
 import { DatePickerField } from '@/components/forms/date-picker-field';
 import { DestinationAutocomplete } from '@/components/forms/destination-autocomplete';
+import { PlaceSearchField } from '@/components/forms/place-search-field';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/feedback/states';
 import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography';
@@ -17,12 +18,14 @@ import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { providers } from '@/providers/registry';
 import {
   addItineraryItem,
+  addPlaceToTrip,
   listItinerary,
   optimizeItineraryDay,
   removeItineraryItem,
 } from '@/services/itinerary/itinerary.service';
 import { listItineraryDays } from '@/services/trips/itinerary-days.service';
 import { listTripAccommodations } from '@/services/trips/trip-accommodations.service';
+import { listTripDestinations } from '@/services/trips/trip-destinations.service';
 import { listTransportSegments } from '@/services/trips/transport-segments.service';
 import {
   deleteTrip,
@@ -39,8 +42,8 @@ import { getErrorMessage } from '@/lib/errors/app-error';
 import { Skeleton } from '@/components/feedback/skeleton';
 import { ItineraryStopImage } from '@/components/trips/itinerary-stop-image';
 import { formatDayLabel, formatTripDateRange, tripCalendarDays } from '@/utils/dates';
-import { findNextFreeSlot } from '@/utils/itinerary-time';
-import type { ItineraryItem, TransportSegment, Trip } from '@/types/domain';
+import { findFlexibleFreeSlot } from '@/utils/itinerary-time';
+import type { ItineraryItem, Place, TransportSegment, Trip } from '@/types/domain';
 import * as Clipboard from 'expo-clipboard';
 import { Platform } from 'react-native';
 
@@ -90,6 +93,7 @@ export function TripDetailScreen() {
   const [tab, setTab] = useState<TabId>('overview');
   const [inviteEmail, setInviteEmail] = useState('');
   const [activityTitle, setActivityTitle] = useState('');
+  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editStartDate, setEditStartDate] = useState('');
@@ -97,7 +101,6 @@ export function TripDetailScreen() {
   const [editDestinations, setEditDestinations] = useState<string[]>([]);
   const [editAdults, setEditAdults] = useState('2');
   const [editChildren, setEditChildren] = useState('0');
-  const [usedItineraryImageUrls, setUsedItineraryImageUrls] = useState<string[]>([]);
 
   const tripQuery = useQuery({
     queryKey: ['trip', id],
@@ -132,6 +135,13 @@ export function TripDetailScreen() {
     queryKey: ['trip-stays', id],
     enabled: Boolean(id),
     queryFn: () => listTripAccommodations(String(id)),
+  });
+
+  const destinationsQuery = useQuery({
+    queryKey: ['trip-destinations', id],
+    enabled: Boolean(id),
+    queryFn: () => listTripDestinations(String(id)),
+    staleTime: 60_000,
   });
 
   const tripDays = useMemo(() => {
@@ -169,10 +179,6 @@ export function TripDetailScreen() {
   }, [tripDays, selectedDay]);
 
   const day = selectedDay ?? tripDays[0] ?? new Date().toISOString().slice(0, 10);
-
-  useEffect(() => {
-    setUsedItineraryImageUrls([]);
-  }, [day, id]);
 
   const itineraryQuery = useQuery({
     queryKey: ['itinerary', id, day],
@@ -213,8 +219,19 @@ export function TripDetailScreen() {
       if (current.isPublic) {
         throw new Error('Make the trip private before editing the itinerary.');
       }
-      if (!activityTitle.trim()) throw new Error('Enter an activity title');
-      const slot = findNextFreeSlot(itineraryQuery.data ?? [], 120);
+      const title = (selectedPlace?.name || activityTitle).trim();
+      if (!title) throw new Error('Search and pick a place, or enter an activity title');
+
+      if (selectedPlace) {
+        return addPlaceToTrip({
+          tripId: String(id),
+          place: selectedPlace,
+          day,
+          currency,
+        });
+      }
+
+      const slot = findFlexibleFreeSlot(itineraryQuery.data ?? [], 120);
       if (!slot) {
         throw new Error('No free time left on this day. Remove a stop or pick another day.');
       }
@@ -223,7 +240,7 @@ export function TripDetailScreen() {
         day,
         startTime: slot.startTime,
         endTime: slot.endTime,
-        title: activityTitle.trim(),
+        title,
         kind: 'custom',
         estimatedCost: 20,
         currency,
@@ -232,6 +249,7 @@ export function TripDetailScreen() {
     },
     onSuccess: () => {
       setActivityTitle('');
+      setSelectedPlace(null);
       void queryClient.invalidateQueries({ queryKey: ['itinerary', id] });
       void queryClient.invalidateQueries({ queryKey: ['itinerary-all', id] });
     },
@@ -451,6 +469,38 @@ export function TripDetailScreen() {
 
   const dayItems = itineraryQuery.data ?? [];
 
+  const placeSearchNear = (() => {
+    const dest = (destinationsQuery.data ?? []).find(
+      (item) => item.latitude != null && item.longitude != null,
+    );
+    if (dest?.latitude != null && dest.longitude != null) {
+      return {
+        location: { latitude: dest.latitude, longitude: dest.longitude },
+        label: dest.label || dest.city || trip.destinations[0] || null,
+      };
+    }
+    const pinned = dayItems.find((item) => item.latitude != null && item.longitude != null);
+    if (pinned?.latitude != null && pinned.longitude != null) {
+      return {
+        location: { latitude: pinned.latitude, longitude: pinned.longitude },
+        label: trip.destinations[0] ?? pinned.placeName ?? null,
+      };
+    }
+    const anyPinned = (allDaysQuery.data ?? []).find(
+      (item) => item.latitude != null && item.longitude != null,
+    );
+    if (anyPinned?.latitude != null && anyPinned.longitude != null) {
+      return {
+        location: { latitude: anyPinned.latitude, longitude: anyPinned.longitude },
+        label: trip.destinations[0] ?? null,
+      };
+    }
+    return {
+      location: null as { latitude: number; longitude: number } | null,
+      label: trip.destinations[0] ?? null,
+    };
+  })();
+
   const mapMarkers = dayItems
     .filter((item) => item.latitude != null && item.longitude != null)
     .map((item, index) => ({
@@ -483,10 +533,6 @@ export function TripDetailScreen() {
               latitude={item.latitude}
               longitude={item.longitude}
               addressHint={trip.destinations?.join(', ')}
-              excludeImageUrls={usedItineraryImageUrls}
-              onImageLoaded={(url) =>
-                setUsedItineraryImageUrls((prev) => (prev.includes(url) ? prev : [...prev, url]))
-              }
             />
           ) : null}
           <AppText className="font-sans-semibold">
@@ -545,7 +591,13 @@ export function TripDetailScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-12" testID="screen-trip">
+      <ScrollView
+        className="flex-1 px-5 pt-4"
+        contentContainerClassName="pb-12"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        testID="screen-trip"
+      >
         <SectionHeader
           title={trip.title}
           subtitle={`${formatTripDateRange(trip.startDate, trip.endDate, trip.openEnded)} · ${trip.destinations.join(', ') || 'No destinations'}`}
@@ -696,6 +748,7 @@ export function TripDetailScreen() {
                   values={editDestinations}
                   onChange={setEditDestinations}
                   placeholder="Add city or country"
+                  readOnly
                 />
                 <View className="mb-2 flex-row gap-2">
                   <View className="flex-1">
@@ -886,19 +939,23 @@ export function TripDetailScreen() {
             <AppText className="mb-2 font-sans-semibold">{formatDayLabel(day)}</AppText>
             {canEdit ? (
               <>
-                <TextField
-                  label="Add activity title"
+                <PlaceSearchField
+                  label="Search place or attraction"
                   value={activityTitle}
-                  onChangeText={setActivityTitle}
-                  autoCapitalize="sentences"
-                  placeholder="e.g. Lunch at Kubo sa Bayan"
+                  selectedPlace={selectedPlace}
+                  onChange={setActivityTitle}
+                  onSelectPlace={setSelectedPlace}
+                  near={placeSearchNear.location}
+                  nearLabel={placeSearchNear.label}
+                  placeholder="e.g. Ngong Ping, Victoria Peak…"
+                  testID="trip-add-place-search"
                 />
                 <View className="mb-3 flex-row gap-2">
                   <View className="flex-1">
                     <Button
                       label="Add to this day"
                       loading={addItem.isPending}
-                      disabled={!activityTitle.trim()}
+                      disabled={!activityTitle.trim() && !selectedPlace}
                       onPress={() => addItem.mutate()}
                     />
                   </View>

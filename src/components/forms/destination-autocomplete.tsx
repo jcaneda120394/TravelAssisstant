@@ -17,6 +17,8 @@ type Props = {
   values: string[];
   onChange: (next: string[]) => void;
   placeholder?: string;
+  /** Show selected destinations only — no search or remove. */
+  readOnly?: boolean;
 };
 
 export function DestinationAutocomplete({
@@ -24,14 +26,16 @@ export function DestinationAutocomplete({
   values,
   onChange,
   placeholder = 'Search any city or country…',
+  readOnly = false,
 }: Props) {
   const scheme = useAppColorScheme();
   const [query, setQuery] = useState('');
   const debounced = useDebouncedValue(query, 350);
+  const selectedLabel = values.map((value) => value.trim()).filter(Boolean).join(', ');
 
   const suggestionsQuery = useQuery({
     queryKey: ['destination-autocomplete', debounced],
-    enabled: debounced.trim().length >= 2,
+    enabled: !readOnly && debounced.trim().length >= 2,
     queryFn: () => searchDestinations(debounced),
     staleTime: 60_000,
   });
@@ -68,6 +72,20 @@ export function DestinationAutocomplete({
     setQuery('');
   };
 
+  if (readOnly) {
+    return (
+      <View className="mb-4">
+        <TextField
+          label={label}
+          value={selectedLabel || 'Not set'}
+          editable={false}
+          selectTextOnFocus={false}
+          testID="destination-autocomplete-readonly"
+        />
+      </View>
+    );
+  }
+
   return (
     <View className="mb-4">
       <TextField
@@ -76,7 +94,7 @@ export function DestinationAutocomplete({
         onChangeText={setQuery}
         autoCapitalize="words"
         autoCorrect={false}
-        placeholder={placeholder}
+        placeholder={selectedLabel || placeholder}
         returnKeyType="done"
         onSubmitEditing={addFreeText}
       />

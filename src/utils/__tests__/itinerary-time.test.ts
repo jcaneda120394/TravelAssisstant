@@ -1,4 +1,5 @@
 import {
+  findFlexibleFreeSlot,
   findNextFreeSlot,
   rangesOverlap,
   timeToMinutes,
@@ -47,6 +48,26 @@ describe('itinerary-time', () => {
     expect(findNextFreeSlot(existing, 120, 11 * 60)).toEqual({
       startTime: '15:00',
       endTime: '17:00',
+    });
+  });
+
+  it('packs a short stop onto a full day via flexible slot', () => {
+    const packed = [
+      {
+        id: '1',
+        tripId: 't',
+        day: '2026-09-12',
+        startTime: '09:00',
+        endTime: '22:00',
+        title: 'Full day',
+        order: 0,
+      },
+    ] as ItineraryItem[];
+
+    expect(findNextFreeSlot(packed, 120)).toBeNull();
+    expect(findFlexibleFreeSlot(packed, 120)).toEqual({
+      startTime: '22:00',
+      endTime: '22:30',
     });
   });
 });

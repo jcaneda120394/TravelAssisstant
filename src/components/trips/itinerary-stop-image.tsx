@@ -1,11 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { Image } from 'react-native';
 
 import { AppText } from '@/components/ui/typography';
 import { View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
-import { getTravelImage, parseCityCountryFromAddress } from '@/lib/images';
+import {
+  buildFallbackTravelImage,
+  getTravelImage,
+  parseCityCountryFromAddress,
+} from '@/lib/images';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 
 type Props = {
@@ -15,12 +19,11 @@ type Props = {
   kind?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  excludeImageUrls?: string[];
-  onImageLoaded?: (url: string) => void;
 };
 
 /**
  * Thumbnail for itinerary stops — uses central getTravelImage (not AI-invented URLs).
+ * Query key is stable per stop (no shared exclude list) so siblings don’t re-fetch forever.
  */
 export function ItineraryStopImage({
   title,
@@ -28,20 +31,20 @@ export function ItineraryStopImage({
   kind,
   latitude,
   longitude,
-  excludeImageUrls,
-  onImageLoaded,
 }: Props) {
   const scheme = useAppColorScheme();
+  const [failedUri, setFailedUri] = useState<string | null>(null);
   const parsed = parseCityCountryFromAddress(addressHint);
   const query = useQuery({
     queryKey: [
       'itinerary-stop-image',
-      'v1',
+      'v2',
       title,
       parsed.city,
       parsed.country,
       kind,
-      (excludeImageUrls ?? []).slice(0, 6).join('|'),
+      latitude ?? null,
+      longitude ?? null,
     ],
     queryFn: () =>
       getTravelImage({
@@ -51,37 +54,41 @@ export function ItineraryStopImage({
         type: kind || 'activity',
         latitude,
         longitude,
-        excludeImageUrls,
       }),
     staleTime: 45 * 60_000,
+    gcTime: 2 * 60 * 60_000,
   });
 
-  useEffect(() => {
-    const url = query.data?.url;
-    if (url && query.data?.provider !== 'fallback') {
-      onImageLoaded?.(url);
-    }
-  }, [query.data?.url, query.data?.provider, onImageLoaded]);
+  const fallback = buildFallbackTravelImage(
+    {
+      name: title,
+      city: parsed.city,
+      country: parsed.country,
+      type: kind || 'activity',
+      latitude,
+      longitude,
+    },
+    title,
+  );
 
-  const uri = query.data?.thumbnailUrl ?? query.data?.url;
+  const resolvedUri = query.data?.thumbnailUrl ?? query.data?.url ?? null;
+  const uri =
+    resolvedUri && resolvedUri !== failedUri ? resolvedUri : fallback.url;
   const skeleton = scheme === 'dark' ? 'bg-brand-900' : 'bg-surface-mist';
 
   return (
     <View className={`mb-2 overflow-hidden rounded-xl ${skeleton}`} style={{ height: 120 }}>
-      {uri ? (
-        <Image
-          source={{ uri }}
-          style={{ width: '100%', height: 120 }}
-          resizeMode="cover"
-          accessibilityLabel={query.data?.alt ?? title}
-        />
-      ) : (
-        <View className="h-full items-center justify-center">
-          <AppText muted className="text-xs">
-            {query.isLoading ? 'Loading photo…' : 'Photo'}
-          </AppText>
-        </View>
-      )}
+      <Image
+        source={{ uri }}
+        style={{ width: '100%', height: 120 }}
+        resizeMode="cover"
+        accessibilityLabel={query.data?.alt ?? title}
+        onError={() => {
+          if (uri !== fallback.url) {
+            setFailedUri(uri);
+          }
+        }}
+      />
       {env.appEnv !== 'production' && query.data?.provider ? (
         <AppText muted className="absolute bottom-1 right-2 text-[10px]">
           {query.data.provider}

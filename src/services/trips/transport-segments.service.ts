@@ -116,6 +116,37 @@ export async function replaceTransportSegmentsForDay(
 ): Promise<TransportSegment[]> {
   if (useCloudStorage() && isUuid(tripId) && supabase) {
     await supabase.from('transport_segments').delete().eq('trip_id', tripId).eq('day', day);
+    if (!segments.length) {
+      return [];
+    }
+    const { data, error } = await supabase
+      .from('transport_segments')
+      .insert(
+        segments.map((segment, order) => ({
+          trip_id: tripId,
+          day,
+          from_item_id:
+            segment.fromItemId && isUuid(segment.fromItemId) ? segment.fromItemId : null,
+          to_item_id: segment.toItemId && isUuid(segment.toItemId) ? segment.toItemId : null,
+          status: segment.status,
+          summary: segment.summary ?? null,
+          mode: segment.mode ?? null,
+          duration_seconds: segment.durationSeconds ?? null,
+          distance_meters: segment.distanceMeters ?? null,
+          estimated_cost: segment.estimatedCost ?? null,
+          currency: segment.currency ?? null,
+          provider: segment.provider ?? null,
+          selected_route: segment.selectedRoute ?? null,
+          alternatives: segment.alternatives ?? [],
+          sort_order: segment.order ?? order,
+          fetched_at: segment.fetchedAt ?? null,
+        })),
+      )
+      .select('*');
+    if (!error && data) {
+      return (data as Row[]).map(mapRow);
+    }
+    // Fall through to local when cloud insert fails (e.g. missing table).
   } else {
     const rows = await dbGet<TransportSegment[]>(KEY, []);
     await dbSet(
@@ -123,16 +154,20 @@ export async function replaceTransportSegmentsForDay(
       rows.filter((row) => !(row.tripId === tripId && row.day === day)),
     );
   }
-  const created: TransportSegment[] = [];
-  for (const [order, segment] of segments.entries()) {
-    created.push(
-      await addTransportSegment({
-        ...segment,
-        tripId,
-        day,
-        order: segment.order ?? order,
-      }),
-    );
+
+  if (!segments.length) {
+    return [];
   }
+
+  const rows = await dbGet<TransportSegment[]>(KEY, []);
+  const withoutDay = rows.filter((row) => !(row.tripId === tripId && row.day === day));
+  const created = segments.map((segment, order) => ({
+    ...segment,
+    id: createId('tseg'),
+    tripId,
+    day,
+    order: segment.order ?? order,
+  }));
+  await dbSet(KEY, [...withoutDay, ...created]);
   return created;
 }

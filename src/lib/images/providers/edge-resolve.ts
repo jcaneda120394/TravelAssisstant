@@ -10,6 +10,21 @@ type EdgePayload = {
   error?: string;
 };
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        resolve(null);
+      });
+  });
+}
+
 /**
  * Server-side sequential resolve: Pexels → Unsplash → Openverse → Wikimedia.
  * API keys stay on Supabase Edge (never EXPO_PUBLIC).
@@ -21,20 +36,25 @@ export async function resolveTravelImageViaEdge(
 
   const queries = buildImageQueryLadder(input);
   try {
-    const { data, error } = await supabase.functions.invoke<EdgePayload>('stock-photos', {
-      body: {
-        action: 'resolve',
-        name: input.name,
-        city: input.city ?? null,
-        country: input.country ?? null,
-        type: input.type ?? null,
-        queries,
-        excludeImageUrls: input.excludeImageUrls ?? [],
-        excludeImageIds: input.excludeImageIds ?? [],
-        latitude: input.latitude ?? null,
-        longitude: input.longitude ?? null,
-      },
-    });
+    const result = await withTimeout(
+      supabase.functions.invoke<EdgePayload>('stock-photos', {
+        body: {
+          action: 'resolve',
+          name: input.name,
+          city: input.city ?? null,
+          country: input.country ?? null,
+          type: input.type ?? null,
+          queries,
+          excludeImageUrls: input.excludeImageUrls ?? [],
+          excludeImageIds: input.excludeImageIds ?? [],
+          latitude: input.latitude ?? null,
+          longitude: input.longitude ?? null,
+        },
+      }),
+      8_000,
+    );
+    if (!result) return null;
+    const { data, error } = result;
     if (error || !data?.image?.url) return null;
     return data.image;
   } catch {

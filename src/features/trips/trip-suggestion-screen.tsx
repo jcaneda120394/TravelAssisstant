@@ -69,13 +69,16 @@ export function TripSuggestionScreen() {
 
   const generateMutation = useMutation({
     mutationFn: () => {
+      const destinationLabel =
+        (plan?.destinationLabel || city.trim() || label || 'nearby').trim();
       const useCoords =
+        plan?.location ??
         pickedLocation ??
         (hasLocation && coords && (!city.trim() || city.trim() === (label?.split(',')[0] ?? ''))
           ? coords
           : null);
       return generateTripSuggestion({
-        destinationLabel: city.trim() || label || 'nearby',
+        destinationLabel,
         location: useCoords,
         startDate,
         endDate,
@@ -213,17 +216,38 @@ export function TripSuggestionScreen() {
         />
 
         <Card className="mb-4">
-          <CityAutocomplete
-            label="Destination city"
-            value={city}
-            onChange={setCity}
-            onSelect={onSelectCity}
-            nearLabel={label}
-            placeholder="e.g. Hong Kong, Malolos, Tokyo"
-          />
-          <View className="mb-3">
-            <Button label="Use my current location" variant="secondary" onPress={useMyLocation} />
-          </View>
+          {plan ? (
+            <View className="mb-4">
+              <AppText className="mb-2 font-sans-medium text-sm">Destination</AppText>
+              <View
+                className={`rounded-2xl border px-4 py-3.5 ${
+                  scheme === 'dark'
+                    ? 'border-brand-800 bg-surface-cardDark'
+                    : 'border-black/8 bg-black/[0.03]'
+                }`}
+                testID="trip-suggestion-destination-readonly"
+              >
+                <AppText className="text-base">{plan.destinationLabel}</AppText>
+              </View>
+              <AppText muted className="mt-1.5 text-xs">
+                Locked to the destination used for this plan. Generate again to change it.
+              </AppText>
+            </View>
+          ) : (
+            <>
+              <CityAutocomplete
+                label="Destination city"
+                value={city}
+                onChange={setCity}
+                onSelect={onSelectCity}
+                nearLabel={label}
+                placeholder="e.g. Hong Kong, Malolos, Tokyo"
+              />
+              <View className="mb-3">
+                <Button label="Use my current location" variant="secondary" onPress={useMyLocation} />
+              </View>
+            </>
+          )}
           <DatePickerField
             label="Start date"
             value={startDate}
@@ -257,9 +281,9 @@ export function TripSuggestionScreen() {
 
           <View className="mt-4">
             <Button
-              label="Generate day plan"
+              label={plan ? 'Regenerate day plan' : 'Generate day plan'}
               loading={generateMutation.isPending}
-              disabled={!city.trim() && !pickedLocation}
+              disabled={!city.trim() && !pickedLocation && !plan}
               onPress={() => generateMutation.mutate()}
             />
           </View>
@@ -397,6 +421,14 @@ export function TripSuggestionScreen() {
 
             <Card className="mb-4">
               <SectionHeader title="Save choices" subtitle="Where and how much to save" />
+
+              <TextField
+                label="Destination"
+                value={plan.destinationLabel}
+                editable={false}
+                selectTextOnFocus={false}
+                testID="trip-suggestion-save-destination"
+              />
 
               <AppText className="mb-2 font-sans-medium">Save to</AppText>
               <View className="mb-3 flex-row gap-2">

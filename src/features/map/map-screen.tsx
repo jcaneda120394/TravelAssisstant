@@ -49,7 +49,7 @@ export function MapScreen() {
   );
 
   const placesQuery = useQuery({
-    queryKey: ['map-places', 'v3-nearness', coords?.latitude, coords?.longitude, label],
+    queryKey: ['map-places', 'v4-local-area', coords?.latitude, coords?.longitude, label],
     enabled: Boolean(coords),
     staleTime: 3 * 60_000,
     queryFn: () =>

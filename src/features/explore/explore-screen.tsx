@@ -119,7 +119,7 @@ export function ExploreScreen() {
   const query = useQuery({
     queryKey: [
       'nearby',
-      'explore-v7-nearness',
+      'explore-v8-local-area',
       coords?.latitude,
       coords?.longitude,
       radiusMeters,

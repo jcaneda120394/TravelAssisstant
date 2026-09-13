@@ -105,12 +105,13 @@ async function fetchExplorePool(params: {
     raceWithBudget(photonPromise, LIVE_BUDGET_MS).then((v) => v ?? []),
   ]);
 
-  // Catalog uses a wider soft radius so sparse towns still fill after a city switch.
+  // Catalog soft radius — keep it near the selected distance so wrong metros
+  // (e.g. Manila while in Bulacan) are not force-injected at 60 km.
   const catalog = shouldBlendCatalog(category)
     ? searchCatalogNearby({
         location,
         category: category ?? 'attraction',
-        radiusMeters: Math.max(radiusMeters, 60_000),
+        radiusMeters: Math.min(Math.max(radiusMeters, 12_000), 40_000),
         limit: Math.max(48, Math.floor(limit / 2)),
       })
     : [];

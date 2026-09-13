@@ -83,7 +83,8 @@ async function fetchHomePool(params: {
   const catalog = searchCatalogNearby({
     location,
     category,
-    radiusMeters: Math.max(radiusMeters, 50_000),
+    // Respect the active radius — forcing 50km pulled Manila into Bulacan Home feeds.
+    radiusMeters,
     limit: Math.max(limit + 16, 40),
   });
 
@@ -112,15 +113,15 @@ export async function getHomeNearbyPlaces(params: {
   companions?: CompanionPrefs | null;
 }): Promise<Place[]> {
   const limit = params.limit ?? DEFAULT_LIMIT;
-  // Start tight so "near you" fills with local stops before widening to province landmarks.
+  // Start tight so "near you" fills with local stops before widening.
+  // Cap expansion so Metro Manila landmarks stay out of Bulacan / SJDM Home feeds.
+  const maxRadius = Math.min(Math.max(params.radiusMeters, 35_000), 45_000);
   const radii = Array.from(
     new Set([
-      Math.min(params.radiusMeters, 12_000),
-      Math.min(params.radiusMeters, 25_000),
-      params.radiusMeters,
-      Math.max(params.radiusMeters, 50_000),
-      Math.max(params.radiusMeters, 90_000),
-      Math.max(params.radiusMeters, 150_000),
+      Math.min(maxRadius, 12_000),
+      Math.min(maxRadius, 20_000),
+      Math.min(maxRadius, 28_000),
+      maxRadius,
     ]),
   ).sort((a, b) => a - b);
 

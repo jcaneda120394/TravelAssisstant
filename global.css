@@ -39,6 +39,26 @@ html,
 body,
 #root {
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  position: relative;
+}
+
+/* Phone web: inputs under 16px trigger Safari zoom — keep controls readable. */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* Prefer a thin classic scrollbar (takes layout space) over overlay thumbs. */

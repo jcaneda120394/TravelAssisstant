@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
 import type { ComponentProps } from 'react';
 import { Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AiAssistantFab } from '@/components/ai/ai-assistant-fab';
 import { WebSidebar } from '@/components/layout/web-sidebar';
@@ -10,13 +11,16 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
-function TabIcon({ color, name }: { color: string; name: IconName }) {
-  return <Ionicons name={name} size={22} color={color} />;
+function TabIcon({ color, name, size }: { color: string; name: IconName; size: number }) {
+  return <Ionicons name={name} size={size} color={color} />;
 }
 
 export default function TabsLayout() {
   const { scheme, colors } = useCountryAppearance();
-  const { isDesktop, isWeb } = useResponsiveLayout();
+  const { isDesktop, isCompact, isWeb, tabBarHeight } = useResponsiveLayout();
+  const insets = useSafeAreaInsets();
+  const iconSize = isCompact ? 20 : 22;
+  const showLabels = !isCompact;
 
   const tabs = (
     <Tabs
@@ -25,21 +29,27 @@ export default function TabsLayout() {
         tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: colors.tabIconSelected,
         tabBarInactiveTintColor: colors.tabIconDefault,
+        tabBarShowLabel: showLabels,
         tabBarStyle: isDesktop
           ? { display: 'none', height: 0 }
           : {
               backgroundColor: colors.surface,
               borderTopColor: scheme === 'dark' ? colors.border : 'rgba(18,32,30,0.08)',
               borderTopWidth: 1,
-              height: Platform.OS === 'ios' ? 88 : isWeb ? 72 : 66,
-              paddingTop: 8,
+              height: tabBarHeight,
+              paddingTop: showLabels ? 6 : 8,
+              paddingBottom: Math.max(insets.bottom, isWeb ? 8 : 4),
               elevation: 0,
               shadowOpacity: 0,
             },
         tabBarLabelStyle: {
           fontFamily: 'PlusJakartaSans_600SemiBold',
-          fontSize: isWeb ? 11 : 9,
-          marginTop: 2,
+          fontSize: isWeb ? 10 : 9,
+          marginTop: 0,
+          marginBottom: 0,
+        },
+        tabBarItemStyle: {
+          paddingVertical: showLabels ? 0 : 4,
         },
       }}
     >
@@ -47,35 +57,39 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="home" />,
+          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="home" size={iconSize} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="compass" />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon color={String(color)} name="compass" size={iconSize} />
+          ),
         }}
       />
       <Tabs.Screen
         name="trips"
         options={{
           title: 'Trips',
-          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="briefcase" />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon color={String(color)} name="briefcase" size={iconSize} />
+          ),
         }}
       />
       <Tabs.Screen
         name="guide"
         options={{
           title: 'Guide',
-          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="book" />,
+          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="book" size={iconSize} />,
         }}
       />
       <Tabs.Screen
         name="map"
         options={{
           title: 'Map',
-          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="map" />,
+          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="map" size={iconSize} />,
         }}
       />
       <Tabs.Screen
@@ -88,14 +102,18 @@ export default function TabsLayout() {
         name="assistant"
         options={{
           title: 'AI',
-          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="sparkles" />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon color={String(color)} name="sparkles" size={iconSize} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="person" />,
+          tabBarIcon: ({ color }) => (
+            <TabIcon color={String(color)} name="person" size={iconSize} />
+          ),
         }}
       />
     </Tabs>
@@ -103,16 +121,18 @@ export default function TabsLayout() {
 
   if (isDesktop) {
     return (
-      <View className="h-full flex-1 flex-row">
+      <View className="h-full flex-1 flex-row" style={{ minHeight: 0, width: '100%' }}>
         <WebSidebar />
-        <View className="h-full flex-1">{tabs}</View>
+        <View className="h-full flex-1" style={{ minWidth: 0, minHeight: 0 }}>
+          {tabs}
+        </View>
         <AiAssistantFab />
       </View>
     );
   }
 
   return (
-    <View className="flex-1">
+    <View className="flex-1" style={{ minHeight: 0, width: '100%', maxWidth: '100%' }}>
       {tabs}
       <AiAssistantFab />
     </View>

@@ -14,6 +14,7 @@ import { AppText, Card, Screen, SectionHeader } from '@/components/ui/typography
 import { Pressable, ScrollView, View } from '@/components/ui/primitives';
 import { requireAuthForTrips, requireAuthToSave } from '@/features/auth/require-auth';
 import { useAuth } from '@/hooks/use-auth';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { createTrip, deleteTrip, listTrips } from '@/services/trips/trips.service';
 import { analytics } from '@/lib/analytics';
 import { getErrorMessage } from '@/lib/errors/app-error';
@@ -25,6 +26,7 @@ export function TripsScreen() {
   const router = useRouter();
   const { user, preferences } = useAuth();
   const scheme = useAppColorScheme();
+  const { scrollBottomPad } = useResponsiveLayout();
   const queryClient = useQueryClient();
   const label = useLocationStore((state) => state.label);
   const [showForm, setShowForm] = useState(false);
@@ -76,7 +78,12 @@ export function TripsScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-trips">
+      <ScrollView
+        className="flex-1 px-5 pt-4"
+        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
+        style={{ width: '100%', maxWidth: '100%' }}
+        testID="screen-trips"
+      >
         <SectionHeader
           title="Trips"
           subtitle={

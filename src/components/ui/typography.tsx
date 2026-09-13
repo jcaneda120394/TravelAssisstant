@@ -71,16 +71,18 @@ export function Screen({
       <PageContainer className="flex-1">{children}</PageContainer>
     );
 
+  const shellStyle = { width: '100%' as const, maxWidth: '100%' as const, minHeight: 0 };
+
   if (unsafe) {
     return (
-      <View className={`flex-1 ${bg} ${className}`} testID={testID}>
+      <View className={`flex-1 ${bg} ${className}`} style={shellStyle} testID={testID}>
         {body}
       </View>
     );
   }
 
   return (
-    <SafeAreaView edges={edges} className={`flex-1 ${bg} ${className}`} testID={testID}>
+    <SafeAreaView edges={edges} className={`flex-1 ${bg} ${className}`} style={shellStyle} testID={testID}>
       {body}
     </SafeAreaView>
   );
@@ -108,14 +110,21 @@ export function SectionHeader({
   subtitle?: string;
   eyebrow?: string;
 }) {
+  const { isCompact } = useResponsiveLayout();
   return (
-    <View className="mb-4 gap-1">
+    <View className="mb-4 gap-1" style={{ maxWidth: '100%' }}>
       {eyebrow ? (
         <AppText className="font-sans-semibold text-xs uppercase tracking-[0.14em] text-accent-500">
           {eyebrow}
         </AppText>
       ) : null}
-      <AppText className="font-display-bold text-[26px] leading-8 tracking-tight">{title}</AppText>
+      <AppText
+        className={`font-display-bold tracking-tight ${
+          isCompact ? 'text-[22px] leading-7' : 'text-[26px] leading-8'
+        }`}
+      >
+        {title}
+      </AppText>
       {subtitle ? <AppText muted className="mt-0.5 text-[15px] leading-5">{subtitle}</AppText> : null}
     </View>
   );

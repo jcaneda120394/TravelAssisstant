@@ -25,7 +25,7 @@ const MAP_ATTRACTIONS_LIMIT = 20;
 export function MapScreen() {
   const router = useRouter();
   const scheme = useAppColorScheme();
-  const { isDesktop, isWeb } = useResponsiveLayout();
+  const { isDesktop, isWeb, scrollBottomPad } = useResponsiveLayout();
   const { coords, label, hasLocation, hasHydrated, locate, error, mode } = useEnsureLocation({
     auto: true,
     refresh: true,
@@ -33,7 +33,7 @@ export function MapScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const MapView = providers.maps.MapView;
-  const mapHeight = isDesktop ? 560 : isWeb ? 420 : 360;
+  const mapHeight = isDesktop ? 560 : isWeb ? 320 : 360;
 
   // Re-check GPS whenever the Map tab is focused (skip manual city overrides).
   useFocusEffect(
@@ -105,7 +105,12 @@ export function MapScreen() {
 
   return (
     <Screen>
-      <ScrollView className="flex-1 px-5 pt-4" contentContainerClassName="pb-10" testID="screen-map">
+      <ScrollView
+        className="flex-1 px-5 pt-4"
+        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
+        style={{ width: '100%', maxWidth: '100%' }}
+        testID="screen-map"
+      >
         <SectionHeader
           title="Map"
           subtitle={

@@ -1,8 +1,11 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Platform, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const DESKTOP_MIN = 768;
-const WIDE_MIN = 1100;
+/** Sidebar / multi-column shell — keep above phone landscape widths. */
+const DESKTOP_MIN = 1024;
+const WIDE_MIN = 1280;
+const COMPACT_MAX = 400;
 
 export type ResponsiveLayout = {
   isWeb: boolean;
@@ -10,21 +13,65 @@ export type ResponsiveLayout = {
   height: number;
   isDesktop: boolean;
   isWide: boolean;
+  /** Narrow phone web — prefer icon-first chrome. */
+  isCompact: boolean;
   contentMaxWidth: number;
   placeColumns: 1 | 2 | 3;
   sidebarWidth: number;
   pagePaddingX: number;
+  /** Bottom tab bar total height (0 on desktop). */
+  tabBarHeight: number;
+  /** Recommended ScrollView bottom padding so content clears tabs + FAB. */
+  scrollBottomPad: number;
 };
+
+function usePrefersCoarsePointer(): boolean {
+  const [coarse, setCoarse] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.matchMedia) {
+      return;
+    }
+    const mq = window.matchMedia('(pointer: coarse)');
+    const sync = () => setCoarse(mq.matches);
+    sync();
+    mq.addEventListener?.('change', sync);
+    return () => mq.removeEventListener?.('change', sync);
+  }, []);
+
+  return coarse;
+}
 
 /** Shared breakpoints for traveler web shell vs mobile/native layouts. */
 export function useResponsiveLayout(): ResponsiveLayout {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isWeb = Platform.OS === 'web';
+  const coarsePointer = usePrefersCoarsePointer();
 
   return useMemo(() => {
-    const isDesktop = isWeb && width >= DESKTOP_MIN;
+    // Touch phones in landscape can exceed 768px — don't treat them as desktop.
+    const isDesktop = isWeb && width >= DESKTOP_MIN && !coarsePointer;
     const isWide = width >= WIDE_MIN;
+    const isCompact = width < COMPACT_MAX;
     const placeColumns: 1 | 2 | 3 = !isDesktop ? 1 : isWide ? 3 : 2;
+
+    const safeBottom = Math.max(insets.bottom, 0);
+    let tabBarHeight = 0;
+    if (!isDesktop) {
+      if (Platform.OS === 'ios') {
+        tabBarHeight = 49 + Math.max(safeBottom, 20);
+      } else if (isWeb) {
+        // Mobile browsers: labels + icons + home-indicator / URL bar inset.
+        tabBarHeight = (isCompact ? 56 : 64) + Math.max(safeBottom, 8);
+      } else {
+        tabBarHeight = 56 + Math.max(safeBottom, 8);
+      }
+    }
+
+    // Clear tab bar + floating AI button.
+    const fabClearance = isDesktop ? 24 : 72;
+    const scrollBottomPad = isDesktop ? 40 : tabBarHeight + fabClearance;
 
     return {
       isWeb,
@@ -32,11 +79,13 @@ export function useResponsiveLayout(): ResponsiveLayout {
       height,
       isDesktop,
       isWide,
+      isCompact,
       contentMaxWidth: isWide ? 1120 : 960,
       placeColumns,
       sidebarWidth: 232,
-      // Extra right padding on desktop web keeps grids clear of the scrollbar.
       pagePaddingX: isDesktop ? (isWide ? 36 : 28) : 0,
+      tabBarHeight,
+      scrollBottomPad,
     };
-  }, [height, isWeb, width]);
+  }, [coarsePointer, height, insets.bottom, isWeb, width]);
 }

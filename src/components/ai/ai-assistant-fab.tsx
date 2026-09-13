@@ -3,7 +3,6 @@ import { usePathname, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Modal,
-  Platform,
   Pressable as RNPressable,
   useWindowDimensions,
 } from 'react-native';
@@ -33,35 +32,43 @@ export function AiAssistantFab() {
   const { scheme, colors } = useCountryAppearance();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const { isDesktop, sidebarWidth, contentMaxWidth } = useResponsiveLayout();
+  const { isDesktop, isWeb, sidebarWidth, contentMaxWidth, tabBarHeight, isCompact } =
+    useResponsiveLayout();
   const [open, setOpen] = useState(false);
 
   const onAssistantTab = pathname.includes('assistant');
 
   const layout = useMemo(() => {
-    const compact = width < 360;
-    const tablet = width >= 768;
-    const fabSize = compact ? 52 : isDesktop ? 60 : tablet ? 64 : 58;
-    const tabBarApprox = isDesktop ? 0 : Platform.OS === 'ios' ? 88 : 66;
-    const bottom = Math.max(insets.bottom, 8) + tabBarApprox + (compact ? 4 : 10);
+    const compact = isCompact || width < 360;
+    const tablet = width >= 768 && !isCompact;
+    const fabSize = compact ? 48 : isDesktop ? 60 : tablet ? 56 : 52;
+    const bottom =
+      Math.max(insets.bottom, isWeb ? 8 : 4) + (isDesktop ? 24 : tabBarHeight) + (compact ? 6 : 10);
 
     let right: number;
     if (isDesktop) {
-      // Anchor to the content column (right of sidebar), not the full viewport.
       const mainWidth = Math.max(0, width - sidebarWidth);
       const contentWidth = Math.min(contentMaxWidth, mainWidth);
       const sideGutter = Math.max(24, (mainWidth - contentWidth) / 2);
       right = sideGutter + 20;
-    } else if (tablet) {
-      right = Math.max(24, (width - 720) / 2 + 24);
     } else {
-      right = compact ? 14 : 18;
+      right = compact ? 12 : 16;
     }
 
-    const sheetMaxWidth = tablet || isDesktop ? 440 : width;
+    const sheetMaxWidth = tablet || isDesktop ? 440 : Math.min(width, 480);
     const sheetMaxHeight = Math.min(height * 0.72, tablet || isDesktop ? 560 : 520);
     return { fabSize, bottom, right, sheetMaxWidth, sheetMaxHeight, compact, tablet };
-  }, [width, height, insets.bottom, isDesktop, sidebarWidth, contentMaxWidth]);
+  }, [
+    width,
+    height,
+    insets.bottom,
+    isDesktop,
+    isWeb,
+    isCompact,
+    sidebarWidth,
+    contentMaxWidth,
+    tabBarHeight,
+  ]);
 
   if (onAssistantTab) {
     return null;

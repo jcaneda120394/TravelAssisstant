@@ -66,7 +66,7 @@ export function ExploreScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ category?: string | string[] }>();
   const { preferences } = useAuth();
-  const { isDesktop } = useResponsiveLayout();
+  const { isDesktop, scrollBottomPad } = useResponsiveLayout();
   const { coords, label, hasLocation } = useEnsureLocation({ auto: true });
   const [distanceOption, setDistanceOption] = useState<DistanceOption>('25000');
   const [lastPresetOption, setLastPresetOption] = useState<Exclude<DistanceOption, 'custom'>>('25000');
@@ -193,7 +193,8 @@ export function ExploreScreen() {
     <Screen>
       <ScrollView
         className={`flex-1 pt-4 ${isDesktop ? '' : 'px-5'}`}
-        contentContainerClassName="pb-10"
+        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
+        style={{ width: '100%', maxWidth: '100%' }}
         testID="screen-explore"
       >
         <SectionHeader

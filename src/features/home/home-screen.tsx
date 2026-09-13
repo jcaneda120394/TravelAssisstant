@@ -62,7 +62,7 @@ export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scheme = useAppColorScheme();
-  const { isDesktop, isWeb } = useResponsiveLayout();
+  const { isDesktop, isWeb, scrollBottomPad } = useResponsiveLayout();
   const queryClient = useQueryClient();
   const { profile, preferences, user } = useAuth();
   const { currency, setCurrency } = useDisplayCurrency();
@@ -76,7 +76,7 @@ export function HomeScreen() {
   const stuckOnSf = looksLikeSanFrancisco(coords) && mode !== 'manual';
   const topPad = isDesktop
     ? 40
-    : Math.max(insets.top || 0, Platform.OS === 'ios' ? 58 : 24) + 8;
+    : Math.max(insets.top || 0, isWeb ? 16 : Platform.OS === 'ios' ? 58 : 24) + 8;
   const expoMenuGutter = isDesktop
     ? 0
     : Platform.OS === 'ios'
@@ -197,7 +197,11 @@ export function HomeScreen() {
   return (
     <Screen testID="screen-home" unsafe>
       <StatusBar style="light" />
-      <ScrollView className="flex-1" contentContainerClassName="pb-12">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
+        style={{ width: '100%', maxWidth: '100%' }}
+      >
         <LinearGradient
           colors={[...gradient]}
           start={{ x: 0, y: 0 }}

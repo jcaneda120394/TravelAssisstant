@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useDisplayCurrency } from '@/hooks/use-display-currency';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useCountryAppearance } from '@/hooks/use-country-appearance';
+import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { signOut, deleteAccount } from '@/services/auth/auth.service';
 import { buildOfflinePack } from '@/services/offline/offline.service';
@@ -35,6 +36,7 @@ export function ProfileScreen() {
   const followCountryTheme = useThemeStore((state) => state.followCountryTheme);
   const setFollowCountryTheme = useThemeStore((state) => state.setFollowCountryTheme);
   const { countryTheme, locationLabel, colors, countryThemesSupported } = useCountryAppearance();
+  const { scrollBottomPad } = useResponsiveLayout();
 
   const onSignOut = async () => {
     try {
@@ -106,7 +108,8 @@ export function ProfileScreen() {
     <Screen>
       <ScrollView
         className="flex-1 px-5 pt-4"
-        contentContainerClassName="pb-10"
+        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
+        style={{ width: '100%', maxWidth: '100%' }}
         testID="screen-profile"
       >
         <SectionHeader title="Profile" subtitle="Traveler identity, prefs, and tools" />

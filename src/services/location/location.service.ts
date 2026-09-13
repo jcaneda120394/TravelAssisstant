@@ -16,6 +16,25 @@ export const HOME_LOCATION = {
 
 const FALLBACK: GeoPoint = HOME_LOCATION.coords;
 
+/** When traveler picks a whole country, snap Discover to a major city so results aren't empty. */
+const COUNTRY_HUBS: Record<string, { city: string; latitude: number; longitude: number }> = {
+  vietnam: { city: 'Hanoi', latitude: 21.0285, longitude: 105.8542 },
+  philippines: { city: 'Manila', latitude: 14.5995, longitude: 120.9842 },
+  japan: { city: 'Tokyo', latitude: 35.6762, longitude: 139.6503 },
+  thailand: { city: 'Bangkok', latitude: 13.7563, longitude: 100.5018 },
+  'south korea': { city: 'Seoul', latitude: 37.5665, longitude: 126.978 },
+  korea: { city: 'Seoul', latitude: 37.5665, longitude: 126.978 },
+  singapore: { city: 'Singapore', latitude: 1.3521, longitude: 103.8198 },
+  'hong kong': { city: 'Hong Kong', latitude: 22.3193, longitude: 114.1694 },
+  spain: { city: 'Madrid', latitude: 40.4168, longitude: -3.7038 },
+  france: { city: 'Paris', latitude: 48.8566, longitude: 2.3522 },
+  'united states': { city: 'New York', latitude: 40.7128, longitude: -74.006 },
+  usa: { city: 'New York', latitude: 40.7128, longitude: -74.006 },
+  'united kingdom': { city: 'London', latitude: 51.5074, longitude: -0.1278 },
+  indonesia: { city: 'Jakarta', latitude: -6.2088, longitude: 106.8456 },
+  malaysia: { city: 'Kuala Lumpur', latitude: 3.139, longitude: 101.6869 },
+};
+
 type NominatimReverse = {
   display_name?: string;
   address?: {
@@ -23,9 +42,13 @@ type NominatimReverse = {
     town?: string;
     village?: string;
     municipality?: string;
+    suburb?: string;
+    neighbourhood?: string;
+    city_district?: string;
     county?: string;
     state?: string;
     country?: string;
+    country_code?: string;
   };
 };
 
@@ -42,48 +65,82 @@ async function labelFromCoords(coords: GeoPoint): Promise<{
   country: string | null;
   label: string;
 }> {
+  // Prefer Nominatim at neighborhood zoom so we get city+district, not only country.
+  try {
+    const reverse = await fetchJson<NominatimReverse>(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=16&addressdetails=1`,
+      { timeoutMs: 10_000, cacheTtlMs: 5 * 60_000 },
+    );
+    const a = reverse.address;
+    if (a) {
+      const locality =
+        a.neighbourhood ||
+        a.suburb ||
+        a.city_district ||
+        a.city ||
+        a.town ||
+        a.village ||
+        a.municipality ||
+        a.county ||
+        a.state ||
+        null;
+      const city =
+        a.city || a.town || a.village || a.municipality || a.county || a.state || locality;
+      const country = a.country ?? null;
+      const parts = [locality, city, a.state, country].filter(
+        (part, index, arr): part is string =>
+          Boolean(part) && arr.findIndex((p) => p?.toLowerCase() === part!.toLowerCase()) === index,
+      );
+      if (parts.length > 0) {
+        return {
+          city: city ?? locality,
+          country,
+          label: parts.join(', '),
+        };
+      }
+      if (reverse.display_name) {
+        return {
+          city: city ?? locality,
+          country,
+          label: reverse.display_name.split(',').slice(0, 4).join(',').trim(),
+        };
+      }
+    }
+  } catch {
+    // Fall through to Expo reverse geocode.
+  }
+
   try {
     const places = await Location.reverseGeocodeAsync(coords);
     const first = places[0];
     if (first) {
-      const city = first.city ?? first.subregion ?? first.region ?? null;
+      const city =
+        first.district ||
+        first.city ||
+        first.subregion ||
+        first.region ||
+        first.name ||
+        null;
       const country = first.country ?? null;
+      const parts = [first.name, city, first.region, country].filter(
+        (part, index, arr): part is string =>
+          Boolean(part) && arr.findIndex((p) => p?.toLowerCase() === part!.toLowerCase()) === index,
+      );
       return {
         city,
         country,
-        label: [city, country].filter(Boolean).join(', ') || 'Current location',
+        label: parts.join(', ') || 'Current location',
       };
     }
   } catch {
-    // Fall through to Nominatim.
+    // Fall through.
   }
 
-  try {
-    const reverse = await fetchJson<NominatimReverse>(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=12`,
-      { timeoutMs: 10_000, cacheTtlMs: 10 * 60_000 },
-    );
-    const city =
-      reverse.address?.city ||
-      reverse.address?.town ||
-      reverse.address?.village ||
-      reverse.address?.municipality ||
-      reverse.address?.county ||
-      reverse.address?.state ||
-      null;
-    const country = reverse.address?.country ?? null;
-    return {
-      city,
-      country,
-      label: [city, country].filter(Boolean).join(', ') || reverse.display_name || 'Current location',
-    };
-  } catch {
-    return {
-      city: null,
-      country: null,
-      label: `${coords.latitude.toFixed(3)}, ${coords.longitude.toFixed(3)}`,
-    };
-  }
+  return {
+    city: null,
+    country: null,
+    label: `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`,
+  };
 }
 
 /** Apply Malolos / Bulacan as the active planning location. */
@@ -115,7 +172,7 @@ export function replaceSimulatorSanFranciscoIfNeeded(): boolean {
   return true;
 }
 
-/** Fresh GPS fix — Simulator SF is remapped to Bulacan so the app matches your area. */
+/** Fresh GPS fix — uses precise coords + detailed reverse-geocode when permission is granted. */
 export async function getCurrentPosition(): Promise<GeoPoint> {
   try {
     const status = await requestForegroundLocation();
@@ -126,7 +183,8 @@ export async function getCurrentPosition(): Promise<GeoPoint> {
     }
 
     const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
+      accuracy: Location.Accuracy.Highest,
+      mayShowUserSettingsDialog: true,
     });
 
     let coords = {
@@ -166,21 +224,40 @@ export async function getCurrentPosition(): Promise<GeoPoint> {
 export async function setLocationFromSuggestion(
   suggestion: DestinationSuggestion,
 ): Promise<GeoPoint> {
-  const latitude = Number(suggestion.latitude);
-  const longitude = Number(suggestion.longitude);
+  let latitude = Number(suggestion.latitude);
+  let longitude = Number(suggestion.longitude);
+  let city = suggestion.shortName;
+  let label = suggestion.label;
+  let country = suggestion.label.split(',').slice(-1)[0]?.trim() ?? null;
+
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     throw new AppError('That place is missing coordinates. Try another result.', {
       code: 'INVALID_COORDS',
     });
   }
 
+  // Country-only picks → hub city so Home Discover isn't empty in the middle of nowhere.
+  if (suggestion.kind === 'country') {
+    const hub =
+      COUNTRY_HUBS[suggestion.shortName.toLowerCase()] ||
+      COUNTRY_HUBS[(country ?? '').toLowerCase()] ||
+      COUNTRY_HUBS[suggestion.label.toLowerCase()];
+    if (hub) {
+      latitude = hub.latitude;
+      longitude = hub.longitude;
+      city = hub.city;
+      country = suggestion.shortName || country;
+      label = `${hub.city}, ${country}`;
+    }
+  }
+
   const coords = { latitude, longitude };
 
   useLocationStore.getState().setManualLocation({
     coords,
-    city: suggestion.shortName,
-    country: suggestion.label.split(',').slice(-1)[0]?.trim() ?? null,
-    label: suggestion.label,
+    city,
+    country,
+    label,
   });
 
   return coords;

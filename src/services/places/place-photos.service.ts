@@ -35,9 +35,35 @@ type WikiQueryResponse = {
 
 const USER_AGENT = 'TravelMateAI/1.0 (https://travelmate.app; place-photos)';
 
-/** Titles that almost never represent the venue itself. */
-const IRRELEVANT_TITLE =
-  /\b(logo|icon|wordmark|flag|coat of arms|seal|map|satellite|aerial|expressway|highway|slex|nlex|skyway|tollway|sesame place|disneyland|universal studios|theme park|amusement|volcano|mayon|mt\.?\s*mayon|mount mayon|diagram|svg|signage template|placeholder)\b/i;
+/** Always-junk titles (never the venue photo). */
+const ALWAYS_IRRELEVANT =
+  /\b(logo|icon|wordmark|flag|coat of arms|seal|expressway|highway|slex|nlex|skyway|tollway|diagram|svg|signage template|placeholder)\b/i;
+
+/** Theme-park titles — only junk when the place itself is NOT that park. */
+const THEME_PARK_TITLE =
+  /\b(disneyland|disney|universal studios|sesame place|theme park|amusement park|legoland|ocean park)\b/i;
+
+/** Famous-volcano titles — junk only when the place name does not also match. */
+const VOLCANO_TITLE = /\b(volcano|mayon|mt\.?\s*mayon|mount mayon)\b/i;
+const GEO_ONLY_TOKEN =
+  /^(sorsogon|bulacan|manila|philippines|luzon|visayas|mindanao|albay|gubat|barcelona|cebu|davao|legazpi|hong|kong|vietnam|japan|spain|city|island|rock|formation|park|beach)$/i;
+
+function isIrrelevantPhotoTitle(placeName: string, photoTitle: string): boolean {
+  const title = photoTitle.toLowerCase();
+  const name = placeName.toLowerCase();
+  if (ALWAYS_IRRELEVANT.test(title)) return true;
+  if (THEME_PARK_TITLE.test(title)) {
+    return !THEME_PARK_TITLE.test(name);
+  }
+  if (VOLCANO_TITLE.test(title)) {
+    // Keep "Mayon at Paguriran Island" when searching Paguriran.
+    const distinctive = significantTokens(placeName).filter((t) => !GEO_ONLY_TOKEN.test(t));
+    if (distinctive.some((t) => title.includes(t))) return false;
+    return !/mayon|volcano/i.test(name);
+  }
+  if (/\b(satellite|aerial map|street map)\b/i.test(title)) return true;
+  return false;
+}
 
 const FOOD_CATEGORIES = new Set<PlaceCategory>([
   'restaurant',
@@ -114,7 +140,7 @@ export function scorePhotoRelevance(
 ): number {
   const title = (photoTitle ?? '').toLowerCase();
   if (!title.trim()) return 0;
-  if (IRRELEVANT_TITLE.test(title)) return 0;
+  if (isIrrelevantPhotoTitle(placeName, title)) return 0;
 
   const nameTokens = significantTokens(placeName);
   if (nameTokens.length === 0) return 0;
@@ -130,18 +156,16 @@ export function scorePhotoRelevance(
   const ratio = matched.length / nameTokens.length;
   const onlyGeoTokens =
     matched.length > 0 &&
-    matched.every((token) =>
-      /^(sorsogon|bulacan|manila|philippines|luzon|visayas|mindanao|albay|gubat|barcelona|cebu|davao|legazpi)$/i.test(
-        token,
-      ),
-    );
+    matched.every((token) => GEO_ONLY_TOKEN.test(token));
   // City/province-only overlap is never enough (e.g. "Sorsogon" on a volcano page).
   if (onlyGeoTokens) return 0;
-  if (ratio < 0.5 || matched.length < 2) {
-    // Allow single strong brand token when the name is mostly stopwords + brand.
-    if (!(matched.length === 1 && nameTokens.length <= 2 && matched[0]!.length >= 5)) {
-      return 0;
-    }
+  if (ratio < 0.34 || matched.length < 1) {
+    return 0;
+  }
+  // Need 2 tokens OR one strong distinctive token (Victoria, Disneyland, Paguriran…).
+  if (matched.length < 2) {
+    const strong = matched[0]!;
+    if (strong.length < 4 && nameTokens.length > 1) return 0;
   }
 
   let score = ratio;
@@ -168,15 +192,28 @@ function dedupePhotos(photos: PlacePhoto[]): PlacePhoto[] {
   });
 }
 
-function rankPhotos(place: Place, photos: PlacePhoto[]): PlacePhoto[] {
+function rankPhotos(place: Place, photos: PlacePhoto[], minScore = 0.34): PlacePhoto[] {
   const name = displayNameForSearch(place);
   return dedupePhotos(photos)
     .map((photo) => ({
       ...photo,
+      url: cleanMediaUrl(photo.url),
+      thumbUrl: photo.thumbUrl ? cleanMediaUrl(photo.thumbUrl) : undefined,
       score: scorePhotoRelevance(name, photo.title, place.address),
     }))
-    .filter((photo) => (photo.score ?? 0) >= 0.5)
+    .filter((photo) => (photo.score ?? 0) >= minScore)
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+}
+
+function cleanMediaUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    // Wikimedia sometimes appends tracking params that break some clients.
+    parsed.search = '';
+    return parsed.toString();
+  } catch {
+    return url;
+  }
 }
 
 async function wikipediaSearchPhotos(query: string, limit: number): Promise<PlacePhoto[]> {
@@ -198,7 +235,7 @@ async function wikipediaSearchPhotos(query: string, limit: number): Promise<Plac
     for (const page of pages) {
       const full = page.original?.source ?? page.thumbnail?.source;
       if (!full) continue;
-      if (IRRELEVANT_TITLE.test(page.title ?? '')) continue;
+      if (ALWAYS_IRRELEVANT.test(page.title ?? '')) continue;
       photos.push({
         url: full,
         thumbUrl: page.thumbnail?.source,
@@ -232,7 +269,7 @@ async function wikipediaGeoPhotos(
     for (const page of pages) {
       const full = page.original?.source ?? page.thumbnail?.source;
       if (!full) continue;
-      if (IRRELEVANT_TITLE.test(page.title ?? '')) continue;
+      if (ALWAYS_IRRELEVANT.test(page.title ?? '')) continue;
       photos.push({
         url: full,
         thumbUrl: page.thumbnail?.source,
@@ -265,7 +302,7 @@ async function commonsSearchPhotos(query: string, limit: number): Promise<PlaceP
       if (!info?.url) continue;
       if (info.mime && !info.mime.startsWith('image/')) continue;
       const title = (page.title ?? '').toLowerCase();
-      if (IRRELEVANT_TITLE.test(title)) continue;
+      if (ALWAYS_IRRELEVANT.test(title)) continue;
       photos.push({
         url: info.url,
         thumbUrl: info.thumburl ?? info.url,
@@ -310,7 +347,7 @@ async function openverseSearchPhotos(query: string, limit: number): Promise<Plac
     const photos: PlacePhoto[] = [];
     for (const item of data.results ?? []) {
       if (!item.url) continue;
-      if (IRRELEVANT_TITLE.test(item.title ?? '')) continue;
+      if (ALWAYS_IRRELEVANT.test(item.title ?? '')) continue;
       photos.push({
         url: item.url,
         thumbUrl: item.thumbnail ?? item.url,
@@ -324,18 +361,24 @@ async function openverseSearchPhotos(query: string, limit: number): Promise<Plac
   }
 }
 
-/** Honest fallback when no venue-matched photo exists. */
+/** Last-resort map tile — works worldwide without API keys. */
 function mapPreviewPhoto(place: Place): PlacePhoto {
-  const lat = place.latitude.toFixed(5);
-  const lon = place.longitude.toFixed(5);
-  const url =
-    `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}` +
-    `&zoom=16&size=800x480&maptype=mapnik&markers=${lat},${lon},lightblue1`;
+  const zoom = 15;
+  const lat = place.latitude;
+  const lon = place.longitude;
+  const n = 2 ** zoom;
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const latRad = (lat * Math.PI) / 180;
+  const y = Math.floor(
+    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n,
+  );
+  const url = `https://basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${x}/${y}@2x.png`;
   return {
     url,
+    thumbUrl: url,
     source: 'map',
     title: 'Map preview',
-    score: 0,
+    score: 0.05,
   };
 }
 
@@ -500,22 +543,30 @@ async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhot
   const city = cityHint(place);
   if (name.length < 3) return [];
 
+  const primaryToken =
+    significantTokens(name).find((t) => !GEO_ONLY_TOKEN.test(t) && t.length >= 4) ?? '';
+
   const queries = [
     [name, city].filter(Boolean).join(' '),
     name,
+    primaryToken && city ? `${primaryToken} ${city}` : '',
+    primaryToken,
   ].filter((q, index, arr) => q.length >= 3 && arr.indexOf(q) === index);
 
   const batches = await Promise.all(
     queries.flatMap((query) => [
       wikipediaSearchPhotos(query, limit),
-      commonsSearchPhotos(`"${name}"`, limit),
       commonsSearchPhotos(query, limit),
-      // Free CC photos (Flickr/Wikimedia via Openverse) — no Google billing.
+      commonsSearchPhotos(`"${primaryToken || name}"`, limit),
       openverseSearchPhotos(query, limit),
     ]),
   );
 
-  return rankPhotos(place, batches.flat());
+  const ranked = rankPhotos(place, batches.flat(), 0.34);
+  if (ranked.length > 0) return ranked;
+
+  // Soft accept: any title that shares a distinctive token (worldwide obscure spots).
+  return rankPhotos(place, batches.flat(), 0.2);
 }
 
 /**
@@ -525,13 +576,12 @@ async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhot
 export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePhoto[]> {
   const existing = (place.photos ?? [])
     .filter((url) => typeof url === 'string' && /^https?:\/\//i.test(url))
-    .map((url) => ({ url, source: 'place' as const, score: 1 }));
+    .map((url) => ({ url: cleanMediaUrl(url), source: 'place' as const, score: 1 }));
 
   if (existing.length >= limit) {
     return existing.slice(0, limit);
   }
 
-  // Prefer free sources so cards work without Google billing.
   const named = await searchNamedPhotos(place, limit);
 
   let geo: PlacePhoto[] = [];
@@ -540,11 +590,11 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
     Number.isFinite(place.latitude) &&
     Number.isFinite(place.longitude)
   ) {
-    geo = rankPhotos(place, await wikipediaGeoPhotos(place.latitude, place.longitude, limit));
+    geo = rankPhotos(place, await wikipediaGeoPhotos(place.latitude, place.longitude, limit), 0.34);
   }
 
   let googleList: PlacePhoto[] = [];
-  if (named.length + geo.length < limit) {
+  if (named.length + geo.length < Math.min(2, limit)) {
     const google = await fetchGooglePlacePhoto(place, 1200);
     if (google) googleList = [google];
   }
@@ -557,33 +607,34 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
 }
 
 /**
- * Single best photo for list tiles (Home / Explore cards).
- * Uses free name-matched photos; Google only when configured; else map preview.
+ * Single best photo for list tiles (Home / Explore cards) — every city/country/place.
  */
 export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
   const existing = (place.photos ?? []).find(
     (url) => typeof url === 'string' && /^https?:\/\//i.test(url),
   );
   if (existing) {
-    return { url: existing, thumbUrl: existing, source: 'place', score: 1 };
+    const url = cleanMediaUrl(existing);
+    return { url, thumbUrl: url, source: 'place', score: 1 };
   }
 
-  const named = await searchNamedPhotos(place, 6);
-  if (named[0] && (named[0].score ?? 0) >= 0.5) {
-    return named[0];
-  }
+  try {
+    const named = await searchNamedPhotos(place, 8);
+    if (named[0]) return named[0];
 
-  const google = await fetchGooglePlacePhoto(place, 900);
-  if (google) return google;
+    if (!isFoodPlace(place) && Number.isFinite(place.latitude) && Number.isFinite(place.longitude)) {
+      const geo = rankPhotos(
+        place,
+        await wikipediaGeoPhotos(place.latitude, place.longitude, 6),
+        0.25,
+      );
+      if (geo[0]) return geo[0];
+    }
 
-  if (!isFoodPlace(place)) {
-    const photos = await fetchPlacePhotos(place, 3);
-    const best = photos.find(
-      (photo) =>
-        photo.source !== 'map' &&
-        (photo.source === 'google' || (photo.score ?? 0) >= 0.5),
-    );
-    if (best) return best;
+    const google = await fetchGooglePlacePhoto(place, 900);
+    if (google) return google;
+  } catch {
+    // Fall through to map tile so the card never looks empty.
   }
 
   return mapPreviewPhoto(place);

@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Image } from 'react-native';
@@ -23,16 +23,24 @@ const PHOTO_HEIGHT = 188;
 
 function PlaceCardPhoto({ place }: { place: Place }) {
   const scheme = useAppColorScheme();
-  const [failed, setFailed] = useState(false);
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
+  const title = displayPlaceName(place);
   const photoQuery = useQuery({
-    queryKey: ['place-card-photo', 'v4-free', place.id, place.name, place.address],
+    queryKey: ['place-card-photo', 'v6-world', place.id, place.name, place.address],
     queryFn: () => fetchBestPlacePhoto(place),
     staleTime: 45 * 60_000,
     gcTime: 2 * 60 * 60_000,
   });
 
-  const uri = failed ? undefined : photoQuery.data?.thumbUrl ?? photoQuery.data?.url;
+  const candidates = useMemo(() => {
+    const data = photoQuery.data;
+    if (!data) return [] as string[];
+    return [...new Set([data.thumbUrl, data.url].filter((u): u is string => Boolean(u)))];
+  }, [photoQuery.data]);
+
+  const uri = candidates.find((u) => !failedUrls.has(u)) ?? null;
   const skeletonClass = scheme === 'dark' ? 'bg-brand-900' : 'bg-surface-mist';
+  const initial = (title.trim().charAt(0) || '?').toUpperCase();
 
   return (
     <View className={`w-full overflow-hidden rounded-2xl ${skeletonClass}`} style={{ height: PHOTO_HEIGHT }}>
@@ -41,14 +49,29 @@ function PlaceCardPhoto({ place }: { place: Place }) {
           source={{ uri }}
           style={{ width: '100%', height: PHOTO_HEIGHT }}
           resizeMode="cover"
-          accessibilityLabel={`${displayPlaceName(place)} photo`}
-          onError={() => setFailed(true)}
+          accessibilityLabel={`${title} photo`}
+          onError={() =>
+            setFailedUrls((prev) => {
+              const next = new Set(prev);
+              next.add(uri);
+              return next;
+            })
+          }
         />
       ) : (
         <View className={`h-full w-full items-center justify-center ${skeletonClass}`}>
-          <AppText muted className="text-xs">
-            {photoQuery.isLoading ? 'Loading photo…' : 'No photo'}
-          </AppText>
+          {photoQuery.isLoading ? (
+            <AppText muted className="text-xs">
+              Loading photo…
+            </AppText>
+          ) : (
+            <>
+              <AppText className="text-3xl font-sans-semibold opacity-40">{initial}</AppText>
+              <AppText muted className="mt-1 text-xs capitalize">
+                {labelize(place.category)}
+              </AppText>
+            </>
+          )}
         </View>
       )}
     </View>
@@ -63,7 +86,6 @@ function PlaceCardComponent({
   className?: string;
 }) {
   const router = useRouter();
-  const scheme = useAppColorScheme();
   const { currency, budgetTier } = useDisplayCurrency();
   const title = displayPlaceName(place);
   const ratingText = formatPlaceRating(place);
@@ -113,13 +135,7 @@ function PlaceCardComponent({
         ) : null}
 
         {place.address ? (
-          <AppText
-            muted
-            className={`mt-0.5 text-[13px] leading-4 ${
-              scheme === 'dark' ? '' : ''
-            }`}
-            numberOfLines={1}
-          >
+          <AppText muted className="mt-0.5 text-[13px] leading-4" numberOfLines={1}>
             {place.address}
           </AppText>
         ) : null}

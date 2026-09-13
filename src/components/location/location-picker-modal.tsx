@@ -162,6 +162,33 @@ const QUICK_PICKS: DestinationSuggestion[] = [
     longitude: 125.4553,
     countryCode: 'PH',
   },
+  {
+    id: 'quick-hanoi',
+    label: 'Hanoi, Vietnam',
+    shortName: 'Hanoi',
+    kind: 'city',
+    latitude: 21.0285,
+    longitude: 105.8542,
+    countryCode: 'VN',
+  },
+  {
+    id: 'quick-sapa',
+    label: 'Sa Pa, Lao Cai, Vietnam',
+    shortName: 'Sa Pa',
+    kind: 'city',
+    latitude: 22.3364,
+    longitude: 103.8438,
+    countryCode: 'VN',
+  },
+  {
+    id: 'quick-hcmc',
+    label: 'Ho Chi Minh City, Vietnam',
+    shortName: 'Ho Chi Minh City',
+    kind: 'city',
+    latitude: 10.8231,
+    longitude: 106.6297,
+    countryCode: 'VN',
+  },
 ];
 
 export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
@@ -172,7 +199,7 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
   const debounced = useDebouncedValue(query, 350);
 
   const suggestionsQuery = useQuery({
-    queryKey: ['location-picker', debounced],
+    queryKey: ['location-picker', 'v2-world', debounced],
     enabled: visible && debounced.trim().length >= 2,
     queryFn: () => searchDestinations(debounced),
     staleTime: 60_000,
@@ -246,17 +273,17 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
           >
             <Card className="mb-4">
               <AppText muted className="mb-3 text-sm">
-                iOS Simulator GPS defaults to San Francisco. This app remaps that to Malolos,
-                Bulacan (your area). On a real phone, GPS uses your true coordinates.
+                With location permission on, we use your precise GPS and reverse-geocode the exact
+                city/area. On iOS Simulator, SF GPS is remapped to Malolos, Bulacan.
               </AppText>
               <Button
-                label="Use my location (Malolos, Bulacan)"
+                label="Use Malolos, Bulacan"
                 loading={busy}
                 onPress={() => void applyHome()}
               />
               <View className="mt-2">
                 <Button
-                  label="Read device GPS"
+                  label="Use precise device GPS"
                   variant="secondary"
                   loading={busy}
                   onPress={() => void applyGps()}
@@ -297,7 +324,7 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
               value={query}
               onChangeText={setQuery}
               autoCapitalize="words"
-              placeholder="e.g. Bulacan, Philippines"
+              placeholder="e.g. Sa Pa Vietnam, Tokyo, Bulacan"
               returnKeyType="search"
               blurOnSubmit
             />

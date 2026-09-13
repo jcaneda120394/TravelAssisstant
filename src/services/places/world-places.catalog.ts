@@ -11,6 +11,8 @@ type WorldEntry = {
   rating?: number;
   reviewCount?: number;
   tags?: string[];
+  /** Optional Wikimedia/Openverse URL so cards never depend on live search. */
+  photoUrl?: string;
 };
 
 function e(
@@ -23,8 +25,9 @@ function e(
   rating: number,
   reviewCount: number,
   tags: string[] = [],
+  photoUrl?: string,
 ): WorldEntry {
-  return { id, name, category, latitude, longitude, address, rating, reviewCount, tags };
+  return { id, name, category, latitude, longitude, address, rating, reviewCount, tags, photoUrl };
 }
 
 /**
@@ -150,10 +153,17 @@ const WORLD: WorldEntry[] = [
   e('w-phuket-big-buddha', 'Big Buddha Phuket', 'temple', 7.8277, 98.3128, 'Phuket', 4.6, 25_000, ['famous']),
 
   // ——— Vietnam / Indonesia / Malaysia ———
-  e('w-hanoi-old', 'Hanoi Old Quarter', 'attraction', 21.034, 105.852, 'Hanoi', 4.5, 40_000, ['famous']),
-  e('w-hanoi-hoankiem', 'Hoan Kiem Lake', 'park', 21.0288, 105.852, 'Hanoi', 4.5, 25_000, ['famous']),
-  e('w-hcmc-ben-thanh', 'Ben Thanh Market', 'market', 10.772, 106.698, 'Ho Chi Minh City', 4.3, 30_000, ['market']),
-  e('w-hcmc-notre', 'Notre-Dame Cathedral Basilica of Saigon', 'temple', 10.7798, 106.699, 'Ho Chi Minh City', 4.5, 20_000, ['famous']),
+  e('w-hanoi-old', 'Hanoi Old Quarter', 'attraction', 21.034, 105.852, 'Hanoi, Vietnam', 4.5, 40_000, ['famous']),
+  e('w-hanoi-hoankiem', 'Hoan Kiem Lake', 'park', 21.0288, 105.852, 'Hanoi, Vietnam', 4.5, 25_000, ['famous']),
+  e('w-hanoi-temple', 'Temple of Literature', 'temple', 21.028, 105.8355, 'Hanoi, Vietnam', 4.6, 18_000, ['famous']),
+  e('w-sapa-town', 'Sa Pa Town Center', 'attraction', 22.3364, 103.8438, 'Sa Pa, Vietnam', 4.5, 12_000, ['famous', 'local']),
+  e('w-sapa-fansipan', 'Fansipan Peak / Cable Car', 'viewpoint', 22.304, 103.775, 'Sa Pa, Vietnam', 4.7, 20_000, ['famous', 'viewpoint']),
+  e('w-sapa-catcat', 'Cat Cat Village', 'attraction', 22.323, 103.832, 'Sa Pa, Vietnam', 4.5, 9_000, ['local', 'famous']),
+  e('w-sapa-hamrong', 'Ham Rong Mountain', 'attraction', 22.341, 103.847, 'Sa Pa, Vietnam', 4.4, 6_000, ['local']),
+  e('w-hcmc-ben-thanh', 'Ben Thanh Market', 'market', 10.772, 106.698, 'Ho Chi Minh City, Vietnam', 4.3, 30_000, ['market']),
+  e('w-hcmc-notre', 'Notre-Dame Cathedral Basilica of Saigon', 'temple', 10.7798, 106.699, 'Ho Chi Minh City, Vietnam', 4.5, 20_000, ['famous']),
+  e('w-danang-marble', 'Marble Mountains', 'attraction', 16.0039, 108.2638, 'Da Nang, Vietnam', 4.6, 22_000, ['famous']),
+  e('w-hoian-ancient', 'Hoi An Ancient Town', 'attraction', 15.8801, 108.338, 'Hoi An, Vietnam', 4.7, 45_000, ['famous', 'unesco']),
   e('w-bali-uluwatu', 'Uluwatu Temple', 'temple', -8.8291, 115.0849, 'Bali', 4.6, 40_000, ['famous']),
   e('w-bali-tegallalang', 'Tegallalang Rice Terrace', 'attraction', -8.4312, 115.2792, 'Bali', 4.5, 35_000, ['famous']),
   e('w-bali-ubud', 'Ubud Monkey Forest', 'park', -8.5189, 115.2592, 'Bali', 4.4, 30_000, ['famous']),
@@ -178,11 +188,10 @@ const WORLD: WorldEntry[] = [
 
   // Sorsogon / Bicol
   e('w-sorsogon-capitol', 'Sorsogon Provincial Capitol Park', 'park', 12.9742, 124.0048, 'Sorsogon City', 4.4, 2_800, ['park', 'landmark', 'local']),
-  e('w-sorsogon-boulevard', 'Sorsogon City Boulevard / Rompeolas', 'viewpoint', 12.9688, 124.0125, 'Sorsogon City', 4.5, 3_400, ['viewpoint', 'local', 'famous']),
+  e('w-sorsogon-boulevard', 'Sorsogon City Boulevard / Rompeolas', 'viewpoint', 12.9688, 124.0125, 'Sorsogon City', 4.5, 3_400, ['viewpoint', 'local', 'famous'], 'https://upload.wikimedia.org/wikipedia/commons/4/41/Sunrise_in_Sorsogon_Rompeolas.jpg'),
   e('w-sorsogon-museum', 'Sorsogon Museum and Heritage Center', 'museum', 12.9725, 124.0059, 'Sorsogon City', 4.3, 1_200, ['museum', 'culture']),
   e('w-sorsogon-cathedral', 'Sts. Peter and Paul Cathedral', 'temple', 12.9736, 124.0068, 'Sorsogon City', 4.6, 2_100, ['church', 'landmark']),
   e('w-sorsogon-rizal-beach', 'Rizal Beach (Gubat)', 'beach', 12.9205, 124.1232, 'Gubat, Sorsogon', 4.6, 4_500, ['beach', 'famous', 'local']),
-  e('w-sorsogon-paguriran', 'Paguriran Island / Rock Formation', 'beach', 12.906, 124.148, 'Barcelona, Sorsogon', 4.7, 5_200, ['beach', 'famous', 'underrated']),
   e('w-sorsogon-bulusan', 'Bulusan Lake', 'lake', 12.769, 124.056, 'Bulusan, Sorsogon', 4.7, 6_800, ['nature', 'famous', 'lake', 'park']),
   e('w-sorsogon-barcelona', 'Barcelona Ruins Church (St. Joseph Parish)', 'temple', 12.866, 124.14, 'Barcelona, Sorsogon', 4.6, 3_800, ['historic', 'church', 'famous', 'local']),
   e('w-sorsogon-barcelona-ruins-park', 'Barcelona Ruins Park / Presidencia', 'attraction', 12.8665, 124.1405, 'Barcelona, Sorsogon', 4.5, 2_200, ['historic', 'local', 'underrated']),
@@ -190,8 +199,8 @@ const WORLD: WorldEntry[] = [
   e('w-sorsogon-barcelona-bridge', 'Vintage Bridge of 1939 (Barcelona)', 'attraction', 12.8672, 124.1392, 'Barcelona, Sorsogon', 4.3, 980, ['historic', 'local', 'photo']),
   e('w-sorsogon-barcelona-hall', 'Barcelona Town Hall', 'attraction', 12.868, 124.141, 'Barcelona, Sorsogon', 4.3, 1_100, ['historic', 'architecture', 'local']),
   e('w-sorsogon-agrihope', 'AgriHope Tourism Farm', 'attraction', 12.875, 124.135, 'Barcelona, Sorsogon', 4.5, 1_400, ['farm', 'family', 'local', 'underrated']),
-  e('w-sorsogon-paguriran', 'Paguriran Island / Rock Formation', 'beach', 12.906, 124.148, 'Barcelona, Sorsogon', 4.7, 5_200, ['beach', 'famous', 'underrated', 'island']),
-  e('w-sorsogon-paguriran-cove', 'Paguriran Cove Swim Spot', 'beach', 12.9045, 124.1468, 'Barcelona, Sorsogon', 4.6, 2_900, ['beach', 'swim', 'local']),
+  e('w-sorsogon-paguriran', 'Paguriran Island / Rock Formation', 'beach', 12.906, 124.148, 'Barcelona, Sorsogon', 4.7, 5_200, ['beach', 'famous', 'underrated', 'island'], 'https://upload.wikimedia.org/wikipedia/commons/d/da/Magnificent_View_of_Mayon_at_Paguriran_Island,_Bacon,_Sorsogon.jpg'),
+  e('w-sorsogon-paguriran-cove', 'Paguriran Cove Swim Spot', 'beach', 12.9045, 124.1468, 'Barcelona, Sorsogon', 4.6, 2_900, ['beach', 'swim', 'local'], 'https://upload.wikimedia.org/wikipedia/commons/d/da/Magnificent_View_of_Mayon_at_Paguriran_Island,_Bacon,_Sorsogon.jpg'),
   e('w-sorsogon-palogtoc', 'Palogtoc Falls / Cold Spring', 'cold_spring', 12.702, 124.032, 'Irosin, Sorsogon', 4.6, 3_100, ['cold spring', 'waterfall', 'nature', 'famous']),
   e('w-sorsogon-san-benon', 'San Benon Hot Springs', 'hot_spring', 12.7055, 124.018, 'Irosin, Sorsogon', 4.5, 2_400, ['hot spring', 'spa', 'nature', 'local']),
   e('w-sorsogon-tongig', 'Tongig Hot Spring', 'hot_spring', 12.71, 124.01, 'Irosin, Sorsogon', 4.3, 980, ['hot spring', 'local']),
@@ -392,6 +401,7 @@ function toPlace(entry: WorldEntry, origin: GeoPoint): Place {
     rating: entry.rating,
     reviewCount: entry.reviewCount,
     tags: entry.tags,
+    photos: entry.photoUrl ? [entry.photoUrl] : undefined,
     distanceMeters: Math.round(
       haversineMeters(origin, { latitude: entry.latitude, longitude: entry.longitude }),
     ),

@@ -285,6 +285,60 @@ export const LOCAL_DESTINATIONS: DestinationSuggestion[] = [
     longitude: 126.978,
     countryCode: 'KR',
   },
+  {
+    id: 'local-hanoi',
+    label: 'Hanoi, Vietnam',
+    shortName: 'Hanoi',
+    kind: 'city',
+    latitude: 21.0285,
+    longitude: 105.8542,
+    countryCode: 'VN',
+  },
+  {
+    id: 'local-hcmc',
+    label: 'Ho Chi Minh City, Vietnam',
+    shortName: 'Ho Chi Minh City',
+    kind: 'city',
+    latitude: 10.8231,
+    longitude: 106.6297,
+    countryCode: 'VN',
+  },
+  {
+    id: 'local-danang',
+    label: 'Da Nang, Vietnam',
+    shortName: 'Da Nang',
+    kind: 'city',
+    latitude: 16.0544,
+    longitude: 108.2022,
+    countryCode: 'VN',
+  },
+  {
+    id: 'local-hoian',
+    label: 'Hoi An, Vietnam',
+    shortName: 'Hoi An',
+    kind: 'city',
+    latitude: 15.8801,
+    longitude: 108.338,
+    countryCode: 'VN',
+  },
+  {
+    id: 'local-sapa',
+    label: 'Sa Pa, Lao Cai, Vietnam',
+    shortName: 'Sa Pa',
+    kind: 'city',
+    latitude: 22.3364,
+    longitude: 103.8438,
+    countryCode: 'VN',
+  },
+  {
+    id: 'local-vietnam',
+    label: 'Vietnam',
+    shortName: 'Vietnam',
+    kind: 'country',
+    latitude: 21.0285,
+    longitude: 105.8542,
+    countryCode: 'VN',
+  },
 ];
 
 function kindFromHit(hit: NominatimHit): DestinationSuggestion['kind'] {
@@ -301,6 +355,9 @@ function kindFromHit(hit: NominatimHit): DestinationSuggestion['kind'] {
   if (hit.class === 'place') {
     return 'city';
   }
+  if (hit.class === 'landuse' && ['residential', 'commercial', 'retail'].includes(type)) {
+    return 'city';
+  }
   if (hit.class === 'boundary' && type === 'administrative') {
     if (hit.address?.country && !hit.address?.state && !hit.address?.city) {
       return 'country';
@@ -312,52 +369,95 @@ function kindFromHit(hit: NominatimHit): DestinationSuggestion['kind'] {
 
 function shortNameFromHit(hit: NominatimHit): string {
   const address = hit.address;
+  const namedFromDisplay = hit.display_name.split(',')[0]?.trim();
   // Prefer the named POI (theme park, landmark) over the containing city.
   if (hit.class && !['place', 'boundary', 'administrative'].includes(hit.class)) {
-    const named = address?.name || hit.display_name.split(',')[0];
+    const named = address?.name || namedFromDisplay;
     if (named?.trim()) {
       return named.trim();
     }
   }
   return (
+    address?.name ||
+    namedFromDisplay ||
     address?.city ||
     address?.town ||
     address?.village ||
     address?.municipality ||
     address?.state ||
     address?.country ||
-    address?.name ||
-    hit.display_name.split(',')[0] ||
     'Place'
   );
 }
 
 function labelFromHit(hit: NominatimHit): string {
   const address = hit.address;
+  const primary =
+    address?.name ||
+    hit.display_name.split(',')[0]?.trim() ||
+    address?.city ||
+    address?.town ||
+    address?.village ||
+    address?.municipality;
   const city =
-    address?.city || address?.town || address?.village || address?.municipality || address?.name;
+    address?.city || address?.town || address?.village || address?.municipality;
   const state = address?.state;
   const country = address?.country;
-  return [city, state, country].filter(Boolean).join(', ') || hit.display_name;
+  const parts = [primary];
+  if (city && city !== primary) parts.push(city);
+  if (state) parts.push(state);
+  if (country) parts.push(country);
+  return parts.filter(Boolean).join(', ') || hit.display_name;
 }
 
 function isUsefulHit(hit: NominatimHit, includePlaces: boolean): boolean {
   const type = hit.type ?? '';
   const cls = hit.class ?? '';
+  const addresstype = (hit as { addresstype?: string }).addresstype ?? '';
+
   if (cls === 'place') return true;
   if (cls === 'boundary' && type === 'administrative') return true;
-  if (['country', 'state', 'city', 'town', 'village', 'municipality', 'region'].includes(type)) {
+  if (
+    [
+      'country',
+      'state',
+      'city',
+      'town',
+      'village',
+      'municipality',
+      'region',
+      'hamlet',
+      'suburb',
+      'neighbourhood',
+      'quarter',
+      'locality',
+    ].includes(type)
+  ) {
+    return true;
+  }
+  if (
+    ['city', 'town', 'village', 'municipality', 'suburb', 'neighbourhood', 'county', 'state', 'country'].includes(
+      addresstype,
+    )
+  ) {
+    return true;
+  }
+  // Named settlement areas (Sa Pa often returns as landuse=residential).
+  if (
+    cls === 'landuse' &&
+    ['residential', 'commercial', 'retail', 'recreation_ground', 'village_green'].includes(type) &&
+    Boolean(hit.display_name || hit.address?.name || hit.address?.city)
+  ) {
     return true;
   }
   if (!includePlaces) {
     return false;
   }
-  // Theme parks, landmarks, stations, museums, etc. for Directions / place search.
   if (['tourism', 'leisure', 'amenity', 'historic', 'attraction', 'aeroway'].includes(cls)) {
     return true;
   }
-  if (cls === 'landuse' && (type === 'commercial' || type === 'retail' || type === 'recreation_ground')) {
-    return true;
+  if (cls === 'landuse') {
+    return Boolean(hit.display_name);
   }
   if (cls === 'railway' && (type === 'station' || type === 'halt')) {
     return true;
@@ -384,9 +484,11 @@ function searchLocalDestinations(query: string): DestinationSuggestion[] {
     return [];
   }
   const tokens = q.split(' ').filter(Boolean);
+  const compact = (value: string) => normalizeQuery(value).replace(/\s+/g, '');
 
   return LOCAL_DESTINATIONS.filter((item) => {
     const hay = normalizeQuery(`${item.shortName} ${item.label}`);
+    const hayCompact = compact(`${item.shortName} ${item.label}`);
     // Ambiguous short names (Barcelona, Springfield…) must match an extra token
     // from the full label unless the query already includes country/region context.
     const ambiguous =
@@ -399,7 +501,9 @@ function searchLocalDestinations(query: string): DestinationSuggestion[] {
         return false;
       }
     }
-    return tokens.every((token) => hay.includes(token));
+    return tokens.every(
+      (token) => hay.includes(token) || hayCompact.includes(compact(token)),
+    );
   }).slice(0, 8);
 }
 
@@ -573,28 +677,37 @@ export async function searchDestinations(
   const includePlaces = Boolean(options.includePlaces);
   const limit = includePlaces ? 12 : 10;
 
-  try {
-    if (includePlaces) {
-      const [nominatim, photon] = await Promise.all([
-        searchNominatimDestinations(q, options).catch(() => [] as DestinationSuggestion[]),
-        searchPhotonDestinations(q, options).catch(() => [] as DestinationSuggestion[]),
-      ]);
-      const merged = dedupeSuggestions([...local, ...photon, ...nominatim]).sort(
-        (a, b) => placeQualityRank(a) - placeQualityRank(b),
-      );
-      if (merged.length > 0) {
-        return merged.slice(0, limit);
-      }
-    }
+  // Always query Nominatim + Photon in parallel so worldwide cities work
+  // even when one provider is down / rate-limited / filters oddly.
+  const [nominatim, photon] = await Promise.all([
+    searchNominatimDestinations(q, options).catch(() => [] as DestinationSuggestion[]),
+    searchPhotonDestinations(q, options).catch(() => [] as DestinationSuggestion[]),
+  ]);
 
-    const remote = await searchNominatimDestinations(q, options);
-    return dedupeSuggestions([...local, ...remote]).slice(0, limit);
-  } catch {
-    try {
-      const photon = await searchPhotonDestinations(q, options);
-      return dedupeSuggestions([...local, ...photon]).slice(0, limit);
-    } catch {
-      return local;
-    }
+  let merged = dedupeSuggestions([...local, ...nominatim, ...photon]);
+  if (includePlaces) {
+    merged = merged.sort((a, b) => placeQualityRank(a) - placeQualityRank(b));
+  } else {
+    // Location picker: prefer cities/regions over stray POIs.
+    merged = merged.sort((a, b) => {
+      const rank = (k: DestinationSuggestion['kind']) =>
+        k === 'city' ? 0 : k === 'region' ? 1 : k === 'country' ? 2 : 3;
+      return rank(a.kind) - rank(b.kind);
+    });
   }
+
+  if (merged.length > 0) {
+    return merged.slice(0, limit);
+  }
+
+  // Last resort: looser Nominatim query (drop feature-type filter by including places).
+  if (!includePlaces) {
+    const loose = await searchNominatimDestinations(q, {
+      ...options,
+      includePlaces: true,
+    }).catch(() => [] as DestinationSuggestion[]);
+    return dedupeSuggestions([...local, ...loose]).slice(0, limit);
+  }
+
+  return local;
 }

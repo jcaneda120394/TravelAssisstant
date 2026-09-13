@@ -7,7 +7,7 @@ import { haversineMeters } from '@/utils/geo';
 export type PlacePhoto = {
   url: string;
   thumbUrl?: string;
-  source: 'place' | 'google' | 'wikipedia' | 'commons' | 'map' | 'community';
+  source: 'place' | 'google' | 'wikipedia' | 'commons' | 'openverse' | 'map' | 'community';
   title?: string;
   /** 0–1 relevance to the place name; map previews are 0. */
   score?: number;
@@ -279,6 +279,51 @@ async function commonsSearchPhotos(query: string, limit: number): Promise<PlaceP
   }
 }
 
+type OpenverseResponse = {
+  results?: Array<{
+    title?: string;
+    url?: string;
+    thumbnail?: string;
+    foreign_landing_url?: string;
+  }>;
+};
+
+/**
+ * Free Creative Commons image search (no Google billing).
+ * Best for landmarks / named attractions; restaurants may still fall back to map.
+ */
+async function openverseSearchPhotos(query: string, limit: number): Promise<PlacePhoto[]> {
+  if (!query.trim()) return [];
+  const url =
+    `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}` +
+    `&page_size=${Math.min(Math.max(limit, 1), 12)}` +
+    `&category=photograph&mature=false&filter_dead=true`;
+  try {
+    const data = await fetchJson<OpenverseResponse>(url, {
+      timeoutMs: 8_000,
+      cacheTtlMs: 30 * 60_000,
+      headers: {
+        'User-Agent': USER_AGENT,
+        Accept: 'application/json',
+      },
+    });
+    const photos: PlacePhoto[] = [];
+    for (const item of data.results ?? []) {
+      if (!item.url) continue;
+      if (IRRELEVANT_TITLE.test(item.title ?? '')) continue;
+      photos.push({
+        url: item.url,
+        thumbUrl: item.thumbnail ?? item.url,
+        source: 'openverse',
+        title: item.title,
+      });
+    }
+    return photos;
+  } catch {
+    return [];
+  }
+}
+
 /** Honest fallback when no venue-matched photo exists. */
 function mapPreviewPhoto(place: Place): PlacePhoto {
   const lat = place.latitude.toFixed(5);
@@ -310,16 +355,22 @@ type GooglePhotoPayload = {
 };
 
 const googleInflight = new Map<string, Promise<PlacePhoto | null>>();
+/** Skip Google Edge calls after we learn Places billing/key is unavailable. */
+let googlePlacesUnavailableUntil = 0;
 
 function googleCacheKey(place: Place): string {
   return `${place.id}|${place.name}|${place.latitude.toFixed(4)}|${place.longitude.toFixed(4)}`;
 }
 
-/** Prefer Google Places photos — accurate venue imagery for cards + detail. */
+/** Optional Google Places photos — skipped when no key / billing. */
 async function fetchGooglePlacePhoto(
   place: Place,
   maxWidthPx = 900,
 ): Promise<PlacePhoto | null> {
+  if (Date.now() < googlePlacesUnavailableUntil && !env.googleMapsApiKey?.trim()) {
+    return null;
+  }
+
   const key = googleCacheKey(place);
   const existing = googleInflight.get(key);
   if (existing) return existing;
@@ -339,7 +390,14 @@ async function fetchGooglePlacePhoto(
         const { data, error } = await supabase.functions.invoke<GooglePhotoPayload>('google-places', {
           body: { action: 'photo', ...body },
         });
-        if (!error && data?.photo?.url) {
+        if (
+          data?.code === 'NO_GOOGLE_KEY' ||
+          data?.error === 'Google Places is not configured' ||
+          (error && /503|NO_GOOGLE/i.test(String(error.message ?? error)))
+        ) {
+          googlePlacesUnavailableUntil = Date.now() + 60 * 60_000;
+          // Fall through to free sources.
+        } else if (!error && data?.photo?.url) {
           return {
             url: data.photo.url,
             thumbUrl: data.photo.thumbUrl ?? data.photo.url,
@@ -349,7 +407,7 @@ async function fetchGooglePlacePhoto(
           };
         }
       } catch {
-        // Fall through to optional client key / Wikimedia.
+        // Fall through to optional client key / free sources.
       }
     }
 
@@ -452,6 +510,8 @@ async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhot
       wikipediaSearchPhotos(query, limit),
       commonsSearchPhotos(`"${name}"`, limit),
       commonsSearchPhotos(query, limit),
+      // Free CC photos (Flickr/Wikimedia via Openverse) — no Google billing.
+      openverseSearchPhotos(query, limit),
     ]),
   );
 
@@ -460,7 +520,7 @@ async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhot
 
 /**
  * Resolve a few photos for a place detail screen.
- * Prefer Google Places, then name-matched Wikimedia; otherwise map preview.
+ * Free Wikimedia/Openverse first; Google Places only if a key is configured.
  */
 export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePhoto[]> {
   const existing = (place.photos ?? [])
@@ -471,13 +531,9 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
     return existing.slice(0, limit);
   }
 
-  const google = await fetchGooglePlacePhoto(place, 1200);
-  const googleList = google ? [google] : [];
-
+  // Prefer free sources so cards work without Google billing.
   const named = await searchNamedPhotos(place, limit);
 
-  // Geo Wikipedia is useful for landmarks, but for restaurants it often returns
-  // nearby volcanoes / highways — skip it for food.
   let geo: PlacePhoto[] = [];
   if (
     !isFoodPlace(place) &&
@@ -485,6 +541,12 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
     Number.isFinite(place.longitude)
   ) {
     geo = rankPhotos(place, await wikipediaGeoPhotos(place.latitude, place.longitude, limit));
+  }
+
+  let googleList: PlacePhoto[] = [];
+  if (named.length + geo.length < limit) {
+    const google = await fetchGooglePlacePhoto(place, 1200);
+    if (google) googleList = [google];
   }
 
   const merged = dedupePhotos([...existing, ...googleList, ...named, ...geo]).slice(0, limit);
@@ -496,7 +558,7 @@ export async function fetchPlacePhotos(place: Place, limit = 6): Promise<PlacePh
 
 /**
  * Single best photo for list tiles (Home / Explore cards).
- * Prefer Google Places venue photos; never show unrelated Wikimedia hits.
+ * Uses free name-matched photos; Google only when configured; else map preview.
  */
 export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
   const existing = (place.photos ?? []).find(
@@ -506,13 +568,13 @@ export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
     return { url: existing, thumbUrl: existing, source: 'place', score: 1 };
   }
 
-  const google = await fetchGooglePlacePhoto(place, 900);
-  if (google) return google;
-
-  const named = await searchNamedPhotos(place, 4);
+  const named = await searchNamedPhotos(place, 6);
   if (named[0] && (named[0].score ?? 0) >= 0.5) {
     return named[0];
   }
+
+  const google = await fetchGooglePlacePhoto(place, 900);
+  if (google) return google;
 
   if (!isFoodPlace(place)) {
     const photos = await fetchPlacePhotos(place, 3);

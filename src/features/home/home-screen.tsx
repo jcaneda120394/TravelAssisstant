@@ -118,7 +118,7 @@ export function HomeScreen() {
   const attractionsQuery = useQuery({
     queryKey: [
       'home-attractions',
-      'v3-google',
+      'v4-nearness',
       coords?.latitude,
       coords?.longitude,
       label,
@@ -143,7 +143,7 @@ export function HomeScreen() {
   const foodQuery = useQuery({
     queryKey: [
       'home-food',
-      'v3-google',
+      'v4-nearness',
       coords?.latitude,
       coords?.longitude,
       label,

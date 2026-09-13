@@ -8,7 +8,7 @@ import { applyCompanionFilter, companionFilterActive } from '@/utils/companion-s
 import { filterPlacesWithinRadius } from '@/utils/geo';
 import { dropForeignLandmarkNoise } from '@/utils/place-foreign-noise';
 import { filterPlacesByCategory } from '@/utils/place-category-match';
-import { topPopularPlaces } from '@/utils/place-popularity';
+import { topNearbyPlaces } from '@/utils/place-popularity';
 import { dedupePlaces } from '@/utils/dedupe-places';
 
 const DEFAULT_LIMIT = 18;
@@ -44,9 +44,10 @@ function finish(
     cityLabel,
   );
   const deduped = dedupePlaces(localOnly);
+  const nearFirst = topNearbyPlaces(deduped, Math.max(limit * 2, 40), category);
   const ranked = companionFilterActive(companions)
-    ? applyCompanionFilter(deduped, companions).slice(0, limit)
-    : topPopularPlaces(deduped, limit);
+    ? applyCompanionFilter(nearFirst, companions).slice(0, limit)
+    : nearFirst.slice(0, limit);
   rememberPlaces(ranked);
   return ranked;
 }
@@ -98,7 +99,7 @@ async function fetchHomePool(params: {
 
 /**
  * Home lists for any city worldwide:
- * merge OSM + Photon + curated catalog, then popularity-rank.
+ * merge OSM + Photon + curated catalog, then sort closest-first.
  * Every result is distance-checked against the user's coordinates.
  * Sparse areas expand the search radius until enough local hits appear.
  */
@@ -111,8 +112,11 @@ export async function getHomeNearbyPlaces(params: {
   companions?: CompanionPrefs | null;
 }): Promise<Place[]> {
   const limit = params.limit ?? DEFAULT_LIMIT;
+  // Start tight so "near you" fills with local stops before widening to province landmarks.
   const radii = Array.from(
     new Set([
+      Math.min(params.radiusMeters, 12_000),
+      Math.min(params.radiusMeters, 25_000),
       params.radiusMeters,
       Math.max(params.radiusMeters, 50_000),
       Math.max(params.radiusMeters, 90_000),

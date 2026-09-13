@@ -13,7 +13,7 @@ import {
   isShoppingCategory,
 } from '@/utils/place-category-match';
 import { dropForeignLandmarkNoise } from '@/utils/place-foreign-noise';
-import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
+import { sortPlacesByNearness } from '@/utils/place-popularity';
 import { dedupePlaces } from '@/utils/dedupe-places';
 
 const LIVE_BUDGET_MS = 7_000;
@@ -66,7 +66,7 @@ function rankNearby(
   merged = dropForeignLandmarkNoise(merged, cityLabel);
   merged = filterPlacesByCategory(merged, category);
 
-  const ranked = sortPlacesByCategoryPopularity(merged, category);
+  const ranked = sortPlacesByNearness(merged, category);
   const tailored = companionFilterActive(companions)
     ? applyCompanionFilter(ranked, companions)
     : ranked;

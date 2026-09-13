@@ -18,6 +18,28 @@ export function sortPlacesByCategoryPopularity(
   );
 }
 
+/**
+ * "Near you" ranking: closest first, with popularity only as a tie-break inside ~1 km bands.
+ * Famous far landmarks (e.g. 25 km away) must not outrank places next to the traveler.
+ */
+export function sortPlacesByNearness(
+  places: Place[],
+  category?: PlaceCategory | null,
+  bandMeters = 1_000,
+): Place[] {
+  const band = Math.max(200, bandMeters);
+  return [...places].sort((a, b) => {
+    const da = a.distanceMeters ?? Number.POSITIVE_INFINITY;
+    const db = b.distanceMeters ?? Number.POSITIVE_INFINITY;
+    const bandA = Math.floor(da / band);
+    const bandB = Math.floor(db / band);
+    if (bandA !== bandB) return bandA - bandB;
+    const scoreDiff = popularityScore(b, category) - popularityScore(a, category);
+    if (scoreDiff !== 0) return scoreDiff;
+    return da - db;
+  });
+}
+
 function haystack(place: Place): string {
   return [place.name, place.category, place.description, place.cuisine, ...(place.tags ?? [])]
     .join(' ')
@@ -93,8 +115,8 @@ function popularityScore(place: Place, category?: PlaceCategory | null): number 
 
   const catalogBoost = place.provider === 'world-catalog' || place.provider === 'local-catalog' ? 6 : 0;
 
-  // Light distance preference — never stronger than popularity.
-  const distanceScore = Math.max(0, 4 - distanceMeters / 25_000);
+  // Stronger nearness bias when used as a secondary signal elsewhere.
+  const distanceScore = Math.max(0, 12 - distanceMeters / 8_000);
 
   return (
     majorLandmarkBonus +
@@ -115,4 +137,13 @@ function popularityScore(place: Place, category?: PlaceCategory | null): number 
 
 export function topPopularPlaces(places: Place[], limit = 15): Place[] {
   return sortPlacesByPopularity(places).slice(0, limit);
+}
+
+/** Closest places first — used by Home / Explore "near you" feeds. */
+export function topNearbyPlaces(
+  places: Place[],
+  limit = 15,
+  category?: PlaceCategory | null,
+): Place[] {
+  return sortPlacesByNearness(places, category).slice(0, limit);
 }

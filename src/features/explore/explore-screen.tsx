@@ -29,7 +29,7 @@ import { getExploreNearbyPlaces } from '@/services/places/explore-nearby.service
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { companionFilterActive } from '@/utils/companion-suitability';
 import { dedupePlaces } from '@/utils/dedupe-places';
-import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
+import { sortPlacesByNearness } from '@/utils/place-popularity';
 
 const MIN_RADIUS_METERS = 500;
 const MAX_RADIUS_METERS = 200_000;
@@ -119,7 +119,7 @@ export function ExploreScreen() {
   const query = useQuery({
     queryKey: [
       'nearby',
-      'explore-v6-google',
+      'explore-v7-nearness',
       coords?.latitude,
       coords?.longitude,
       radiusMeters,
@@ -151,8 +151,8 @@ export function ExploreScreen() {
   const places = useMemo(() => {
     const raw = query.data ?? [];
     // Trust explore nearby (already radius-filtered; may expand in sparse areas).
-    // Re-clamping to the chip distance was wiping auto-expanded best-of lists.
-    return sortPlacesByCategoryPopularity(
+    // Keep closest-first so "near you" matches the selected location.
+    return sortPlacesByNearness(
       dedupePlaces(raw),
       category === 'all' ? undefined : (category as PlaceCategory),
     );

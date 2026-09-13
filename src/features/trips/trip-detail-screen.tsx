@@ -769,7 +769,7 @@ export function TripDetailScreen() {
                   </View>
                 </View>
                 <View className="mb-2 flex-row gap-2">
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Button
                       label="Save changes"
                       loading={saveTripDetails.isPending}
@@ -777,7 +777,7 @@ export function TripDetailScreen() {
                       testID="trip-save-details"
                     />
                   </View>
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Button
                       label="Delete trip"
                       variant="secondary"
@@ -955,7 +955,7 @@ export function TripDetailScreen() {
                   testID="trip-add-place-search"
                 />
                 <View className="mb-3 flex-row gap-2">
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Button
                       label="Add to this day"
                       loading={addItem.isPending}
@@ -963,7 +963,7 @@ export function TripDetailScreen() {
                       onPress={() => addItem.mutate()}
                     />
                   </View>
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Button
                       label="Sort by time"
                       variant="secondary"

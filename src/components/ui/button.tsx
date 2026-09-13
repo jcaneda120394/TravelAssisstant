@@ -30,7 +30,8 @@ export function Button({
   const { colors } = useCountryAppearance();
   const spinnerColor = colors?.primary ?? theme[scheme].primary;
 
-  const base = 'flex-row items-center justify-center rounded-2xl px-5 py-3.5';
+  const base =
+    'w-full min-w-0 max-w-full flex-row items-center justify-center rounded-2xl px-4 py-3.5';
   const variants = {
     primary: 'bg-brand-600',
     accent: 'bg-accent-500',
@@ -56,15 +57,18 @@ export function Button({
       className={`${base} ${variants[variant]} ${disabled ? 'opacity-50' : 'opacity-100'}`}
       accessibilityRole="button"
       accessibilityLabel={label}
+      style={{ maxWidth: '100%' }}
     >
       {loading ? (
         <ActivityIndicator
           color={variant === 'primary' || variant === 'accent' ? '#fff' : spinnerColor}
         />
       ) : (
-        <View className="flex-row items-center gap-2">
+        <View className="min-w-0 max-w-full flex-row items-center justify-center gap-2">
           {icon}
-          <AppText className={labelClass}>{label}</AppText>
+          <AppText className={`${labelClass} text-center`} numberOfLines={1}>
+            {label}
+          </AppText>
         </View>
       )}
     </Pressable>

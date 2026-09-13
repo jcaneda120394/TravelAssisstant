@@ -521,11 +521,11 @@ export function CreateTripScreen() {
       >
         <View className="flex-row gap-2">
           {draft.stepIndex > 0 ? (
-            <View className="flex-1">
+            <View className="min-w-0 flex-1">
               <Button label="Back" variant="secondary" onPress={draft.prevStep} />
             </View>
           ) : null}
-          <View className="flex-1">
+          <View className="min-w-0 flex-1">
             {step === 'build' ? (
               <Button
                 label={

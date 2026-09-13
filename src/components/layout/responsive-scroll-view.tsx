@@ -46,7 +46,7 @@ export function ResponsiveScrollView({
       className={className}
       contentContainerClassName={contentContainerClassName}
       style={[{ width: '100%', maxWidth: '100%', minHeight: 0 }, style]}
-      contentContainerStyle={[{ paddingBottom, width: '100%', maxWidth: '100%' }, contentContainerStyle]}
+      contentContainerStyle={[{ paddingBottom, width: '100%', maxWidth: '100%', minWidth: 0 }, contentContainerStyle]}
       keyboardShouldPersistTaps="handled"
       {...rest}
     >

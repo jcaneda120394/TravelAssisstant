@@ -475,11 +475,11 @@ export function OnboardingScreen() {
 
         <View className="flex-row gap-3">
           {step > 0 ? (
-            <View className="flex-1">
+            <View className="min-w-0 flex-1">
               <Button label="Back" variant="secondary" onPress={back} />
             </View>
           ) : null}
-          <View className="flex-1">
+          <View className="min-w-0 flex-1">
             {step < STEPS.length - 1 ? (
               <Button label="Continue" onPress={next} testID="onboarding-next" />
             ) : (

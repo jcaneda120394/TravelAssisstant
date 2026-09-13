@@ -44,10 +44,13 @@ const ScrollViewBase = forwardRef<RNScrollView, ScrollViewProps>(function Scroll
           // Web-only CSS property — keeps classic scrollbar gutters.
           // @ts-expect-error react-native style types omit scrollbarGutter
           scrollbarGutter: 'stable',
+          maxWidth: '100%',
         },
         style,
       ]}
-      contentContainerStyle={[{ paddingRight: 16 }, contentContainerStyle]}
+      // Do not inject extra paddingRight — screens already use px-5 gutters;
+      // an extra 16px made narrow cards overflow on phone web.
+      contentContainerStyle={[{ maxWidth: '100%', minWidth: 0 }, contentContainerStyle]}
       {...props}
     />
   );

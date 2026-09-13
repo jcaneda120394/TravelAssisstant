@@ -104,14 +104,14 @@ export function EmergencyScreen() {
             Traveler nationality: {countryNameForCode(homeCountry)} — embassies use this, not GPS.
           </AppText>
           <View className="flex-row gap-2">
-            <View className="flex-1">
+            <View className="min-w-0 flex-1">
               <Button
                 label={`Police ${numbers.police}`}
                 variant="secondary"
                 onPress={() => void Linking.openURL(`tel:${numbers.police}`)}
               />
             </View>
-            <View className="flex-1">
+            <View className="min-w-0 flex-1">
               <Button
                 label={`Ambulance ${numbers.ambulance}`}
                 onPress={() => void Linking.openURL(`tel:${numbers.ambulance}`)}

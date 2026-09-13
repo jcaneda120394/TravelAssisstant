@@ -248,7 +248,7 @@ export function HomeScreen() {
               className={`mt-5 gap-2 ${isDesktop ? 'max-w-md flex-row' : ''}`}
               style={expoMenuGutter ? { marginRight: -expoMenuGutter } : undefined}
             >
-              <View className={isDesktop ? 'flex-1' : undefined}>
+              <View className={isDesktop ? 'min-w-0 flex-1' : undefined}>
                 <Button
                   label="Choose city"
                   variant="secondary"
@@ -321,7 +321,7 @@ export function HomeScreen() {
               {user ? (
                 <>
                   <View className="flex-row" style={{ gap: 8 }}>
-                    <View className="flex-1">
+                    <View className="min-w-0 flex-1">
                       <Button
                         label="Create trip"
                         onPress={() => {
@@ -330,7 +330,7 @@ export function HomeScreen() {
                         }}
                       />
                     </View>
-                    <View className="flex-1">
+                    <View className="min-w-0 flex-1">
                       <Button
                         label="Suggestions"
                         variant="accent"
@@ -339,7 +339,7 @@ export function HomeScreen() {
                     </View>
                   </View>
                   <View className="flex-row" style={{ gap: 8 }}>
-                    <View className="flex-1">
+                    <View className="min-w-0 flex-1">
                       <Button
                         label="Save trip"
                         variant="secondary"
@@ -349,7 +349,7 @@ export function HomeScreen() {
                         }}
                       />
                     </View>
-                    <View className="flex-1">
+                    <View className="min-w-0 flex-1">
                       <Button
                         label="My trips"
                         variant="secondary"
@@ -366,10 +366,10 @@ export function HomeScreen() {
                     onPress={() => router.push('/trip-suggestions')}
                   />
                   <View className="flex-row" style={{ gap: 8 }}>
-                    <View className="flex-1">
+                    <View className="min-w-0 flex-1">
                       <Button label="Sign up" onPress={() => router.push('/(auth)/signup')} />
                     </View>
-                    <View className="flex-1">
+                    <View className="min-w-0 flex-1">
                       <Button
                         label="Log in"
                         variant="secondary"

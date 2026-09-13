@@ -165,11 +165,13 @@ export function CityAutocomplete({
             scheme === 'dark' ? 'border-brand-700 bg-brand-900' : 'border-brand-200 bg-brand-50'
           }`}
         >
-          <View className="flex-1 pr-2">
+          <View className="min-w-0 flex-1 pr-2">
             <AppText className="text-xs font-sans-semibold uppercase tracking-wide text-brand-600">
               Selected
             </AppText>
-            <AppText className="font-sans-semibold">{query.trim()}</AppText>
+            <AppText className="font-sans-semibold" numberOfLines={2}>
+              {query.trim()}
+            </AppText>
           </View>
           <Pressable
             onPress={() => {

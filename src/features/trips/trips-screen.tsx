@@ -99,10 +99,10 @@ export function TripsScreen() {
               Suggestions stay open for guests. Create trip and Save trip need an account.
             </AppText>
             <View className="mt-3 flex-row" style={{ gap: 8 }}>
-              <View className="flex-1">
+              <View className="min-w-0 flex-1">
                 <Button label="Sign up" onPress={() => router.push('/(auth)/signup')} />
               </View>
-              <View className="flex-1">
+              <View className="min-w-0 flex-1">
                 <Button
                   label="Log in"
                   variant="secondary"
@@ -117,7 +117,7 @@ export function TripsScreen() {
           {user ? (
             <>
               <View className="flex-row" style={{ gap: 8 }}>
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="Create trip"
                     onPress={() => {
@@ -126,7 +126,7 @@ export function TripsScreen() {
                     }}
                   />
                 </View>
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="Suggestions"
                     variant="accent"
@@ -135,7 +135,7 @@ export function TripsScreen() {
                 </View>
               </View>
               <View className="flex-row" style={{ gap: 8 }}>
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="Save trip"
                     variant="secondary"
@@ -145,7 +145,7 @@ export function TripsScreen() {
                     }}
                   />
                 </View>
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="Live AI plan"
                     variant="secondary"

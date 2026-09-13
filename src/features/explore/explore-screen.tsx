@@ -204,10 +204,10 @@ export function ExploreScreen() {
         />
 
         <View className="mb-4 flex-row gap-2">
-          <View className="flex-1">
+          <View className="min-w-0 flex-1">
             <Button label="Choose city" variant="secondary" onPress={() => setPickerOpen(true)} />
           </View>
-          <View className="flex-1">
+          <View className="min-w-0 flex-1">
             <Button label="Map" variant="ghost" onPress={() => router.push('/map')} />
           </View>
         </View>
@@ -243,7 +243,7 @@ export function ExploreScreen() {
               Any value from 0.5 km to 200 km.
             </AppText>
             <View className="flex-row gap-2">
-              <View className="flex-1">
+              <View className="min-w-0 flex-1">
                 <Button
                   label="Cancel"
                   variant="secondary"
@@ -251,7 +251,7 @@ export function ExploreScreen() {
                   testID="explore-custom-distance-cancel"
                 />
               </View>
-              <View className="flex-1">
+              <View className="min-w-0 flex-1">
                 <Button
                   label="Apply distance"
                   variant="secondary"

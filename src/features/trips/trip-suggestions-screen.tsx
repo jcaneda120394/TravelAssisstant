@@ -39,7 +39,7 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      className={`mb-2 mr-2 rounded-2xl border px-3 py-2 ${
+      className={`max-w-full shrink rounded-2xl border px-3 py-2 ${
         selected
           ? 'border-brand-600 bg-brand-600'
           : scheme === 'dark'
@@ -47,7 +47,9 @@ function Chip({
             : 'border-black/8 bg-white'
       }`}
     >
-      <AppText className={selected ? 'text-white' : undefined}>{label}</AppText>
+      <AppText className={selected ? 'text-white' : undefined} numberOfLines={1}>
+        {label}
+      </AppText>
     </Pressable>
   );
 }
@@ -294,26 +296,26 @@ export function TripSuggestionsScreen() {
                   Adults: {customAdults} · Children: {customChildren} · Pace: {customPace}
                 </AppText>
                 <View className="mb-2 flex-row gap-2">
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Button
                       label="Adults −"
                       variant="secondary"
                       onPress={() => setCustomAdults((n) => Math.max(1, n - 1))}
                     />
                   </View>
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Button label="Adults +" variant="secondary" onPress={() => setCustomAdults((n) => n + 1)} />
                   </View>
                 </View>
                 <View className="mb-2 flex-row gap-2">
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Button
                       label="Kids −"
                       variant="secondary"
                       onPress={() => setCustomChildren((n) => Math.max(0, n - 1))}
                     />
                   </View>
-                  <View className="flex-1">
+                  <View className="min-w-0 flex-1">
                     <Button
                       label="Kids +"
                       variant="secondary"
@@ -462,7 +464,7 @@ export function TripSuggestionsScreen() {
           <AppText muted className="mb-2">
             Style
           </AppText>
-          <View className="mb-2 flex-row flex-wrap">
+          <View className="mb-2 w-full min-w-0 max-w-full flex-row flex-wrap gap-2">
             <Chip label="Any" selected={!travelStyle} onPress={() => setTravelStyle(undefined)} />
             {TRAVEL_STYLES.map((s) => (
               <Chip
@@ -476,7 +478,7 @@ export function TripSuggestionsScreen() {
           <AppText muted className="mb-2">
             Budget
           </AppText>
-          <View className="mb-2 flex-row flex-wrap">
+          <View className="mb-2 w-full min-w-0 max-w-full flex-row flex-wrap gap-2">
             <Chip label="Any" selected={!budgetLevel} onPress={() => setBudgetLevel(undefined)} />
             {BUDGET_LEVELS.map((b) => (
               <Chip
@@ -487,7 +489,7 @@ export function TripSuggestionsScreen() {
               />
             ))}
           </View>
-          <View className="mb-2 flex-row flex-wrap">
+          <View className="mb-2 w-full min-w-0 max-w-full flex-row flex-wrap gap-2">
             <Chip
               label={childrenOnly ? '✓ With kids' : 'With kids'}
               selected={childrenOnly}

@@ -437,14 +437,14 @@ export function TripSuggestionScreen() {
 
               <AppText className="mb-2 font-sans-medium">Save to</AppText>
               <View className="mb-3 flex-row gap-2">
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="New trip"
                     variant={saveMode === 'new' ? 'primary' : 'secondary'}
                     onPress={() => setSaveMode('new')}
                   />
                 </View>
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="Existing trip"
                     variant={saveMode === 'existing' ? 'primary' : 'secondary'}
@@ -455,14 +455,14 @@ export function TripSuggestionScreen() {
 
               <AppText className="mb-2 font-sans-medium">Days to save</AppText>
               <View className="mb-3 flex-row gap-2">
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="All days"
                     variant={saveScope === 'all' ? 'primary' : 'secondary'}
                     onPress={() => setSaveScope('all')}
                   />
                 </View>
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="Selected day only"
                     variant={saveScope === 'selected' ? 'primary' : 'secondary'}

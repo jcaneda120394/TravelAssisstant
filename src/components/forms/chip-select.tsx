@@ -39,7 +39,7 @@ export function ChipSelect<T extends string>({
   };
 
   return (
-    <View className="flex-row flex-wrap gap-2">
+    <View className="w-full min-w-0 max-w-full flex-row flex-wrap gap-2">
       {options.map((option) => {
         const selected = values.includes(option);
         return (
@@ -48,7 +48,7 @@ export function ChipSelect<T extends string>({
             onPress={() => toggle(option)}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            className={`rounded-xl px-3.5 py-2.5 ${
+            className={`max-w-full rounded-xl px-3.5 py-2.5 ${
               selected
                 ? scheme === 'dark'
                   ? 'bg-brand-800'
@@ -61,6 +61,7 @@ export function ChipSelect<T extends string>({
             <AppText
               inverse={selected}
               className={`text-sm ${selected ? 'font-sans-semibold' : 'font-sans-medium'}`}
+              numberOfLines={1}
             >
               {labels?.[option] ?? labelize(option)}
             </AppText>

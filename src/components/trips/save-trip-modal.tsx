@@ -162,14 +162,16 @@ export function SaveTripModal({
       <View className="flex-1 justify-end bg-black/40">
         <View className="max-h-[92%] rounded-t-3xl bg-white px-5 pb-8 pt-4 dark:bg-surface-cardDark">
           <View className="mb-3 flex-row items-center justify-between">
-            <SectionHeader
-              title={place ? 'Add to trip planner' : 'Save trip'}
-              subtitle={
-                place
-                  ? `Save ${place.name} and pick which day`
-                  : 'Keep this plan in Trips'
-              }
-            />
+            <View className="min-w-0 flex-1">
+              <SectionHeader
+                title={place ? 'Add to trip planner' : 'Save trip'}
+                subtitle={
+                  place
+                    ? `Save ${place.name} and pick which day`
+                    : 'Keep this plan in Trips'
+                }
+              />
+            </View>
             <Pressable onPress={onClose} hitSlop={12}>
               <AppText className="font-sans-semibold text-brand-700">Close</AppText>
             </Pressable>
@@ -192,14 +194,14 @@ export function SaveTripModal({
 
             {place ? (
               <View className="mb-4 flex-row gap-2">
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="Existing trip"
                     variant={mode === 'existing' ? 'primary' : 'secondary'}
                     onPress={() => setMode('existing')}
                   />
                 </View>
-                <View className="flex-1">
+                <View className="min-w-0 flex-1">
                   <Button
                     label="New trip"
                     variant={mode === 'create' ? 'primary' : 'secondary'}

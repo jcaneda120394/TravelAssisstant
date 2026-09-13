@@ -95,7 +95,9 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   const border = scheme === 'dark' ? 'border-brand-800/80' : 'border-black/5';
 
   return (
-    <View className={`rounded-2xl border px-4 py-4 ${bg} ${border} ${className}`}>
+    <View
+      className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl border px-4 py-4 ${bg} ${border} ${className}`}
+    >
       {children}
     </View>
   );
@@ -112,7 +114,7 @@ export function SectionHeader({
 }) {
   const { isCompact } = useResponsiveLayout();
   return (
-    <View className="mb-4 gap-1" style={{ maxWidth: '100%' }}>
+    <View className="mb-4 w-full min-w-0 max-w-full gap-1">
       {eyebrow ? (
         <AppText className="font-sans-semibold text-xs uppercase tracking-[0.14em] text-accent-500">
           {eyebrow}
@@ -125,7 +127,11 @@ export function SectionHeader({
       >
         {title}
       </AppText>
-      {subtitle ? <AppText muted className="mt-0.5 text-[15px] leading-5">{subtitle}</AppText> : null}
+      {subtitle ? (
+        <AppText muted className="mt-0.5 w-full min-w-0 text-[15px] leading-5">
+          {subtitle}
+        </AppText>
+      ) : null}
     </View>
   );
 }

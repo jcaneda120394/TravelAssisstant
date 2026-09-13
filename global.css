@@ -61,6 +61,26 @@ body {
   }
 }
 
+/* Safari/Chrome date inputs have a large intrinsic min-width — never let them
+   expand cards or cause horizontal page scroll on phone web. */
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'],
+input[type='month'],
+input[type='week'] {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Catch any leftover absolute-width children inside the app shell. */
+#root,
+#root > div {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 /* Prefer a thin classic scrollbar (takes layout space) over overlay thumbs. */
 @supports (scrollbar-width: thin) {
   * {

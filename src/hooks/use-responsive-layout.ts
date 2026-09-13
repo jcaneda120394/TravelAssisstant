@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const DESKTOP_MIN = 1024;
 const WIDE_MIN = 1280;
 const TABLET_MIN = 600;
-const COMPACT_MAX = 400;
+/** Icon-first chrome kicks in below this (covers most phones incl. Plus sizes). */
+const COMPACT_MAX = 430;
 
 export type ResponsiveLayout = {
   isWeb: boolean;
@@ -69,7 +70,9 @@ export function useResponsiveLayout(): ResponsiveLayout {
       if (Platform.OS === 'ios') {
         tabBarHeight = 49 + Math.max(safeBottom, 20);
       } else if (isWeb) {
-        tabBarHeight = (isCompact ? 56 : isTablet ? 60 : 64) + Math.max(safeBottom, 8);
+        // Icon-only phone bars stay shorter; labeled tablet bars need a bit more.
+        const chrome = isTablet ? 58 : 54;
+        tabBarHeight = chrome + Math.max(safeBottom, isWeb ? 10 : 8);
       } else {
         tabBarHeight = 56 + Math.max(safeBottom, 8);
       }

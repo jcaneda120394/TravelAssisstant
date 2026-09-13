@@ -62,7 +62,8 @@ export function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scheme = useAppColorScheme();
-  const { isDesktop, isWeb, scrollBottomPad } = useResponsiveLayout();
+  const { isDesktop, isWeb, isCompact, scrollBottomPad, contentGutter } =
+    useResponsiveLayout();
   const queryClient = useQueryClient();
   const { profile, preferences, user } = useAuth();
   const { currency, setCurrency } = useDisplayCurrency();
@@ -89,6 +90,9 @@ export function HomeScreen() {
     () => getDestinationTravelGradient(scheme, destinationHint, label),
     [scheme, destinationHint, label],
   );
+  /** Phone: keep warm horizon at the bottom — diagonal gradients paint an orange side stripe. */
+  const heroGradientEnd = isDesktop ? { x: 1, y: 1 } : { x: 0.12, y: 1 };
+  const heroPadX = isDesktop ? 0 : contentGutter || 20;
 
   const refreshNearby = () => {
     void queryClient.invalidateQueries({ queryKey: ['home-weather'] });
@@ -184,8 +188,17 @@ export function HomeScreen() {
 
   const nextTrip = tripsQuery.data?.[0];
   const firstName = profile?.full_name?.split(' ')[0];
+  const shortPlace =
+    label
+      ? label
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .slice(-2)
+          .join(', ')
+      : country || null;
   const locationLine = hasLocation
-    ? `${label ?? 'Current location'}${
+    ? `${shortPlace ?? 'Current location'}${
         weatherQuery.data?.temperatureC != null ? ` · ${weatherQuery.data.temperatureC}°C` : ''
       }`
     : isLocating
@@ -197,25 +210,31 @@ export function HomeScreen() {
       <StatusBar style="light" />
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingBottom: scrollBottomPad }}
-        style={{ width: '100%', maxWidth: '100%' }}
+        contentContainerStyle={{ paddingBottom: scrollBottomPad, maxWidth: '100%' }}
+        style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}
       >
         <LinearGradient
           colors={[...gradient]}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={heroGradientEnd}
           style={{
+            width: '100%',
+            maxWidth: '100%',
+            overflow: 'hidden',
             paddingTop: topPad,
-            paddingBottom: 36,
-            paddingLeft: isDesktop ? 0 : 20,
-            paddingRight: isDesktop ? 0 : 20 + expoMenuGutter,
+            paddingBottom: isCompact ? 28 : 36,
+            paddingLeft: heroPadX,
+            paddingRight: heroPadX + expoMenuGutter,
           }}
         >
           <PageContainer>
-            <View className="flex-row items-start justify-between gap-3">
+            <View className="w-full min-w-0 max-w-full flex-row items-start justify-between gap-3">
               <AppText
                 inverse
-                className="flex-1 font-display-bold text-3xl leading-9 tracking-tight text-white"
+                className={`min-w-0 flex-1 font-display-bold tracking-tight text-white ${
+                  isCompact ? 'text-[26px] leading-8' : 'text-3xl leading-9'
+                }`}
+                numberOfLines={1}
               >
                 {env.appName}
               </AppText>
@@ -223,7 +242,7 @@ export function HomeScreen() {
                 onPress={() => setCurrencyPickerOpen(true)}
                 accessibilityRole="button"
                 accessibilityLabel="Change display currency"
-                className="mt-1 flex-row items-center gap-1 rounded-full border border-white/30 bg-white/15 px-2.5 py-1"
+                className="mt-1 shrink-0 flex-row items-center gap-1 rounded-full border border-white/30 bg-white/15 px-2.5 py-1"
                 testID="home-change-currency"
               >
                 <AppText inverse className="text-xs font-sans-semibold text-white">
@@ -240,15 +259,19 @@ export function HomeScreen() {
               Discover places around you.
             </AppText>
 
-            <AppText inverse className="mt-4 text-sm font-sans-medium leading-5 text-white">
+            <AppText
+              inverse
+              className="mt-4 text-sm font-sans-medium leading-5 text-white"
+              numberOfLines={2}
+            >
               {locationLine}
             </AppText>
 
             <View
-              className={`mt-5 gap-2 ${isDesktop ? 'max-w-md flex-row' : ''}`}
+              className={`mt-5 w-full min-w-0 gap-2 ${isDesktop ? 'max-w-md flex-row' : ''}`}
               style={expoMenuGutter ? { marginRight: -expoMenuGutter } : undefined}
             >
-              <View className={isDesktop ? 'min-w-0 flex-1' : undefined}>
+              <View className={isDesktop ? 'min-w-0 flex-1' : 'w-full min-w-0'}>
                 <Button
                   label="Choose city"
                   variant="secondary"
@@ -259,7 +282,10 @@ export function HomeScreen() {
           </PageContainer>
         </LinearGradient>
 
-        <PageContainer className={isDesktop ? 'mt-[-20px]' : 'mt-[-20px] px-5'}>
+        <PageContainer
+          className={isDesktop ? 'mt-[-20px]' : 'mt-[-20px]'}
+          style={isDesktop ? undefined : { paddingHorizontal: contentGutter || 20 }}
+        >
           {!hasLocation && !stuckOnSf ? (
             <Card className="mb-5">
               <SectionHeader
@@ -306,18 +332,18 @@ export function HomeScreen() {
               subtitle={
                 user
                   ? 'Save a plan and open it anytime'
-                  : 'Browse suggestions anytime — sign in to create or save trips'
+                  : 'Browse ideas anytime — sign in to save trips'
               }
             />
-            <AppText muted>
-              {user
-                ? nextTrip
+            {user ? (
+              <AppText muted className="mb-1">
+                {nextTrip
                   ? `Next: ${nextTrip.title} · ${nextTrip.startDate}`
-                  : 'No saved trips yet — create one in a few taps.'
-                : 'Suggestions stay open for guests.'}
-            </AppText>
+                  : 'No saved trips yet — create one in a few taps.'}
+              </AppText>
+            ) : null}
 
-            <View className="mt-4" style={{ gap: 12 }}>
+            <View className="mt-4" style={{ gap: 10 }}>
               {user ? (
                 <>
                   <View className="flex-row" style={{ gap: 8 }}>

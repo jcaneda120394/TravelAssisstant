@@ -17,10 +17,12 @@ function TabIcon({ color, name, size }: { color: string; name: IconName; size: n
 
 export default function TabsLayout() {
   const { scheme, colors } = useCountryAppearance();
-  const { isDesktop, isCompact, isWeb, tabBarHeight } = useResponsiveLayout();
+  const { isDesktop, isCompact, isTablet, isWeb, tabBarHeight } = useResponsiveLayout();
   const insets = useSafeAreaInsets();
-  const iconSize = isCompact ? 20 : 22;
-  const showLabels = !isCompact;
+  // Phone web: icons only — 6–7 labeled tabs look crushed on ~390px.
+  const showLabels = isTablet || isDesktop;
+  const iconSize = isCompact ? 22 : showLabels ? 22 : 24;
+  const webBottomPad = Math.max(insets.bottom, isWeb ? (Platform.OS === 'web' ? 10 : 8) : 4);
 
   const tabs = (
     <Tabs
@@ -37,8 +39,8 @@ export default function TabsLayout() {
               borderTopColor: scheme === 'dark' ? colors.border : 'rgba(18,32,30,0.08)',
               borderTopWidth: 1,
               height: tabBarHeight,
-              paddingTop: showLabels ? 6 : 8,
-              paddingBottom: Math.max(insets.bottom, isWeb ? 8 : 4),
+              paddingTop: showLabels ? 6 : 10,
+              paddingBottom: webBottomPad,
               elevation: 0,
               shadowOpacity: 0,
             },
@@ -49,7 +51,8 @@ export default function TabsLayout() {
           marginBottom: 0,
         },
         tabBarItemStyle: {
-          paddingVertical: showLabels ? 0 : 4,
+          paddingVertical: showLabels ? 0 : 6,
+          minWidth: 0,
         },
       }}
     >
@@ -101,6 +104,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="assistant"
         options={{
+          // Phone/tablet: FAB + Home shortcuts open AI — keep tab bar uncrowded.
+          href: isDesktop ? undefined : null,
           title: 'AI',
           tabBarIcon: ({ color }) => (
             <TabIcon color={String(color)} name="sparkles" size={iconSize} />
@@ -132,7 +137,7 @@ export default function TabsLayout() {
   }
 
   return (
-    <View className="flex-1" style={{ minHeight: 0, width: '100%', maxWidth: '100%' }}>
+    <View className="flex-1" style={{ minHeight: 0, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
       {tabs}
       <AiAssistantFab />
     </View>

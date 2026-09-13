@@ -102,10 +102,8 @@ async function fetchExplorePool(params: {
 
   const [live, photon] = await Promise.all([
     raceWithBudget(livePromise, LIVE_BUDGET_MS).then((v) => v ?? []),
-    photonPromise,
+    raceWithBudget(photonPromise, LIVE_BUDGET_MS).then((v) => v ?? []),
   ]);
-
-  const lateLive = live.length ? live : await livePromise;
 
   // Catalog uses a wider soft radius so sparse towns still fill after a city switch.
   const catalog = shouldBlendCatalog(category)
@@ -117,7 +115,7 @@ async function fetchExplorePool(params: {
       })
     : [];
 
-  return [...catalog, ...lateLive, ...photon];
+  return [...catalog, ...live, ...photon];
 }
 
 /**

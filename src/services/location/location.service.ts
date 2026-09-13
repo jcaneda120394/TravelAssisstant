@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 import { fetchJson } from '@/lib/http/fetch-json';
 import { useLocationStore } from '@/stores/location-store';
@@ -147,6 +148,97 @@ export function replaceSimulatorSanFranciscoIfNeeded(): boolean {
   return false;
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new AppError(message, { code: 'LOCATION_TIMEOUT' })), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+/** Browser geolocation — Expo's Highest accuracy often hangs on web. */
+async function readBrowserGeolocation(): Promise<GeoPoint> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    throw new AppError('Geolocation is not available in this browser.', {
+      code: 'LOCATION_UNAVAILABLE',
+    });
+  }
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        const denied = err.code === err.PERMISSION_DENIED;
+        reject(
+          new AppError(
+            denied
+              ? 'Location permission is off. Allow location for this site, or choose a city manually.'
+              : 'Unable to read your GPS. Try again or choose a city manually.',
+            { code: denied ? 'LOCATION_DENIED' : 'LOCATION_UNAVAILABLE' },
+          ),
+        );
+      },
+      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 },
+    );
+  });
+}
+
+async function readDevicePosition(): Promise<GeoPoint> {
+  if (Platform.OS === 'web') {
+    try {
+      return await readBrowserGeolocation();
+    } catch (browserError) {
+      // Fall through to Expo Location (also wraps the browser API on web).
+      if (browserError instanceof AppError && browserError.code === 'LOCATION_DENIED') {
+        throw browserError;
+      }
+    }
+  }
+
+  try {
+    const position = await withTimeout(
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        mayShowUserSettingsDialog: true,
+      }),
+      12_000,
+      'GPS is taking too long. Try again, or choose a city manually.',
+    );
+    return {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+    };
+  } catch (error) {
+    // Last known fix is better than failing hard (simulator / weak GPS).
+    try {
+      const last = await Location.getLastKnownPositionAsync({
+        maxAge: 5 * 60_000,
+        requiredAccuracy: 1000,
+      });
+      if (last?.coords) {
+        return {
+          latitude: last.coords.latitude,
+          longitude: last.coords.longitude,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    throw error;
+  }
+}
+
 /** Fresh GPS fix — uses precise coords + detailed reverse-geocode when permission is granted. */
 export async function getCurrentPosition(): Promise<GeoPoint> {
   const epoch = useLocationStore.getState().locationEpoch;
@@ -159,17 +251,34 @@ export async function getCurrentPosition(): Promise<GeoPoint> {
       );
     }
 
-    const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Highest,
-      mayShowUserSettingsDialog: true,
-    });
+    const coords = await readDevicePosition();
 
-    const coords = {
-      latitude: position.coords.latitude,
-      longitude: position.coords.longitude,
-    };
+    if (!Number.isFinite(coords.latitude) || !Number.isFinite(coords.longitude)) {
+      throw new AppError('Unable to get current location', { code: 'LOCATION_UNAVAILABLE' });
+    }
 
-    const labeled = await labelFromCoords(coords);
+    // Don't block GPS success on slow reverse-geocode.
+    let labeled: { city: string | null; country: string | null; label: string };
+    try {
+      labeled = await withTimeout(
+        labelFromCoords(coords),
+        8_000,
+        'Location label timed out',
+      );
+    } catch {
+      labeled = {
+        city: null,
+        country: null,
+        label: `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`,
+      };
+    }
+
+    // Traveler cleared location while GPS was running — discard.
+    if (useLocationStore.getState().locationEpoch !== epoch) {
+      throw new AppError('Location was cleared. Tap Get my location again if you want GPS.', {
+        code: 'LOCATION_CLEARED',
+      });
+    }
 
     useLocationStore.getState().setCurrentLocation({
       coords,
@@ -179,13 +288,6 @@ export async function getCurrentPosition(): Promise<GeoPoint> {
       mode: 'precise',
       epoch,
     });
-
-    // If the traveler cleared location while GPS was running, discard this write.
-    if (useLocationStore.getState().locationEpoch !== epoch) {
-      throw new AppError('Location was cleared. Tap Get my location again if you want GPS.', {
-        code: 'LOCATION_CLEARED',
-      });
-    }
 
     return coords;
   } catch (error) {

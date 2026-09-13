@@ -95,6 +95,7 @@ export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean 
     hasHydrated,
     hasLocation: Boolean(coords),
     locate,
-    isLocating: status === 'loading' || !hasHydrated,
+    // Only spin while an explicit GPS request is in flight — not during store hydration.
+    isLocating: status === 'loading',
   };
 }

@@ -1095,13 +1095,7 @@ export class OsmPlacesProvider implements PlacesProvider {
       return merged;
     }
 
-    // Live may still finish after budget — prefer it over catalog if it has data.
-    const lateLive = await livePromise;
-    if (lateLive.length > 0) {
-      rememberPlaces(lateLive);
-      return lateLive;
-    }
-
+    // Timed out live — fall through to catalog instead of awaiting forever.
     const catalog = searchCatalogNearby({
       location: params.location,
       category: primary,

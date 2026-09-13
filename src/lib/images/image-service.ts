@@ -58,6 +58,8 @@ async function searchClientFallbackProviders(
       query,
       input.excludeImageUrls,
       input.excludeImageIds,
+      input.name,
+      input.type,
     );
     if (bestOpen) {
       log('Openverse found image.');
@@ -74,6 +76,8 @@ async function searchClientFallbackProviders(
       query,
       input.excludeImageUrls,
       input.excludeImageIds,
+      input.name,
+      input.type,
     );
     if (bestWiki) {
       log('Wikimedia found image.');
@@ -83,6 +87,19 @@ async function searchClientFallbackProviders(
   }
 
   return null;
+}
+
+function edgeImageRelevant(image: TravelImage, input: GetTravelImageInput): boolean {
+  return Boolean(
+    pickBestCandidate(
+      [image],
+      image.searchQuery || buildImageSearchQuery(input),
+      input.excludeImageUrls,
+      input.excludeImageIds,
+      input.name,
+      input.type,
+    ),
+  );
 }
 
 /**
@@ -96,12 +113,12 @@ export async function getTravelImage(input: GetTravelImageInput): Promise<Travel
 
   if (!input.bypassCache) {
     const memory = getMemoryTravelImage(input);
-    if (memory) {
+    if (memory && (memory.provider === 'fallback' || edgeImageRelevant(memory, input))) {
       log('Memory cache hit:', memory.provider);
       return memory;
     }
     const db = await getDbTravelImage(input);
-    if (db) {
+    if (db && edgeImageRelevant(db, input)) {
       log('Cached image:', db.provider);
       setMemoryTravelImage(input, db);
       return db;
@@ -109,11 +126,14 @@ export async function getTravelImage(input: GetTravelImageInput): Promise<Travel
   }
 
   const fromEdge = await resolveTravelImageViaEdge(input);
-  if (fromEdge?.url) {
+  if (fromEdge?.url && edgeImageRelevant(fromEdge, input)) {
     log(`${fromEdge.provider} found image (edge).`);
     setMemoryTravelImage(input, fromEdge);
     void saveDbTravelImage(input, fromEdge);
     return fromEdge;
+  }
+  if (fromEdge?.url) {
+    log('Edge image rejected as irrelevant to place:', input.name);
   }
 
   const fromClient = await searchClientFallbackProviders(input, queries);

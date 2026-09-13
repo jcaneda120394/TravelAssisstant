@@ -9,6 +9,8 @@ export {
   buildImageSearchQuery,
   buildPlaceImageCacheKey,
   parseCityCountryFromAddress,
+  isBusinessPlaceType,
+  typeKeywords,
 } from '@/lib/images/image-query-builder';
 export {
   getTravelImage,
@@ -17,3 +19,8 @@ export {
   placeToTravelImageInput,
 } from '@/lib/images/image-service';
 export { buildFallbackTravelImage, esriStreetTileUrl } from '@/lib/images/fallback';
+export {
+  isRelevantToPlace,
+  pickBestCandidate,
+  significantPlaceTokens,
+} from '@/lib/images/image-validate';

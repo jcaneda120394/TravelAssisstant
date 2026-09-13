@@ -42,9 +42,16 @@ function cityFromAddress(address?: string): string | null {
   if (!address) return null;
   const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
   if (parts.length === 0) return null;
-  // Prefer city-ish middle segments; fall back to first.
-  if (parts.length >= 2) return parts[0]!;
-  return parts[0]!;
+  const STREETISH =
+    /^(phố|pho\b|street|st\.|road|rd\.|avenue|ave\.|lane|đường|duong|hang |tong |alley)/i;
+  if (parts.length === 1) return parts[0]!;
+  const beforeCountry = parts.slice(0, -1).filter((p) => !STREETISH.test(p));
+  const city = beforeCountry[beforeCountry.length - 1] ?? parts[0]!;
+  return city.replace(/^thành phố\s+/i, '').replace(/^tp\.?\s+/i, '').trim();
+}
+
+function isFoodOrStay(place: Place): boolean {
+  return /^(restaurant|cafe|bakery|hotel|resort|nightlife)$/.test(place.category);
 }
 
 function regionLine(place: Place): string {
@@ -86,15 +93,38 @@ async function wikipediaSummary(place: Place): Promise<{
   extract: string;
   thumbUrl?: string;
 } | null> {
+  // Small businesses rarely have Wikipedia pages — searching "Vietnam … Coffee"
+  // matches dishes (Pho) or memorials. Prefer generated copy instead.
+  if (isFoodOrStay(place)) {
+    return null;
+  }
+
   const name = cleanName(displayPlaceName(place));
   const city = cityFromAddress(place.address);
   const searchQuery = [name, city].filter(Boolean).join(' ').trim();
   if (searchQuery.length < 3) return null;
 
+  const stop = new Set([
+    'the',
+    'and',
+    'vietnam',
+    'japan',
+    'philippines',
+    'city',
+    'town',
+    'speciality',
+    'specialty',
+  ]);
+  const distinctive = name
+    .toLowerCase()
+    .split(/\s+/)
+    .map((t) => t.replace(/[^a-z0-9]/g, ''))
+    .filter((t) => t.length >= 4 && !stop.has(t));
+
   try {
     const searchUrl =
-      `https://en.wikipedia.org/w/api.php?action=query&list=search&srlimit=3&format=json&origin=*` +
-      `&srsearch=${encodeURIComponent(searchQuery)}`;
+      `https://en.wikipedia.org/w/api.php?action=query&list=search&srlimit=5&format=json&origin=*` +
+      `&srsearch=${encodeURIComponent(`"${name}" ${city ?? ''}`.trim())}`;
     const search = await fetchJson<{
       query?: { search?: Array<{ title?: string; snippet?: string }> };
     }>(searchUrl, {
@@ -128,14 +158,16 @@ async function wikipediaSummary(place: Place): Promise<{
         if (!extract || extract.length < 40) continue;
 
         const hay = `${data.title ?? ''} ${extract}`.toLowerCase();
-        const tokens = name
-          .toLowerCase()
-          .split(/\s+/)
-          .map((t) => t.replace(/[^a-z0-9]/g, ''))
-          .filter((t) => t.length >= 3);
-        const hit = tokens.filter((t) => hay.includes(t)).length;
-        if (tokens.length >= 2 && hit < 1) continue;
-        if (tokens.length === 1 && hit < 1) continue;
+        // Reject food-dish articles and weak country-only matches.
+        if (/\b(soup|noodle|dish consisting|cuisine of)\b/i.test(hay) && distinctive.length) {
+          const titleHits = distinctive.filter((t) => (data.title ?? '').toLowerCase().includes(t));
+          if (titleHits.length === 0) continue;
+        }
+
+        const hit = distinctive.filter((t) => hay.includes(t)).length;
+        if (distinctive.length >= 2 && hit < 2) continue;
+        if (distinctive.length === 1 && hit < 1) continue;
+        if (distinctive.length === 0) continue;
 
         return {
           extract: extract.length > 420 ? `${extract.slice(0, 417).trim()}…` : extract,

@@ -178,7 +178,7 @@ export function PlaceDetailScreen() {
   const place = query.data ?? seeded;
 
   const photosQuery = useQuery({
-    queryKey: ['place-photos', 'v6-travel-image', place?.id, place?.name, place?.latitude, place?.longitude],
+    queryKey: ['place-photos', 'v7-relevant', place?.id, place?.name, place?.latitude, place?.longitude],
     enabled: Boolean(place?.id),
     queryFn: async () => {
       const photos = await fetchPlacePhotos(place!, 6);
@@ -231,6 +231,7 @@ export function PlaceDetailScreen() {
   const overviewQuery = useQuery({
     queryKey: [
       'place-overview',
+      'v2-no-food-wiki',
       place?.id,
       place?.name,
       place?.address,

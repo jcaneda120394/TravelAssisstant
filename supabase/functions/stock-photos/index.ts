@@ -71,12 +71,65 @@ function isExcluded(url: string, exclude: string[]): boolean {
   });
 }
 
-function acceptable(img: TravelImage, excludeUrls: string[], excludeIds: string[]): boolean {
+const IRRELEVANT_FOR_FOOD =
+  /\b(memorial|monument|war|veteran|cemetery|grave|traveling wall|vietnam wall|battlefield|soldier|tomb)\b/i;
+
+const GEO_STOP = new Set([
+  "the", "and", "vietnam", "japan", "philippines", "thailand", "indonesia",
+  "city", "town", "street", "travel", "food", "dining", "interior", "shop",
+  "speciality", "specialty", "special", "landmark", "building",
+]);
+
+function isBusiness(type: string | null | undefined): boolean {
+  return /^(restaurant|cafe|bakery|hotel|resort|nightlife)$/i.test(String(type ?? ""));
+}
+
+function significantTokens(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s']/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length >= 3 && !GEO_STOP.has(t));
+}
+
+function typeHints(type: string | null | undefined): string[] {
+  const t = String(type ?? "").toLowerCase();
+  if (t === "cafe") return ["cafe", "coffee", "espresso", "latte"];
+  if (t === "restaurant") return ["restaurant", "dining", "kitchen", "eatery"];
+  if (t === "bakery") return ["bakery", "pastry", "bread"];
+  if (t === "hotel" || t === "resort") return ["hotel", "resort", "lobby"];
+  return [];
+}
+
+function relevantToPlace(
+  img: TravelImage,
+  placeName: string,
+  placeType: string | null | undefined,
+): boolean {
+  const hay = `${img.alt} ${img.searchQuery}`.toLowerCase();
+  if (isBusiness(placeType) && IRRELEVANT_FOR_FOOD.test(hay)) return false;
+  const tokens = significantTokens(placeName);
+  if (tokens.some((t) => hay.includes(t))) return true;
+  const hints = typeHints(placeType);
+  if (isBusiness(placeType) && hints.some((h) => hay.includes(h))) {
+    return !IRRELEVANT_FOR_FOOD.test(hay);
+  }
+  return false;
+}
+
+function acceptable(
+  img: TravelImage,
+  excludeUrls: string[],
+  excludeIds: string[],
+  placeName: string,
+  placeType: string | null | undefined,
+): boolean {
   if (!img.url || !/^https?:\/\//i.test(img.url)) return false;
   if (/\.svg(\?|$)/i.test(img.url)) return false;
   if (excludeIds.includes(img.id)) return false;
   if (isExcluded(img.url, excludeUrls)) return false;
   if (img.width != null && img.width > 0 && img.width < 640) return false;
+  if (!relevantToPlace(img, placeName, placeType)) return false;
   return true;
 }
 
@@ -284,6 +337,8 @@ async function resolveSequential(params: {
   queries: string[];
   excludeUrls: string[];
   excludeIds: string[];
+  placeName: string;
+  placeType: string | null;
 }): Promise<{ image: TravelImage | null; providerTried: string[] }> {
   const pexelsKey = Deno.env.get("PEXELS_API_KEY")?.trim() ?? "";
   const unsplashKey = Deno.env.get("UNSPLASH_ACCESS_KEY")?.trim() ?? "";
@@ -307,7 +362,13 @@ async function resolveSequential(params: {
         console.log(`[TravelImage] Searching ${provider.name}: ${query}`);
         const candidates = await provider.run(query);
         const hit = candidates.find((img) =>
-          acceptable(img, params.excludeUrls, params.excludeIds)
+          acceptable(
+            img,
+            params.excludeUrls,
+            params.excludeIds,
+            params.placeName,
+            params.placeType,
+          )
         );
         if (hit) {
           console.log(`[TravelImage] ${provider.name} found image.`);
@@ -338,25 +399,41 @@ function buildQueries(body: {
   const city = String(body.city ?? "").trim();
   const country = String(body.country ?? "").trim();
   const type = String(body.type ?? "attraction").trim();
+  const business = /^(restaurant|cafe|bakery|hotel|resort|nightlife)$/i.test(type);
   const keywords =
-    /restaurant|cafe|food/i.test(type)
-      ? "food restaurant"
+    /cafe/i.test(type)
+      ? "cafe coffee shop interior"
+      : /restaurant|food/i.test(type)
+      ? "restaurant food dining"
       : /hotel|resort/i.test(type)
-      ? "hotel travel"
+      ? "hotel building exterior"
       : /beach/i.test(type)
       ? "beach travel"
       : /temple/i.test(type)
       ? "temple landmark"
       : "travel landmark";
+
+  const ladder = business
+    ? [
+      [name, city, keywords].filter(Boolean).join(" "),
+      [name, city, country].filter(Boolean).join(" "),
+      [name, city].filter(Boolean).join(" "),
+      [name, keywords].filter(Boolean).join(" "),
+      city ? `${city} ${keywords}` : "",
+    ]
+    : [
+      [name, city, country, keywords].filter(Boolean).join(" "),
+      [name, city, country].filter(Boolean).join(" "),
+      [name, city].filter(Boolean).join(" "),
+      city ? `${city} ${keywords}` : "",
+      name,
+    ];
+
   return [
-    [name, city, country, keywords].filter(Boolean).join(" "),
-    [name, city, country].filter(Boolean).join(" "),
-    [name, city].filter(Boolean).join(" "),
-    city && country ? `${city} ${country} travel` : "",
-    name,
-  ]
-    .map((q) => q.replace(/\s+/g, " ").trim())
-    .filter((q, i, arr) => q.length >= 2 && arr.indexOf(q) === i);
+    ...new Set(
+      ladder.map((q) => q.replace(/\s+/g, " ").trim()).filter((q) => q.length >= 3),
+    ),
+  ];
 }
 
 Deno.serve(async (req) => {
@@ -435,6 +512,8 @@ Deno.serve(async (req) => {
     queries,
     excludeUrls,
     excludeIds,
+    placeName: String(body.name ?? body.query ?? queries[0] ?? ""),
+    placeType: body.type != null ? String(body.type) : null,
   });
 
   return new Response(

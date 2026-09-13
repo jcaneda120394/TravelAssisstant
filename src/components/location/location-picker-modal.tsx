@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -199,7 +199,13 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const busyRef = useRef(false);
   const debounced = useDebouncedValue(query, 350);
+
+  const setBusySafe = (next: boolean) => {
+    busyRef.current = next;
+    setBusy(next);
+  };
 
   const suggestionsQuery = useQuery({
     queryKey: ['location-picker', 'v2-world', debounced],
@@ -220,8 +226,8 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
   }, [visible]);
 
   const applySuggestion = async (item: DestinationSuggestion) => {
-    if (busy) return;
-    setBusy(true);
+    if (busyRef.current) return;
+    setBusySafe(true);
     setError(null);
     // Close immediately so mobile web never sits behind a frozen sheet.
     onClose();
@@ -234,13 +240,13 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     } catch (err) {
       notifyAlert('Could not set location', getErrorMessage(err));
     } finally {
-      setBusy(false);
+      setBusySafe(false);
     }
   };
 
   const applyGps = async () => {
-    if (busy) return;
-    setBusy(true);
+    if (busyRef.current) return;
+    setBusySafe(true);
     setError(null);
     try {
       // Keep the sheet open on web until GPS finishes — browsers only show the
@@ -256,7 +262,7 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
       setError(message);
       notifyAlert('Location needed', message);
     } finally {
-      setBusy(false);
+      setBusySafe(false);
     }
   };
 
@@ -306,15 +312,15 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
                 loading={busy}
                 onPress={() => void applyGps()}
               />
-              <View className="mt-2">
+              <View className="mt-4">
                 <Button
                   label="Clear saved location"
                   variant="ghost"
-                  loading={busy}
+                  disabled={busy}
                   onPress={() => {
                     void (async () => {
-                      if (busy) return;
-                      setBusy(true);
+                      if (busyRef.current) return;
+                      setBusySafe(true);
                       setError(null);
                       onClose();
                       try {
@@ -325,7 +331,7 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
                       } catch (err) {
                         notifyAlert('Could not clear location', getErrorMessage(err));
                       } finally {
-                        setBusy(false);
+                        setBusySafe(false);
                       }
                     })();
                   }}

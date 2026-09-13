@@ -25,21 +25,31 @@ export function useEnsureLocation(options?: { auto?: boolean; refresh?: boolean 
   const [status, setStatus] = useState<LocateStatus>(coords ? 'ready' : 'idle');
   const [error, setError] = useState<string | null>(null);
   const didAutoAsk = useRef(false);
+  const locateInflight = useRef<Promise<boolean> | null>(null);
 
   const locate = useCallback(async () => {
+    if (locateInflight.current) {
+      return locateInflight.current;
+    }
     setStatus('loading');
     setError(null);
-    try {
-      await getCurrentPosition();
-      setStatus('ready');
-      return true;
-    } catch (err) {
-      const message = getErrorMessage(err);
-      const denied = /denied|permission/i.test(message);
-      setError(message);
-      setStatus(denied ? 'denied' : 'error');
-      return false;
-    }
+    const run = (async () => {
+      try {
+        await getCurrentPosition();
+        setStatus('ready');
+        return true;
+      } catch (err) {
+        const message = getErrorMessage(err);
+        const denied = /denied|permission/i.test(message);
+        setError(message);
+        setStatus(denied ? 'denied' : 'error');
+        return false;
+      } finally {
+        locateInflight.current = null;
+      }
+    })();
+    locateInflight.current = run;
+    return run;
   }, []);
 
   useEffect(() => {

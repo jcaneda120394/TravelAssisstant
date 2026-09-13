@@ -307,69 +307,79 @@ async function readDevicePosition(): Promise<GeoPoint> {
 }
 
 /** Fresh GPS fix — uses precise coords + detailed reverse-geocode when permission is granted. */
+let gpsInflight: Promise<GeoPoint> | null = null;
+
 export async function getCurrentPosition(): Promise<GeoPoint> {
-  // Intentional GPS always wins over a prior manual city (Singapore quick-pick, etc.).
-  // Capture epoch after bumping so in-flight older GPS / clear races still lose.
-  useLocationStore.setState((state) => ({
-    locationEpoch: state.locationEpoch + 1,
-  }));
-  const epoch = useLocationStore.getState().locationEpoch;
-  try {
-    const status = await requestForegroundLocation();
-    if (status !== 'granted') {
-      throw new AppError(
-        'Location permission is off. Enable it in Settings, or choose a city manually.',
-        { code: 'LOCATION_DENIED' },
-      );
-    }
-
-    const coords = await readDevicePosition();
-
-    if (!Number.isFinite(coords.latitude) || !Number.isFinite(coords.longitude)) {
-      throw new AppError('Unable to get current location', { code: 'LOCATION_UNAVAILABLE' });
-    }
-
-    // Don't block GPS success on slow reverse-geocode.
-    let labeled: { city: string | null; country: string | null; label: string };
-    try {
-      labeled = await withTimeout(
-        labelFromCoords(coords),
-        8_000,
-        'Location label timed out',
-      );
-    } catch {
-      labeled = {
-        city: null,
-        country: null,
-        label: `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`,
-      };
-    }
-
-    // Traveler cleared location or picked a city while GPS was running — discard.
-    if (useLocationStore.getState().locationEpoch !== epoch) {
-      const latest = useLocationStore.getState().coords;
-      if (latest) return latest;
-      throw new AppError('Location was cleared. Tap Get my location again if you want GPS.', {
-        code: 'LOCATION_CLEARED',
-      });
-    }
-
-    useLocationStore.getState().setCurrentLocation({
-      coords,
-      city: labeled.city,
-      country: labeled.country,
-      label: labeled.label,
-      mode: 'precise',
-      epoch,
-    });
-
-    return coords;
-  } catch (error) {
-    if (error instanceof AppError) {
-      throw error;
-    }
-    throw toAppError(error, 'Unable to get current location');
+  // Coalesce double-taps: a second press awaits the same fix instead of bumping
+  // locationEpoch and invalidating the first write (which looked like “location deleted”).
+  if (gpsInflight) {
+    return gpsInflight;
   }
+
+  gpsInflight = (async () => {
+    // Capture only — do not bump. Epoch bumps are for clear / manual city picks.
+    const epoch = useLocationStore.getState().locationEpoch;
+    try {
+      const status = await requestForegroundLocation();
+      if (status !== 'granted') {
+        throw new AppError(
+          'Location permission is off. Enable it in Settings, or choose a city manually.',
+          { code: 'LOCATION_DENIED' },
+        );
+      }
+
+      const coords = await readDevicePosition();
+
+      if (!Number.isFinite(coords.latitude) || !Number.isFinite(coords.longitude)) {
+        throw new AppError('Unable to get current location', { code: 'LOCATION_UNAVAILABLE' });
+      }
+
+      // Don't block GPS success on slow reverse-geocode.
+      let labeled: { city: string | null; country: string | null; label: string };
+      try {
+        labeled = await withTimeout(
+          labelFromCoords(coords),
+          8_000,
+          'Location label timed out',
+        );
+      } catch {
+        labeled = {
+          city: null,
+          country: null,
+          label: `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}`,
+        };
+      }
+
+      // Traveler cleared location or picked a city while GPS was running — keep their choice.
+      if (useLocationStore.getState().locationEpoch !== epoch) {
+        const latest = useLocationStore.getState().coords;
+        if (latest) return latest;
+        throw new AppError('Location was cleared. Tap Get my location again if you want GPS.', {
+          code: 'LOCATION_CLEARED',
+        });
+      }
+
+      useLocationStore.getState().setCurrentLocation({
+        coords,
+        city: labeled.city,
+        country: labeled.country,
+        label: labeled.label,
+        mode: 'precise',
+        epoch,
+      });
+
+      return coords;
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw toAppError(error, 'Unable to get current location');
+    } finally {
+      gpsInflight = null;
+    }
+  })();
+
+  return gpsInflight;
 }
 
 /** Pick a city/country from autocomplete. */

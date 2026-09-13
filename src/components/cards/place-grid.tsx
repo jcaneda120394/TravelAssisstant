@@ -14,12 +14,19 @@ type Props = {
  * Responsive place card grid — 1 col mobile, 2–3 cols on desktop web.
  * Avoids negative margins that pull cards under overlay scrollbars.
  */
-export function PlaceGrid({ children, className = '', gap = 16 }: Props) {
+export function PlaceGrid({ children, className = '', gap = 24 }: Props) {
   const { placeColumns } = useResponsiveLayout();
   const items = Children.toArray(children);
 
   if (placeColumns === 1) {
-    return <View className={className}>{items}</View>;
+    return (
+      <View className={className} style={{ gap }}>
+        {items.map((child, index) => (
+          // eslint-disable-next-line react/no-array-index-key -- stable order from parent keys inside child
+          <View key={index}>{child}</View>
+        ))}
+      </View>
+    );
   }
 
   const widthPercent = 100 / placeColumns;

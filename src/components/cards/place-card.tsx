@@ -94,7 +94,7 @@ function PlaceCardComponent({
       className={`bg-transparent ${className || 'mb-5'}`}
     >
       <PlaceCardPhoto place={place} />
-      <View className="mt-2.5 px-0.5">
+      <View className="mt-3 px-0.5 pb-1">
         <View className="flex-row items-start justify-between gap-2">
           <AppText className="flex-1 font-sans-semibold text-[15px] leading-5" numberOfLines={1}>
             {title}
@@ -104,7 +104,7 @@ function PlaceCardComponent({
           ) : null}
         </View>
 
-        <View className="mt-1 flex-row flex-wrap items-center gap-x-2">
+        <View className="mt-1.5 flex-row flex-wrap items-center gap-x-2">
           <AppText muted className="text-[13px] capitalize">
             {labelize(place.category)}
           </AppText>
@@ -116,13 +116,13 @@ function PlaceCardComponent({
         </View>
 
         {price ? (
-          <AppText className="mt-1 text-[14px] font-sans-semibold text-ink-light dark:text-ink-dark">
+          <AppText className="mt-1.5 text-[14px] font-sans-semibold text-ink-light dark:text-ink-dark">
             {price.label}
           </AppText>
         ) : null}
 
         {place.address ? (
-          <AppText muted className="mt-0.5 text-[13px] leading-4" numberOfLines={1}>
+          <AppText muted className="mt-1 text-[13px] leading-4" numberOfLines={1}>
             {place.address}
           </AppText>
         ) : null}

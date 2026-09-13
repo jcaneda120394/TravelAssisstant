@@ -263,14 +263,8 @@ export function ExploreScreen() {
         ) : null}
 
         <AppText className="mb-2 mt-4 font-sans-medium">Category</AppText>
-        <ExploreCategoryPicker value={category} onChange={applyCategory} />
-
-        <View className="mt-5 mb-5">
-          <Button
-            label="Browse hotels"
-            variant="secondary"
-            onPress={() => router.push('/hotels')}
-          />
+        <View className="mb-5">
+          <ExploreCategoryPicker value={category} onChange={applyCategory} />
         </View>
 
         {hasLocation && query.isFetching && places.length === 0 ? (

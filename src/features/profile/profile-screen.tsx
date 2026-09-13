@@ -29,6 +29,7 @@ export function ProfileScreen() {
   const { currency, setCurrency } = useDisplayCurrency();
   const [currencyPickerOpen, setCurrencyPickerOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [buildingPack, setBuildingPack] = useState(false);
   const preference = useThemeStore((state) => state.preference);
   const setPreference = useThemeStore((state) => state.setPreference);
   const followCountryTheme = useThemeStore((state) => state.followCountryTheme);
@@ -74,12 +75,31 @@ export function ProfileScreen() {
   };
 
   const onOfflinePack = async () => {
-    if (!user) return;
-    const pack = await buildOfflinePack(user.id);
-    Alert.alert(
-      'Offline pack ready',
-      `Cached ${pack.trips.length} trip(s) and emergency numbers at ${pack.generatedAt}`,
-    );
+    if (!user) {
+      Alert.alert('Sign in required', 'Sign in to cache your trips for offline use.');
+      return;
+    }
+    setBuildingPack(true);
+    try {
+      const pack = await buildOfflinePack(user.id, {
+        homeCountry: preferences?.home_country,
+        locationLabel,
+      });
+      const when = new Date(pack.generatedAt).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+      const emergency = `${pack.emergencyNumbers.countryName}: police ${pack.emergencyNumbers.police}, ambulance ${pack.emergencyNumbers.ambulance}, fire ${pack.emergencyNumbers.fire}`;
+      const summary =
+        pack.tripCount === 0
+          ? `No trips found to cache. Emergency numbers saved (${emergency}).\n\nBuilt ${when}.`
+          : `Cached ${pack.tripCount} trip${pack.tripCount === 1 ? '' : 's'} (${pack.stopCount} stop${pack.stopCount === 1 ? '' : 's'}) and emergency numbers (${emergency}).\n\nBuilt ${when}.`;
+      Alert.alert(pack.tripCount === 0 ? 'Offline pack saved' : 'Offline pack ready', summary);
+    } catch (error) {
+      Alert.alert('Could not build offline pack', getErrorMessage(error));
+    } finally {
+      setBuildingPack(false);
+    }
   };
 
   return (
@@ -99,9 +119,6 @@ export function ProfileScreen() {
           </AppText>
           <AppText muted className="mt-1">
             {user?.email ?? 'Sign up to save trips and favorites'}
-          </AppText>
-          <AppText muted className="mt-2">
-            Auth: {env.isSupabaseConfigured ? 'Supabase' : 'Local demo'}
           </AppText>
           <View className="mt-4 gap-2">
             {user ? (
@@ -164,7 +181,7 @@ export function ProfileScreen() {
         </Card>
 
         <Card className="mb-4">
-          <SectionHeader title="Travel preferences" />
+          <SectionHeader title="Travel Preferences" />
           {preferences ? (
             <View className="gap-2">
               <AppText muted>
@@ -221,7 +238,7 @@ export function ProfileScreen() {
         </Card>
 
         <Card className="mb-4">
-          <SectionHeader title="Travel tools" />
+          <SectionHeader title="Travel Tools" />
           <View className="gap-2">
             <Button label="Travel Guide" variant="secondary" onPress={() => router.push('/(tabs)/guide')} />
             <Button label="Favorites" variant="secondary" onPress={() => router.push('/favorites')} />
@@ -230,7 +247,12 @@ export function ProfileScreen() {
             <Button label="Weather" variant="secondary" onPress={() => router.push('/weather')} />
             <Button label="Emergency" variant="secondary" onPress={() => router.push('/emergency')} />
             <Button label="Notifications" variant="secondary" onPress={() => router.push('/notifications')} />
-            <Button label="Build offline pack" variant="secondary" onPress={() => void onOfflinePack()} />
+            <Button
+              label="Build offline pack"
+              variant="secondary"
+              loading={buildingPack}
+              onPress={() => void onOfflinePack()}
+            />
           </View>
         </Card>
 
@@ -263,7 +285,7 @@ export function ProfileScreen() {
           {countryThemesSupported ? (
             <View className="mb-3 gap-2">
               <Button
-                label={followCountryTheme ? 'Country theme: On' : 'Country theme: Off'}
+                label={followCountryTheme ? 'Country Theme: On' : 'Country Theme: Off'}
                 variant={followCountryTheme ? 'primary' : 'secondary'}
                 onPress={() => setFollowCountryTheme(!followCountryTheme)}
                 testID="theme-follow-country"
@@ -286,10 +308,10 @@ export function ProfileScreen() {
                   key={option}
                   label={
                     option === 'light'
-                      ? 'Light (normal)'
+                      ? 'Light (Normal)'
                       : option === 'dark'
                         ? 'Dark'
-                        : option
+                        : 'System'
                   }
                   variant={selected ? 'primary' : 'secondary'}
                   onPress={() => setPreference(option)}
@@ -301,13 +323,10 @@ export function ProfileScreen() {
         </Card>
 
         <Card>
-          <SectionHeader title="App status" />
-          <AppText muted>Environment: {env.appEnv}</AppText>
-          <AppText muted>
-            Supabase: {env.isSupabaseConfigured ? 'Configured' : 'Not configured (demo auth)'}
-          </AppText>
-          <AppText muted>
-            Mock providers: {env.useMockProviders ? 'Enabled' : 'Disabled'}
+          <SectionHeader title="App Version" />
+          <AppText className="font-sans-semibold">{env.appVersionLabel}</AppText>
+          <AppText muted className="mt-1 text-xs">
+            Updates with each production deploy
           </AppText>
         </Card>
       </ScrollView>

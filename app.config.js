@@ -36,12 +36,30 @@ loadEnvFile(path.join(__dirname, '.env.local'), { override: true });
  */
 module.exports = () => {
   const expo = appJson.expo ?? {};
+  const pkg = require('./package.json');
+  const version =
+    process.env.EXPO_PUBLIC_APP_VERSION?.trim() ||
+    pkg.version ||
+    expo.version ||
+    '0.0.0';
+  const buildId = (
+    process.env.EXPO_PUBLIC_APP_BUILD ||
+    process.env.VERCEL_GIT_COMMIT_SHA ||
+    process.env.GITHUB_SHA ||
+    ''
+  )
+    .trim()
+    .slice(0, 7);
+
   return {
     ...expo,
+    version,
     extra: {
       ...(expo.extra ?? {}),
       appEnv: process.env.EXPO_PUBLIC_APP_ENV ?? 'development',
       appName: process.env.EXPO_PUBLIC_APP_NAME ?? 'TravelAssistant',
+      appVersion: version,
+      appBuild: buildId,
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? '',
       supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
       useMockProviders: process.env.EXPO_PUBLIC_USE_MOCK_PROVIDERS ?? 'false',

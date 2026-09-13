@@ -29,7 +29,6 @@ import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { providers } from '@/providers/registry';
 import { getHomeNearbyPlaces } from '@/services/places/home-nearby.service';
 import { listTrips } from '@/services/trips/trips.service';
-import { seedProactiveNotifications } from '@/services/notifications/notifications.service';
 import { looksLikeSanFrancisco } from '@/services/location/location.service';
 import { getDestinationTravelGradient } from '@/utils/destination-theme';
 
@@ -184,12 +183,6 @@ export function HomeScreen() {
     staleTime: 30_000,
   });
 
-  const alertsQuery = useQuery({
-    queryKey: ['home-alerts'],
-    queryFn: () => seedProactiveNotifications(),
-    staleTime: 15 * 60_000,
-  });
-
   const nextTrip = tripsQuery.data?.[0];
   const firstName = profile?.full_name?.split(' ')[0];
   const locationLine = hasLocation
@@ -246,10 +239,6 @@ export function HomeScreen() {
 
             <AppText inverse className="mt-4 text-sm font-sans-medium leading-5 text-white">
               {locationLine}
-            </AppText>
-
-            <AppText inverse className="mt-2 text-xs text-white/65">
-              {providers.usingMocks ? 'Mock' : 'Live'} data
             </AppText>
 
             <View
@@ -393,43 +382,25 @@ export function HomeScreen() {
           {hasLocation ? (
             <Card className="mb-5">
               <SectionHeader eyebrow="Now" title="Today" subtitle={label ?? 'Near you'} />
-              <View className="flex-row gap-3">
-                <View
-                  className={`flex-1 rounded-2xl px-3 py-3 ${
-                    scheme === 'dark' ? 'bg-brand-800' : 'bg-surface-mist'
+              <View
+                className={`rounded-2xl px-3 py-3 ${
+                  scheme === 'dark' ? 'bg-brand-800' : 'bg-surface-mist'
+                }`}
+              >
+                <AppText
+                  className={`text-xs font-sans-semibold uppercase tracking-wide ${
+                    scheme === 'dark' ? 'text-brand-200' : 'text-brand-600'
                   }`}
                 >
-                  <AppText
-                    className={`text-xs font-sans-semibold uppercase tracking-wide ${
-                      scheme === 'dark' ? 'text-brand-200' : 'text-brand-600'
-                    }`}
-                  >
-                    Weather
-                  </AppText>
-                  <AppText className="mt-1 font-sans-semibold">
-                    {weatherQuery.data?.condition ??
-                      (weatherQuery.isLoading ? 'Loading…' : '—')}
-                    {weatherQuery.data?.temperatureC != null
-                      ? ` · ${weatherQuery.data.temperatureC}°C`
-                      : ''}
-                  </AppText>
-                </View>
-                <View
-                  className={`flex-1 rounded-2xl px-3 py-3 ${
-                    scheme === 'dark' ? 'bg-brand-800' : 'bg-accent-soft'
-                  }`}
-                >
-                  <AppText
-                    className={`text-xs font-sans-semibold uppercase tracking-wide ${
-                      scheme === 'dark' ? 'text-accent-400' : 'text-accent-600'
-                    }`}
-                  >
-                    Alert
-                  </AppText>
-                  <AppText className="mt-1 font-sans-semibold">
-                    {alertsQuery.data?.[0]?.title ?? 'No alerts'}
-                  </AppText>
-                </View>
+                  Weather
+                </AppText>
+                <AppText className="mt-1 font-sans-semibold">
+                  {weatherQuery.data?.condition ??
+                    (weatherQuery.isLoading ? 'Loading…' : '—')}
+                  {weatherQuery.data?.temperatureC != null
+                    ? ` · ${weatherQuery.data.temperatureC}°C`
+                    : ''}
+                </AppText>
               </View>
             </Card>
           ) : null}

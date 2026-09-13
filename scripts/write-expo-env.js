@@ -12,6 +12,8 @@ const path = require('path');
 const KEYS = [
   'EXPO_PUBLIC_APP_ENV',
   'EXPO_PUBLIC_APP_NAME',
+  'EXPO_PUBLIC_APP_VERSION',
+  'EXPO_PUBLIC_APP_BUILD',
   'EXPO_PUBLIC_SUPABASE_URL',
   'EXPO_PUBLIC_SUPABASE_ANON_KEY',
   'EXPO_PUBLIC_USE_MOCK_PROVIDERS',
@@ -45,6 +47,20 @@ function ensureDefaults() {
 
   if (!firstNonEmpty('EXPO_PUBLIC_APP_NAME')) {
     process.env.EXPO_PUBLIC_APP_NAME = 'TravelAssistant';
+  }
+
+  if (!firstNonEmpty('EXPO_PUBLIC_APP_VERSION')) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+      if (pkg.version) process.env.EXPO_PUBLIC_APP_VERSION = String(pkg.version);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (!firstNonEmpty('EXPO_PUBLIC_APP_BUILD')) {
+    const sha = firstNonEmpty('VERCEL_GIT_COMMIT_SHA', 'GITHUB_SHA');
+    if (sha) process.env.EXPO_PUBLIC_APP_BUILD = sha.slice(0, 7);
   }
 
   if (!firstNonEmpty('EXPO_PUBLIC_USE_MOCK_PROVIDERS')) {

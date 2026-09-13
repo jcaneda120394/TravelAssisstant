@@ -6,6 +6,8 @@ const envSchema = z.object({
     .enum(['development', 'staging', 'production'])
     .default('development'),
   EXPO_PUBLIC_APP_NAME: z.string().default('TravelAssistant'),
+  EXPO_PUBLIC_APP_VERSION: z.string().optional().default(''),
+  EXPO_PUBLIC_APP_BUILD: z.string().optional().default(''),
   EXPO_PUBLIC_SUPABASE_URL: z.string().optional().default(''),
   EXPO_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().default(''),
   EXPO_PUBLIC_USE_MOCK_PROVIDERS: z
@@ -22,6 +24,8 @@ const envSchema = z.object({
 type Extra = {
   appEnv?: string;
   appName?: string;
+  appVersion?: string;
+  appBuild?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   useMockProviders?: string;
@@ -44,6 +48,11 @@ function pick(envValue: string | undefined, extraValue: string | undefined): str
 const parsed = envSchema.safeParse({
   EXPO_PUBLIC_APP_ENV: pick(process.env.EXPO_PUBLIC_APP_ENV, extra.appEnv),
   EXPO_PUBLIC_APP_NAME: pick(process.env.EXPO_PUBLIC_APP_NAME, extra.appName),
+  EXPO_PUBLIC_APP_VERSION: pick(
+    process.env.EXPO_PUBLIC_APP_VERSION,
+    extra.appVersion ?? Constants.expoConfig?.version,
+  ),
+  EXPO_PUBLIC_APP_BUILD: pick(process.env.EXPO_PUBLIC_APP_BUILD, extra.appBuild),
   EXPO_PUBLIC_SUPABASE_URL: pick(process.env.EXPO_PUBLIC_SUPABASE_URL, extra.supabaseUrl),
   EXPO_PUBLIC_SUPABASE_ANON_KEY: pick(
     process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
@@ -88,9 +97,19 @@ if (data.EXPO_PUBLIC_APP_ENV === 'production' && !isSupabaseConfigured) {
   );
 }
 
+const appVersion =
+  data.EXPO_PUBLIC_APP_VERSION ||
+  Constants.expoConfig?.version ||
+  '0.0.0';
+const appBuild = data.EXPO_PUBLIC_APP_BUILD || '';
+
 export const env = {
   appEnv: data.EXPO_PUBLIC_APP_ENV,
   appName: data.EXPO_PUBLIC_APP_NAME,
+  appVersion,
+  appBuild,
+  /** e.g. "1.2.0" or "1.2.0 (a1b2c3d)" when a deploy SHA is present */
+  appVersionLabel: appBuild ? `${appVersion} (${appBuild})` : appVersion,
   supabaseUrl: data.EXPO_PUBLIC_SUPABASE_URL,
   supabaseAnonKey: data.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   useMockProviders: data.EXPO_PUBLIC_USE_MOCK_PROVIDERS,

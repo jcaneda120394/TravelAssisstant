@@ -26,7 +26,7 @@ function PlaceCardPhoto({ place }: { place: Place }) {
   const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
   const title = displayPlaceName(place);
   const photoQuery = useQuery({
-    queryKey: ['place-card-photo', 'v7-stock', place.id, place.name, place.address],
+    queryKey: ['place-card-photo', 'v8-esri-map', place.id, place.name, place.address],
     queryFn: () => fetchBestPlacePhoto(place),
     staleTime: 45 * 60_000,
     gcTime: 2 * 60 * 60_000,

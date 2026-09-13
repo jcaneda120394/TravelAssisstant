@@ -412,7 +412,7 @@ function rankAtmospherePhotos(place: Place, photos: PlacePhoto[]): PlacePhoto[] 
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
 
-/** Last-resort map tile — works worldwide without API keys. */
+/** Last-resort map tile — free Esri streets (no API key; Carto now watermarks). */
 function mapPreviewPhoto(place: Place): PlacePhoto {
   const zoom = 15;
   const lat = place.latitude;
@@ -423,7 +423,8 @@ function mapPreviewPhoto(place: Place): PlacePhoto {
   const y = Math.floor(
     ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n,
   );
-  const url = `https://basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${x}/${y}@2x.png`;
+  // Esri tile path is z/y/x (not z/x/y).
+  const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${zoom}/${y}/${x}`;
   return {
     url,
     thumbUrl: url,

@@ -38,6 +38,10 @@ function sourceLabel(photo: PlacePhoto): string {
       return 'Wikipedia';
     case 'commons':
       return 'Wikimedia Commons';
+    case 'wikimedia':
+      return 'Wikimedia Commons';
+    case 'fallback':
+      return 'Map preview';
     case 'openverse':
       return 'Openverse';
     case 'pexels':

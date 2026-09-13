@@ -17,10 +17,6 @@ const envSchema = z.object({
   EXPO_PUBLIC_POSTHOG_HOST: z.string().optional().default(''),
   EXPO_PUBLIC_SENTRY_DSN: z.string().optional().default(''),
   EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional().default(''),
-  EXPO_PUBLIC_PEXELS_API_KEY: z.string().optional().default(''),
-  EXPO_PUBLIC_UNSPLASH_ACCESS_KEY: z.string().optional().default(''),
-  EXPO_PUBLIC_PIXABAY_API_KEY: z.string().optional().default(''),
-  EXPO_PUBLIC_FLICKR_API_KEY: z.string().optional().default(''),
 });
 
 type Extra = {
@@ -33,10 +29,6 @@ type Extra = {
   posthogHost?: string;
   sentryDsn?: string;
   googleMapsApiKey?: string;
-  pexelsApiKey?: string;
-  unsplashAccessKey?: string;
-  pixabayApiKey?: string;
-  flickrApiKey?: string;
 };
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
@@ -68,13 +60,6 @@ const parsed = envSchema.safeParse({
     process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
     extra.googleMapsApiKey,
   ),
-  EXPO_PUBLIC_PEXELS_API_KEY: pick(process.env.EXPO_PUBLIC_PEXELS_API_KEY, extra.pexelsApiKey),
-  EXPO_PUBLIC_UNSPLASH_ACCESS_KEY: pick(
-    process.env.EXPO_PUBLIC_UNSPLASH_ACCESS_KEY,
-    extra.unsplashAccessKey,
-  ),
-  EXPO_PUBLIC_PIXABAY_API_KEY: pick(process.env.EXPO_PUBLIC_PIXABAY_API_KEY, extra.pixabayApiKey),
-  EXPO_PUBLIC_FLICKR_API_KEY: pick(process.env.EXPO_PUBLIC_FLICKR_API_KEY, extra.flickrApiKey),
 });
 
 if (!parsed.success) {
@@ -113,10 +98,6 @@ export const env = {
   posthogHost: data.EXPO_PUBLIC_POSTHOG_HOST,
   sentryDsn: data.EXPO_PUBLIC_SENTRY_DSN,
   googleMapsApiKey: data.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-  pexelsApiKey: data.EXPO_PUBLIC_PEXELS_API_KEY,
-  unsplashAccessKey: data.EXPO_PUBLIC_UNSPLASH_ACCESS_KEY,
-  pixabayApiKey: data.EXPO_PUBLIC_PIXABAY_API_KEY,
-  flickrApiKey: data.EXPO_PUBLIC_FLICKR_API_KEY,
   isSupabaseConfigured,
   isProduction: data.EXPO_PUBLIC_APP_ENV === 'production',
 } as const;

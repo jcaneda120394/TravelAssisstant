@@ -1,8 +1,6 @@
-// Supabase Edge Function: stock-photos
-// Free travel photography from Pexels, Unsplash, Pixabay, Flickr (+ Openverse).
-// Guests allowed (verify_jwt = false). Set optional secrets:
-//   PEXELS_API_KEY, UNSPLASH_ACCESS_KEY, PIXABAY_API_KEY, FLICKR_API_KEY
-// Openverse needs no key and always runs.
+// Supabase Edge Function: stock-photos / travel-image resolver
+// Sequential: Pexels → Unsplash → Openverse → Wikimedia → (client fallback)
+// Secrets: PEXELS_API_KEY, UNSPLASH_ACCESS_KEY (never expose to Expo client)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const ALLOWED_ORIGINS = (Deno.env.get("AI_CHAT_ALLOWED_ORIGINS") ?? "")
@@ -49,61 +47,57 @@ function checkRateLimit(key: string): boolean {
   return true;
 }
 
-type StockPhoto = {
+type TravelImage = {
+  id: string;
   url: string;
-  thumbUrl?: string;
-  title?: string;
-  source: string;
-  attribution?: string;
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
+  provider: "pexels" | "unsplash" | "openverse" | "wikimedia";
   photographer?: string;
+  photographerUrl?: string;
+  sourceUrl?: string;
+  attribution?: string;
+  license?: string;
+  alt: string;
+  searchQuery: string;
 };
 
-async function openverse(query: string, limit: number): Promise<StockPhoto[]> {
-  const url =
-    `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}` +
-    `&page_size=${Math.min(limit, 20)}&category=photograph&mature=false&filter_dead=true`;
-  const res = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "TravelMateAI/1.0 (stock-photos edge)",
-    },
+function isExcluded(url: string, exclude: string[]): boolean {
+  const clean = url.split("?")[0]!;
+  return exclude.some((e) => {
+    const b = e.split("?")[0]!;
+    return b === clean || url.includes(b) || b.includes(clean);
   });
-  if (!res.ok) return [];
-  const data = await res.json() as {
-    results?: Array<{
-      title?: string;
-      url?: string;
-      thumbnail?: string;
-      creator?: string;
-      license?: string;
-    }>;
-  };
-  return (data.results ?? [])
-    .filter((item) => item.url)
-    .map((item) => ({
-      url: item.url!,
-      thumbUrl: item.thumbnail ?? item.url,
-      title: item.title,
-      source: "openverse",
-      photographer: item.creator,
-      attribution: item.creator
-        ? `${item.creator} · Openverse${item.license ? ` · ${item.license}` : ""}`
-        : `Openverse${item.license ? ` · ${item.license}` : ""}`,
-    }));
 }
 
-async function pexels(query: string, limit: number, key: string): Promise<StockPhoto[]> {
+function acceptable(img: TravelImage, excludeUrls: string[], excludeIds: string[]): boolean {
+  if (!img.url || !/^https?:\/\//i.test(img.url)) return false;
+  if (/\.svg(\?|$)/i.test(img.url)) return false;
+  if (excludeIds.includes(img.id)) return false;
+  if (isExcluded(img.url, excludeUrls)) return false;
+  if (img.width != null && img.width > 0 && img.width < 640) return false;
+  return true;
+}
+
+async function pexels(query: string, key: string): Promise<TravelImage[]> {
   const url =
     `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}` +
-    `&per_page=${Math.min(limit, 15)}&orientation=landscape`;
+    `&per_page=12&orientation=landscape&size=large`;
   const res = await fetch(url, {
     headers: { Authorization: key, Accept: "application/json" },
   });
+  if (res.status === 429) return [];
   if (!res.ok) return [];
   const data = await res.json() as {
     photos?: Array<{
+      id?: number;
       alt?: string;
       photographer?: string;
+      photographer_url?: string;
+      url?: string;
+      width?: number;
+      height?: number;
       src?: { large2x?: string; large?: string; medium?: string; small?: string };
     }>;
   };
@@ -111,22 +105,29 @@ async function pexels(query: string, limit: number, key: string): Promise<StockP
     .map((item) => {
       const full = item.src?.large2x ?? item.src?.large ?? item.src?.medium;
       if (!full) return null;
+      const photographer = item.photographer?.trim();
       return {
+        id: `pexels:${item.id ?? full}`,
         url: full,
-        thumbUrl: item.src?.medium ?? item.src?.small ?? full,
-        title: item.alt || item.photographer || "Pexels photo",
-        source: "pexels",
-        photographer: item.photographer,
-        attribution: item.photographer ? `${item.photographer} · Pexels` : "Pexels",
-      } satisfies StockPhoto;
+        thumbnailUrl: item.src?.medium ?? item.src?.small ?? full,
+        width: item.width,
+        height: item.height,
+        provider: "pexels" as const,
+        photographer,
+        photographerUrl: item.photographer_url,
+        sourceUrl: item.url,
+        attribution: photographer ? `${photographer} · Pexels` : "Pexels",
+        alt: item.alt || photographer || query,
+        searchQuery: query,
+      };
     })
-    .filter((p): p is StockPhoto => Boolean(p));
+    .filter((p): p is TravelImage => Boolean(p));
 }
 
-async function unsplash(query: string, limit: number, key: string): Promise<StockPhoto[]> {
+async function unsplash(query: string, key: string): Promise<TravelImage[]> {
   const url =
     `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}` +
-    `&per_page=${Math.min(limit, 15)}&orientation=landscape&content_filter=high`;
+    `&per_page=12&orientation=landscape&content_filter=high`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Client-ID ${key}`,
@@ -134,112 +135,228 @@ async function unsplash(query: string, limit: number, key: string): Promise<Stoc
       Accept: "application/json",
     },
   });
+  if (res.status === 429) return [];
   if (!res.ok) return [];
   const data = await res.json() as {
     results?: Array<{
+      id?: string;
       description?: string | null;
       alt_description?: string | null;
-      user?: { name?: string };
+      width?: number;
+      height?: number;
+      user?: { name?: string; links?: { html?: string } };
       urls?: { regular?: string; small?: string; thumb?: string; raw?: string };
+      links?: { html?: string };
     }>;
   };
   return (data.results ?? [])
     .map((item) => {
       const full = item.urls?.regular ?? item.urls?.raw;
       if (!full) return null;
-      const photographer = item.user?.name;
+      const photographer = item.user?.name?.trim();
       return {
+        id: `unsplash:${item.id ?? full}`,
         url: full,
-        thumbUrl: item.urls?.small ?? item.urls?.thumb ?? full,
-        title: item.alt_description || item.description || photographer || "Unsplash photo",
-        source: "unsplash",
+        thumbnailUrl: item.urls?.small ?? item.urls?.thumb ?? full,
+        width: item.width,
+        height: item.height,
+        provider: "unsplash" as const,
         photographer,
+        photographerUrl: item.user?.links?.html,
+        sourceUrl: item.links?.html,
         attribution: photographer ? `${photographer} · Unsplash` : "Unsplash",
-      } satisfies StockPhoto;
+        alt: item.alt_description || item.description || photographer || query,
+        searchQuery: query,
+      };
     })
-    .filter((p): p is StockPhoto => Boolean(p));
+    .filter((p): p is TravelImage => Boolean(p));
 }
 
-async function pixabay(query: string, limit: number, key: string): Promise<StockPhoto[]> {
+async function openverse(query: string): Promise<TravelImage[]> {
   const url =
-    `https://pixabay.com/api/?key=${encodeURIComponent(key)}` +
-    `&q=${encodeURIComponent(query)}&image_type=photo&safesearch=true` +
-    `&orientation=horizontal&per_page=${Math.min(Math.max(limit, 3), 20)}`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+    `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}` +
+    `&page_size=12&category=photograph&mature=false&filter_dead=true`;
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "TravelAssistant/1.0 (stock-photos edge)",
+    },
+  });
+  if (res.status === 429) return [];
   if (!res.ok) return [];
   const data = await res.json() as {
-    hits?: Array<{
-      largeImageURL?: string;
-      webformatURL?: string;
-      previewURL?: string;
-      tags?: string;
-      user?: string;
+    results?: Array<{
+      id?: string | number;
+      title?: string;
+      url?: string;
+      thumbnail?: string;
+      creator?: string;
+      creator_url?: string;
+      license?: string;
+      license_version?: string;
+      foreign_landing_url?: string;
+      width?: number;
+      height?: number;
     }>;
   };
-  return (data.hits ?? [])
+  return (data.results ?? [])
+    .filter((item) => item.url)
     .map((item) => {
-      const full = item.largeImageURL ?? item.webformatURL;
-      if (!full) return null;
+      const license = [item.license, item.license_version].filter(Boolean).join(" ").trim();
+      const photographer = item.creator?.trim();
       return {
-        url: full,
-        thumbUrl: item.webformatURL ?? item.previewURL ?? full,
-        title: item.tags || item.user || "Pixabay photo",
-        source: "pixabay",
-        photographer: item.user,
-        attribution: item.user ? `${item.user} · Pixabay` : "Pixabay",
-      } satisfies StockPhoto;
-    })
-    .filter((p): p is StockPhoto => Boolean(p));
+        id: `openverse:${item.id ?? item.url}`,
+        url: item.url!,
+        thumbnailUrl: item.thumbnail ?? item.url,
+        width: item.width,
+        height: item.height,
+        provider: "openverse" as const,
+        photographer,
+        photographerUrl: item.creator_url,
+        sourceUrl: item.foreign_landing_url,
+        license: license || undefined,
+        attribution: photographer
+          ? `${photographer} · Openverse${license ? ` · ${license}` : ""}`
+          : `Openverse${license ? ` · ${license}` : ""}`,
+        alt: item.title || query,
+        searchQuery: query,
+      };
+    });
 }
 
-async function flickr(query: string, limit: number, key: string): Promise<StockPhoto[]> {
-  const url =
-    `https://www.flickr.com/services/rest/?method=flickr.photos.search` +
-    `&api_key=${encodeURIComponent(key)}` +
-    `&text=${encodeURIComponent(query)}` +
-    `&license=4,5,6,9,10&safe_search=1&content_type=1&media=photos` +
-    `&extras=url_c,url_l,url_m,url_n,owner_name` +
-    `&per_page=${Math.min(limit, 20)}&format=json&nojsoncallback=1`;
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
+async function wikimedia(query: string): Promise<TravelImage[]> {
+  const commonsUrl =
+    `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*` +
+    `&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(query)}` +
+    `&gsrlimit=10&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=1200`;
+  const res = await fetch(commonsUrl, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "TravelAssistant/1.0 (stock-photos edge)",
+    },
+  });
   if (!res.ok) return [];
   const data = await res.json() as {
-    stat?: string;
-    photos?: {
-      photo?: Array<{
-        title?: string;
-        ownername?: string;
-        url_c?: string;
-        url_l?: string;
-        url_m?: string;
-        url_n?: string;
-      }>;
+    query?: {
+      pages?: Record<
+        string,
+        {
+          pageid?: number;
+          title?: string;
+          imageinfo?: Array<{
+            url?: string;
+            thumburl?: string;
+            width?: number;
+            height?: number;
+            mime?: string;
+            descriptionurl?: string;
+          }>;
+        }
+      >;
     };
   };
-  if (data.stat === "fail") return [];
-  return (data.photos?.photo ?? [])
-    .map((item) => {
-      const full = item.url_l ?? item.url_c ?? item.url_m;
-      if (!full) return null;
-      return {
-        url: full,
-        thumbUrl: item.url_n ?? item.url_m ?? full,
-        title: item.title || item.ownername || "Flickr photo",
-        source: "flickr",
-        photographer: item.ownername,
-        attribution: item.ownername ? `${item.ownername} · Flickr (CC)` : "Flickr (CC)",
-      } satisfies StockPhoto;
-    })
-    .filter((p): p is StockPhoto => Boolean(p));
+  const out: TravelImage[] = [];
+  for (const page of Object.values(data.query?.pages ?? {})) {
+    const info = page.imageinfo?.[0];
+    if (!info?.url) continue;
+    if (info.mime && !info.mime.startsWith("image/")) continue;
+    if (/\.svg(\?|$)/i.test(info.url)) continue;
+    out.push({
+      id: `wikimedia:${page.pageid ?? info.url}`,
+      url: info.url,
+      thumbnailUrl: info.thumburl ?? info.url,
+      width: info.width,
+      height: info.height,
+      provider: "wikimedia",
+      sourceUrl: info.descriptionurl,
+      attribution: "Wikimedia Commons",
+      license: "Wikimedia",
+      alt: page.title?.replace(/^File:/, "") || query,
+      searchQuery: query,
+    });
+  }
+  return out;
 }
 
-function dedupe(photos: StockPhoto[]): StockPhoto[] {
-  const seen = new Set<string>();
-  return photos.filter((photo) => {
-    const key = photo.url.split("?")[0]!;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+type ProviderFn = (query: string) => Promise<TravelImage[]>;
+
+async function resolveSequential(params: {
+  queries: string[];
+  excludeUrls: string[];
+  excludeIds: string[];
+}): Promise<{ image: TravelImage | null; providerTried: string[] }> {
+  const pexelsKey = Deno.env.get("PEXELS_API_KEY")?.trim() ?? "";
+  const unsplashKey = Deno.env.get("UNSPLASH_ACCESS_KEY")?.trim() ?? "";
+
+  const providers: Array<{ name: string; run: ProviderFn }> = [];
+  if (pexelsKey) {
+    providers.push({ name: "pexels", run: (q) => pexels(q, pexelsKey) });
+  }
+  if (unsplashKey) {
+    providers.push({ name: "unsplash", run: (q) => unsplash(q, unsplashKey) });
+  }
+  providers.push({ name: "openverse", run: openverse });
+  providers.push({ name: "wikimedia", run: wikimedia });
+
+  const providerTried: string[] = [];
+
+  for (const provider of providers) {
+    providerTried.push(provider.name);
+    for (const query of params.queries) {
+      try {
+        console.log(`[TravelImage] Searching ${provider.name}: ${query}`);
+        const candidates = await provider.run(query);
+        const hit = candidates.find((img) =>
+          acceptable(img, params.excludeUrls, params.excludeIds)
+        );
+        if (hit) {
+          console.log(`[TravelImage] ${provider.name} found image.`);
+          return { image: hit, providerTried };
+        }
+        console.log(`[TravelImage] ${provider.name} returned no result for query.`);
+      } catch (error) {
+        console.log(`[TravelImage] ${provider.name} error — skipping.`, String(error));
+      }
+    }
+  }
+
+  return { image: null, providerTried };
+}
+
+function buildQueries(body: {
+  queries?: string[];
+  name?: string;
+  city?: string | null;
+  country?: string | null;
+  type?: string | null;
+  query?: string;
+}): string[] {
+  if (Array.isArray(body.queries) && body.queries.length) {
+    return body.queries.map((q) => String(q).trim()).filter((q) => q.length >= 2).slice(0, 8);
+  }
+  const name = String(body.name ?? body.query ?? "").trim();
+  const city = String(body.city ?? "").trim();
+  const country = String(body.country ?? "").trim();
+  const type = String(body.type ?? "attraction").trim();
+  const keywords =
+    /restaurant|cafe|food/i.test(type)
+      ? "food restaurant"
+      : /hotel|resort/i.test(type)
+      ? "hotel travel"
+      : /beach/i.test(type)
+      ? "beach travel"
+      : /temple/i.test(type)
+      ? "temple landmark"
+      : "travel landmark";
+  return [
+    [name, city, country, keywords].filter(Boolean).join(" "),
+    [name, city, country].filter(Boolean).join(" "),
+    [name, city].filter(Boolean).join(" "),
+    city && country ? `${city} ${country} travel` : "",
+    name,
+  ]
+    .map((q) => q.replace(/\s+/g, " ").trim())
+    .filter((q, i, arr) => q.length >= 2 && arr.indexOf(q) === i);
 }
 
 Deno.serve(async (req) => {
@@ -265,53 +382,67 @@ Deno.serve(async (req) => {
     });
   }
 
-  let body: { query?: string; limit?: number } = {};
+  let body: Record<string, unknown> = {};
   try {
     body = await req.json();
   } catch {
     body = {};
   }
 
-  const query = String(body.query ?? "").trim().slice(0, 120);
-  const limit = Math.min(Math.max(Number(body.limit) || 8, 1), 20);
-  if (query.length < 2) {
-    return new Response(JSON.stringify({ photos: [], error: "query required" }), {
+  const action = String(body.action ?? "resolve");
+  const queries = buildQueries(body as {
+    queries?: string[];
+    name?: string;
+    city?: string | null;
+    country?: string | null;
+    type?: string | null;
+    query?: string;
+  });
+  const excludeUrls = Array.isArray(body.excludeImageUrls)
+    ? body.excludeImageUrls.map(String)
+    : [];
+  const excludeIds = Array.isArray(body.excludeImageIds)
+    ? body.excludeImageIds.map(String)
+    : [];
+
+  if (queries.length === 0) {
+    return new Response(JSON.stringify({ success: false, error: "query required", image: null }), {
       status: 400,
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 
-  const pexelsKey = Deno.env.get("PEXELS_API_KEY")?.trim() ?? "";
-  const unsplashKey = Deno.env.get("UNSPLASH_ACCESS_KEY")?.trim() ?? "";
-  const pixabayKey = Deno.env.get("PIXABAY_API_KEY")?.trim() ?? "";
-  const flickrKey = Deno.env.get("FLICKR_API_KEY")?.trim() ?? "";
-
-  const tasks: Array<Promise<StockPhoto[]>> = [openverse(query, limit)];
-  const providers = ["openverse"];
-  if (pexelsKey) {
-    providers.push("pexels");
-    tasks.push(pexels(query, limit, pexelsKey));
-  }
-  if (unsplashKey) {
-    providers.push("unsplash");
-    tasks.push(unsplash(query, limit, unsplashKey));
-  }
-  if (pixabayKey) {
-    providers.push("pixabay");
-    tasks.push(pixabay(query, limit, pixabayKey));
-  }
-  if (flickrKey) {
-    providers.push("flickr");
-    tasks.push(flickr(query, limit, flickrKey));
+  // Legacy fan-out still supported for older clients.
+  if (action === "search") {
+    const open = await openverse(queries[0]!).catch(() => []);
+    return new Response(
+      JSON.stringify({
+        photos: open.map((img) => ({
+          url: img.url,
+          thumbUrl: img.thumbnailUrl,
+          title: img.alt,
+          source: img.provider,
+          attribution: img.attribution,
+          photographer: img.photographer,
+        })),
+        providers: ["openverse"],
+      }),
+      { status: 200, headers: { ...cors, "Content-Type": "application/json" } },
+    );
   }
 
-  const batches = await Promise.all(
-    tasks.map((task) => task.catch(() => [] as StockPhoto[])),
-  );
-  const photos = dedupe(batches.flat()).slice(0, Math.max(limit, 12));
-
-  return new Response(JSON.stringify({ photos, providers }), {
-    status: 200,
-    headers: { ...cors, "Content-Type": "application/json" },
+  const { image, providerTried } = await resolveSequential({
+    queries,
+    excludeUrls,
+    excludeIds,
   });
+
+  return new Response(
+    JSON.stringify({
+      success: Boolean(image),
+      image,
+      providerTried,
+    }),
+    { status: 200, headers: { ...cors, "Content-Type": "application/json" } },
+  );
 });

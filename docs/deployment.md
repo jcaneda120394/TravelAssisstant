@@ -39,14 +39,16 @@ npx supabase secrets set GOOGLE_MAPS_API_KEY=your_key --project-ref viyzvgdvnxhd
 npx supabase functions deploy google-places --project-ref viyzvgdvnxhddtobpyys
 npx supabase functions deploy place-photo --project-ref viyzvgdvnxhddtobpyys
 
-# Optional free stock photos (Pexels / Unsplash / Pixabay / Flickr — all free API keys)
-npx supabase secrets set PEXELS_API_KEY=... UNSPLASH_ACCESS_KEY=... PIXABAY_API_KEY=... FLICKR_API_KEY=... --project-ref viyzvgdvnxhddtobpyys
+# Optional free stock photos — sequential Pexels → Unsplash → Openverse → Wikimedia
+# NEVER use EXPO_PUBLIC for Pexels/Unsplash keys (server-only on stock-photos Edge).
+npx supabase secrets set PEXELS_API_KEY=... UNSPLASH_ACCESS_KEY=... --project-ref viyzvgdvnxhddtobpyys
 npx supabase functions deploy stock-photos --project-ref viyzvgdvnxhddtobpyys
+# Cache table: apply migration 20260913160000_place_images_cache.sql
 ```
 
-Optional client fallback: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (restrict by HTTP referrer to your Vercel domain). Without a Google key, the app uses OSM/Photon + Wikimedia/Openverse (+ stock providers when configured).
+Optional client fallback: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (restrict by HTTP referrer to your Vercel domain). Without a Google key, the app uses OSM/Photon + the travel image service (Openverse/Wikimedia always; Pexels/Unsplash when Edge secrets are set).
 
-Optional client stock keys (if you skip Edge secrets): `EXPO_PUBLIC_PEXELS_API_KEY`, `EXPO_PUBLIC_UNSPLASH_ACCESS_KEY`, `EXPO_PUBLIC_PIXABAY_API_KEY`, `EXPO_PUBLIC_FLICKR_API_KEY`. Openverse always works with no key.
+Travel images go through `getTravelImage()` in `src/lib/images/` — do not call Pexels/Unsplash from the Expo client.
 
 Rebuild after changing env vars (`EXPO_PUBLIC_*` are inlined at build time).
 

@@ -37,6 +37,7 @@ import { shareTrip } from '@/services/trips/share-trip.service';
 import { getBudget, listExpenses, summarizeExpenses, upsertBudget } from '@/services/budget/budget.service';
 import { getErrorMessage } from '@/lib/errors/app-error';
 import { Skeleton } from '@/components/feedback/skeleton';
+import { ItineraryStopImage } from '@/components/trips/itinerary-stop-image';
 import { formatDayLabel, formatTripDateRange, tripCalendarDays } from '@/utils/dates';
 import { findNextFreeSlot } from '@/utils/itinerary-time';
 import type { ItineraryItem, TransportSegment, Trip } from '@/types/domain';
@@ -96,6 +97,7 @@ export function TripDetailScreen() {
   const [editDestinations, setEditDestinations] = useState<string[]>([]);
   const [editAdults, setEditAdults] = useState('2');
   const [editChildren, setEditChildren] = useState('0');
+  const [usedItineraryImageUrls, setUsedItineraryImageUrls] = useState<string[]>([]);
 
   const tripQuery = useQuery({
     queryKey: ['trip', id],
@@ -167,6 +169,10 @@ export function TripDetailScreen() {
   }, [tripDays, selectedDay]);
 
   const day = selectedDay ?? tripDays[0] ?? new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    setUsedItineraryImageUrls([]);
+  }, [day, id]);
 
   const itineraryQuery = useQuery({
     queryKey: ['itinerary', id, day],
@@ -444,6 +450,7 @@ export function TripDetailScreen() {
   }
 
   const dayItems = itineraryQuery.data ?? [];
+
   const mapMarkers = dayItems
     .filter((item) => item.latitude != null && item.longitude != null)
     .map((item, index) => ({
@@ -459,9 +466,29 @@ export function TripDetailScreen() {
 
   const renderActivity = (item: ItineraryItem, index: number) => {
     const segment = segmentsByFrom.get(item.id);
+    const showPhoto =
+      item.kind !== 'transport' &&
+      item.kind !== 'flight' &&
+      item.kind !== 'rest' &&
+      item.kind !== 'free_time' &&
+      item.kind !== 'logistics';
     return (
       <View key={item.id}>
         <View className="mb-2 rounded-xl border border-black/8 p-3 dark:border-brand-800">
+          {showPhoto ? (
+            <ItineraryStopImage
+              title={item.placeName || item.title}
+              placeId={item.placeId}
+              kind={item.kind}
+              latitude={item.latitude}
+              longitude={item.longitude}
+              addressHint={trip.destinations?.join(', ')}
+              excludeImageUrls={usedItineraryImageUrls}
+              onImageLoaded={(url) =>
+                setUsedItineraryImageUrls((prev) => (prev.includes(url) ? prev : [...prev, url]))
+              }
+            />
+          ) : null}
           <AppText className="font-sans-semibold">
             {item.startTime}–{item.endTime} · {item.title}
           </AppText>

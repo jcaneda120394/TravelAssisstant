@@ -1,7 +1,11 @@
 import { fetchJson } from '@/lib/http/fetch-json';
 import { env } from '@/config/env';
+import {
+  getTravelImageForPlace,
+  type TravelImage,
+} from '@/lib/images';
+import { esriStreetTileUrl } from '@/lib/images/fallback';
 import { supabase } from '@/lib/supabase/client';
-import { searchStockPhotos } from '@/services/places/stock-photos.service';
 import type { Place, PlaceCategory } from '@/types/domain';
 import { haversineMeters } from '@/utils/geo';
 
@@ -18,8 +22,10 @@ export type PlacePhoto = {
     | 'unsplash'
     | 'pixabay'
     | 'flickr'
+    | 'wikimedia'
     | 'map'
-    | 'community';
+    | 'community'
+    | 'fallback';
   title?: string;
   /** Photographer / license line for gallery captions. */
   attribution?: string;
@@ -336,43 +342,22 @@ async function commonsSearchPhotos(query: string, limit: number): Promise<PlaceP
   }
 }
 
-const STOCK_SOURCES = new Set<PlacePhoto['source']>([
-  'openverse',
-  'pexels',
-  'unsplash',
-  'pixabay',
-  'flickr',
-]);
-
-function categoryPhotoHint(category: PlaceCategory): string {
-  switch (category) {
-    case 'restaurant':
-    case 'cafe':
-    case 'bakery':
-      return 'food restaurant';
-    case 'nightlife':
-      return 'nightlife bar';
-    case 'beach':
-      return 'beach coast';
-    case 'temple':
-      return 'temple shrine';
-    case 'museum':
-      return 'museum gallery';
-    case 'park':
-      return 'park garden';
-    case 'hotel':
-    case 'resort':
-      return 'hotel resort';
-    case 'market':
-      return 'market street food';
-    case 'shopping':
-    case 'mall':
-      return 'shopping street';
-    case 'viewpoint':
-      return 'viewpoint landscape';
-    default:
-      return 'travel landmark';
-  }
+function travelImageToPlacePhoto(image: TravelImage): PlacePhoto {
+  const source: PlacePhoto['source'] =
+    image.provider === 'fallback'
+      ? 'map'
+      : image.provider === 'wikimedia'
+        ? 'wikimedia'
+        : (image.provider as PlacePhoto['source']);
+  return {
+    url: cleanMediaUrl(image.url),
+    thumbUrl: image.thumbnailUrl ? cleanMediaUrl(image.thumbnailUrl) : cleanMediaUrl(image.url),
+    source,
+    title: image.alt,
+    attribution: image.attribution,
+    photographer: image.photographer,
+    score: image.provider === 'fallback' ? 0.05 : 0.92,
+  };
 }
 
 /**
@@ -393,38 +378,12 @@ export function scoreAtmosphereRelevance(
     return Math.min(0.72, 0.42 + hits.length * 0.08);
   }
   if (hits.length > 0) return 0.38;
-
-  const cat = categoryPhotoHint(place.category).split(' ');
-  if (cat.some((word) => word.length >= 4 && title.includes(word))) return 0.36;
   return 0.3;
 }
 
-function rankAtmospherePhotos(place: Place, photos: PlacePhoto[]): PlacePhoto[] {
-  return dedupePhotos(photos)
-    .map((photo) => ({
-      ...photo,
-      url: cleanMediaUrl(photo.url),
-      thumbUrl: photo.thumbUrl ? cleanMediaUrl(photo.thumbUrl) : undefined,
-      atmosphere: true,
-      score: scoreAtmosphereRelevance(place, photo.title),
-    }))
-    .filter((photo) => (photo.score ?? 0) >= 0.28)
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-}
-
-/** Last-resort map tile — free Esri streets (no API key; Carto now watermarks). */
+/** Last-resort map tile — free Esri streets (no API key). */
 function mapPreviewPhoto(place: Place): PlacePhoto {
-  const zoom = 15;
-  const lat = place.latitude;
-  const lon = place.longitude;
-  const n = 2 ** zoom;
-  const x = Math.floor(((lon + 180) / 360) * n);
-  const latRad = (lat * Math.PI) / 180;
-  const y = Math.floor(
-    ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n,
-  );
-  // Esri tile path is z/y/x (not z/x/y).
-  const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/${zoom}/${y}/${x}`;
+  const url = esriStreetTileUrl(place.latitude, place.longitude);
   return {
     url,
     thumbUrl: url,
@@ -605,49 +564,22 @@ async function searchNamedPhotos(place: Place, limit: number): Promise<PlacePhot
     primaryToken,
   ].filter((q, index, arr) => q.length >= 3 && arr.indexOf(q) === index);
 
-  const primaryQuery = queries[0] ?? name;
-
-  const batches = await Promise.all([
-    ...queries.flatMap((query) => [
+  const batches = await Promise.all(
+    queries.flatMap((query) => [
       wikipediaSearchPhotos(query, limit),
       commonsSearchPhotos(query, limit),
       commonsSearchPhotos(`"${primaryToken || name}"`, limit),
     ]),
-    // Free stock / CC: Openverse + optional Pexels/Unsplash/Pixabay/Flickr.
-    searchStockPhotos(primaryQuery, limit),
-    queries[1] ? searchStockPhotos(queries[1], Math.min(limit, 6)) : Promise.resolve([]),
-  ]);
+  );
 
   const ranked = rankPhotos(place, batches.flat(), 0.34);
   if (ranked.length > 0) return ranked;
-
-  // Soft accept: any title that shares a distinctive token (worldwide obscure spots).
   return rankPhotos(place, batches.flat(), 0.2);
-}
-
-/** Destination mood photos when venue-exact images are thin. */
-async function searchAtmospherePhotos(place: Place, limit: number): Promise<PlacePhoto[]> {
-  const name = cleanSearchName(displayNameForSearch(place));
-  const city = cityHint(place) || place.address?.split(',')[0]?.trim() || '';
-  const hint = categoryPhotoHint(place.category);
-  const queries = [
-    [name, city, 'travel'].filter(Boolean).join(' '),
-    [city, hint].filter(Boolean).join(' '),
-    city ? `${city} travel photography` : '',
-    isFoodPlace(place) ? [city, 'local food'].filter(Boolean).join(' ') : '',
-  ].filter((q, index, arr) => q.length >= 3 && arr.indexOf(q) === index);
-
-  if (queries.length === 0) return [];
-
-  const batches = await Promise.all(
-    queries.slice(0, 3).map((query) => searchStockPhotos(query, limit)),
-  );
-  return rankAtmospherePhotos(place, batches.flat()).slice(0, limit);
 }
 
 /**
  * Resolve photos for a place detail screen.
- * Wikimedia + free stock first; Google Places only if a key is configured.
+ * Primary image via getTravelImage; gallery filled with Wikimedia/Google when available.
  */
 export async function fetchPlacePhotos(place: Place, limit = 10): Promise<PlacePhoto[]> {
   const existing = (place.photos ?? [])
@@ -658,6 +590,7 @@ export async function fetchPlacePhotos(place: Place, limit = 10): Promise<PlaceP
     return existing.slice(0, limit);
   }
 
+  const primary = travelImageToPlacePhoto(await getTravelImageForPlace(place));
   const named = await searchNamedPhotos(place, limit);
 
   let geo: PlacePhoto[] = [];
@@ -675,54 +608,42 @@ export async function fetchPlacePhotos(place: Place, limit = 10): Promise<PlaceP
     if (google) googleList = [google];
   }
 
-  let merged = dedupePhotos([...existing, ...googleList, ...named, ...geo]);
+  const merged = dedupePhotos([
+    ...existing,
+    ...(primary.source !== 'map' ? [primary] : []),
+    ...googleList,
+    ...named,
+    ...geo,
+  ]).slice(0, limit);
 
-  if (merged.length < limit) {
-    const atmosphere = await searchAtmospherePhotos(place, limit);
-    const stockOnly = atmosphere.filter((photo) => STOCK_SOURCES.has(photo.source));
-    merged = dedupePhotos([...merged, ...stockOnly]);
-  }
-
-  merged = merged.slice(0, limit);
   if (merged.length === 0) {
-    return [mapPreviewPhoto(place)];
+    return [primary.source === 'map' ? primary : mapPreviewPhoto(place)];
   }
   return merged;
 }
 
 /**
  * Single best photo for list tiles (Home / Explore cards) — every city/country/place.
+ * Goes through the central travel image service (sequential providers + cache).
  */
-export async function fetchBestPlacePhoto(place: Place): Promise<PlacePhoto> {
+export async function fetchBestPlacePhoto(
+  place: Place,
+  options?: { excludeImageUrls?: string[] },
+): Promise<PlacePhoto> {
   const existing = (place.photos ?? []).find(
     (url) => typeof url === 'string' && /^https?:\/\//i.test(url),
   );
-  if (existing) {
+  if (existing && !options?.excludeImageUrls?.includes(existing)) {
     const url = cleanMediaUrl(existing);
     return { url, thumbUrl: url, source: 'place', score: 1 };
   }
 
   try {
-    const named = await searchNamedPhotos(place, 8);
-    if (named[0]) return named[0];
-
-    if (!isFoodPlace(place) && Number.isFinite(place.latitude) && Number.isFinite(place.longitude)) {
-      const geo = rankPhotos(
-        place,
-        await wikipediaGeoPhotos(place.latitude, place.longitude, 6),
-        0.25,
-      );
-      if (geo[0]) return geo[0];
-    }
-
-    const atmosphere = await searchAtmospherePhotos(place, 6);
-    if (atmosphere[0]) return atmosphere[0];
-
-    const google = await fetchGooglePlacePhoto(place, 900);
-    if (google) return google;
+    const image = await getTravelImageForPlace(place, {
+      excludeImageUrls: options?.excludeImageUrls,
+    });
+    return travelImageToPlacePhoto(image);
   } catch {
-    // Fall through to map tile so the card never looks empty.
+    return mapPreviewPhoto(place);
   }
-
-  return mapPreviewPhoto(place);
 }

@@ -238,15 +238,19 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
     if (busy) return;
     setBusy(true);
     setError(null);
-    onClose();
     try {
+      // Keep the sheet open on web until GPS finishes — browsers only show the
+      // permission prompt reliably while still inside the user-gesture path.
       await getCurrentPosition();
       setQuery('');
+      onClose();
       requestAnimationFrame(() => {
         onChanged?.();
       });
     } catch (err) {
-      notifyAlert('Location needed', getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      notifyAlert('Location needed', message);
     } finally {
       setBusy(false);
     }
@@ -290,11 +294,11 @@ export function LocationPickerModal({ visible, onClose, onChanged }: Props) {
           >
             <Card className="mb-4">
               <AppText muted className="mb-3 text-sm">
-                With location permission on, we use your device GPS and reverse-geocode the exact
-                city or area around you.
+                On web, allow location when your browser asks. This replaces any previously chosen
+                city (for example Singapore) with your GPS position.
               </AppText>
               <Button
-                label="Use precise device GPS"
+                label={busy ? 'Getting precise location…' : 'Use precise device GPS'}
                 loading={busy}
                 onPress={() => void applyGps()}
               />

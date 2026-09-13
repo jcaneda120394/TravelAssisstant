@@ -56,11 +56,8 @@ export const useLocationStore = create<LocationState>()(
         mode = 'precise',
         epoch,
       }) => {
+        // Drop stale GPS writes after clear / a newer city pick bumped the epoch.
         if (epoch != null && epoch !== get().locationEpoch) {
-          return;
-        }
-        // A city pick while GPS was running wins — never clobber manual.
-        if (mode !== 'manual' && get().mode === 'manual' && epoch != null) {
           return;
         }
         set({ coords, city, country, label, mode });

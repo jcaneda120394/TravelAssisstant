@@ -88,6 +88,30 @@ export function formatCompactLocationLabel(label: string | null | undefined): st
 }
 
 export async function requestForegroundLocation(): Promise<Location.PermissionStatus> {
+  // Web: ask the browser Permissions API when available, then let getCurrentPosition
+  // trigger the real prompt. Expo's web permission helper often reports undetermined.
+  if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
+    try {
+      const perms = navigator.permissions;
+      if (perms?.query) {
+        const result = await perms.query({ name: 'geolocation' as PermissionName });
+        if (result.state === 'denied') {
+          useLocationStore.getState().setPermissionStatus('denied');
+          return Location.PermissionStatus.DENIED;
+        }
+        if (result.state === 'granted') {
+          useLocationStore.getState().setPermissionStatus('granted');
+          return Location.PermissionStatus.GRANTED;
+        }
+      }
+    } catch {
+      // Permissions.query('geolocation') is unsupported in some browsers — continue.
+    }
+    // Prompt happens on the next getCurrentPosition call (must stay in user-gesture path).
+    useLocationStore.getState().setPermissionStatus('undetermined');
+    return Location.PermissionStatus.GRANTED;
+  }
+
   const { status } = await Location.requestForegroundPermissionsAsync();
   useLocationStore.getState().setPermissionStatus(
     status === 'granted' ? 'granted' : status === 'denied' ? 'denied' : 'undetermined',
@@ -244,14 +268,9 @@ async function readBrowserGeolocation(): Promise<GeoPoint> {
 
 async function readDevicePosition(): Promise<GeoPoint> {
   if (Platform.OS === 'web') {
-    try {
-      return await readBrowserGeolocation();
-    } catch (browserError) {
-      // Fall through to Expo Location (also wraps the browser API on web).
-      if (browserError instanceof AppError && browserError.code === 'LOCATION_DENIED') {
-        throw browserError;
-      }
-    }
+    // Web must use the browser Geolocation API directly. Falling through to Expo
+    // Location often hangs or returns a stale last-known fix after a denied prompt.
+    return readBrowserGeolocation();
   }
 
   try {
@@ -289,6 +308,11 @@ async function readDevicePosition(): Promise<GeoPoint> {
 
 /** Fresh GPS fix — uses precise coords + detailed reverse-geocode when permission is granted. */
 export async function getCurrentPosition(): Promise<GeoPoint> {
+  // Intentional GPS always wins over a prior manual city (Singapore quick-pick, etc.).
+  // Capture epoch after bumping so in-flight older GPS / clear races still lose.
+  useLocationStore.setState((state) => ({
+    locationEpoch: state.locationEpoch + 1,
+  }));
   const epoch = useLocationStore.getState().locationEpoch;
   try {
     const status = await requestForegroundLocation();

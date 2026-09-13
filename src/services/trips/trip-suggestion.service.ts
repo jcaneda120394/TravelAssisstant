@@ -76,6 +76,36 @@ function shortCity(label: string): string {
   return label.split(',')[0]?.trim() || label.trim();
 }
 
+/** Prefer places actually near the destination; fall back wider only if the soft radius is thin. */
+function preferNearbyBest(
+  places: Place[],
+  origin: GeoPoint,
+  category: Place['category'] | undefined,
+  softMeters: number,
+  hardMeters: number,
+  minCount: number,
+): Place[] {
+  const named = uniqueNamedPlaces(places, origin);
+  const soft = named.filter((place) => (place.distanceMeters ?? Infinity) <= softMeters);
+  const hard = named.filter((place) => (place.distanceMeters ?? Infinity) <= hardMeters);
+  const pool =
+    soft.length >= minCount ? soft : hard.length >= Math.min(4, minCount) ? hard : named;
+  return sortPlacesByCategoryPopularity(pool, category);
+}
+
+/** Hotel for the plan: best-rated among the closest options. */
+function pickPlanHotel(hotels: Place[]): Place | null {
+  if (!hotels.length) return null;
+  const ranked = [...hotels].sort((a, b) => {
+    const score = (place: Place) =>
+      (place.rating ?? 3.6) * 12 +
+      Math.min(place.reviewCount ?? 0, 5_000) / 800 -
+      (place.distanceMeters ?? 40_000) / 900;
+    return score(b) - score(a);
+  });
+  return ranked[0] ?? null;
+}
+
 /** Strip road/POI suffixes so “SJDM–Norzagaray Road” becomes a usable city query. */
 function cityHintFromLabel(label: string): string {
   const head = label.split(/[–—,|/]/)[0]?.trim() || label.trim();
@@ -167,46 +197,48 @@ async function loadNamedPlacePools(
   const local = getLocalPlacePools(location);
 
   // Curated popular destinations near the selected place — always seed the plan.
-  const popularDestinations = sortPlacesByCategoryPopularity(
-    uniqueNamedPlaces(
-      [
-        ...getWorldNearbyPlaces({
-          location,
-          category: 'attraction',
-          radiusMeters: 100_000,
-          limit: 40,
-        }),
-        ...searchCatalogNearby({
-          location,
-          category: 'attraction',
-          radiusMeters: 100_000,
-          limit: 40,
-        }),
-      ],
-      location,
-    ),
+  const popularDestinations = preferNearbyBest(
+    [
+      ...getWorldNearbyPlaces({
+        location,
+        category: 'attraction',
+        radiusMeters: 45_000,
+        limit: 40,
+      }),
+      ...searchCatalogNearby({
+        location,
+        category: 'attraction',
+        radiusMeters: 45_000,
+        limit: 40,
+      }),
+    ],
+    location,
     'attraction',
+    25_000,
+    45_000,
+    8,
   );
 
-  const popularFood = sortPlacesByCategoryPopularity(
-    uniqueNamedPlaces(
-      [
-        ...getWorldNearbyPlaces({
-          location,
-          category: 'restaurant',
-          radiusMeters: 80_000,
-          limit: 20,
-        }),
-        ...searchCatalogNearby({
-          location,
-          category: 'restaurant',
-          radiusMeters: 80_000,
-          limit: 20,
-        }),
-      ],
-      location,
-    ),
+  const popularFood = preferNearbyBest(
+    [
+      ...getWorldNearbyPlaces({
+        location,
+        category: 'restaurant',
+        radiusMeters: 25_000,
+        limit: 24,
+      }),
+      ...searchCatalogNearby({
+        location,
+        category: 'restaurant',
+        radiusMeters: 25_000,
+        limit: 24,
+      }),
+    ],
+    location,
     'restaurant',
+    12_000,
+    25_000,
+    8,
   );
 
   const [live, photonAttr, photonFood] = await Promise.all([
@@ -216,34 +248,34 @@ async function loadNamedPlacePools(
           await Promise.all([
             providers.places.getNearbyPlaces({
               location,
-              radiusMeters: 80_000,
+              radiusMeters: 35_000,
               category: 'attraction',
               limit: 40,
             }),
             providers.places.getNearbyPlaces({
               location,
-              radiusMeters: 40_000,
+              radiusMeters: 15_000,
               category: 'restaurant',
               limit: 30,
             }),
             providers.places.getNearbyPlaces({
               location,
-              radiusMeters: 40_000,
+              radiusMeters: 20_000,
               category: 'hotel',
               limit: 12,
             }),
             providers.places.searchPlaces({
-              query: `popular attractions ${city}`,
+              query: `best attractions near ${city}`,
               location,
               limit: 20,
             }),
             providers.places.searchPlaces({
-              query: `best restaurants ${city}`,
+              query: `best restaurants near ${city}`,
               location,
               limit: 16,
             }),
             providers.places.searchPlaces({
-              query: `hotels ${city}`,
+              query: `hotels near ${city}`,
               location,
               limit: 8,
             }),
@@ -270,72 +302,79 @@ async function loadNamedPlacePools(
       location,
       category: 'attraction',
       cityLabel,
-      radiusMeters: 80_000,
+      radiusMeters: 35_000,
       limit: 30,
     }).catch(() => [] as Place[]),
     searchPhotonNearby({
       location,
       category: 'restaurant',
       cityLabel,
-      radiusMeters: 40_000,
+      radiusMeters: 15_000,
       limit: 24,
     }).catch(() => [] as Place[]),
   ]);
 
-  // Popular curated destinations first, then live/Photon fills the rest.
-  const attractions = sortPlacesByCategoryPopularity(
-    uniqueNamedPlaces(
-      [
-        ...popularDestinations,
-        ...(live?.attractions ?? []),
-        ...photonAttr,
-        ...local.attractions,
-      ],
-      location,
-    ),
+  // Nearby curated + live/Photon first — keep suggestions local to the destination.
+  const attractions = preferNearbyBest(
+    [
+      ...popularDestinations,
+      ...(live?.attractions ?? []),
+      ...photonAttr,
+      ...local.attractions,
+    ],
+    location,
     'attraction',
+    25_000,
+    45_000,
+    10,
   );
 
-  const restaurants = sortPlacesByCategoryPopularity(
-    uniqueNamedPlaces(
-      [
-        ...popularFood,
-        ...(live?.restaurants ?? []),
-        ...photonFood,
-        ...local.restaurants,
-      ],
-      location,
-    ),
+  const restaurants = preferNearbyBest(
+    [
+      ...popularFood,
+      ...(live?.restaurants ?? []),
+      ...photonFood,
+      ...local.restaurants,
+    ],
+    location,
     'restaurant',
+    12_000,
+    25_000,
+    10,
   );
 
-  const hotels = sortPlacesByCategoryPopularity(
-    uniqueNamedPlaces([...(live?.hotels ?? []), ...local.hotels], location),
+  const hotels = preferNearbyBest(
+    [...(live?.hotels ?? []), ...local.hotels],
+    location,
     'hotel',
+    15_000,
+    35_000,
+    3,
   );
 
-  const shopping = sortPlacesByCategoryPopularity(
-    uniqueNamedPlaces(
-      [
-        ...(live?.shopping ?? []),
-        ...photonAttr.filter(
-          (place) =>
-            place.category === 'mall' ||
-            place.category === 'shopping' ||
-            place.category === 'market' ||
-            /mall|market|shop/i.test(place.name),
-        ),
-        ...local.shopping,
-        ...attractions.filter(
-          (place) =>
-            place.category === 'mall' ||
-            place.category === 'market' ||
-            /mall|market|village|shopping/i.test(place.name),
-        ),
-      ],
-      location,
-    ),
+  const shopping = preferNearbyBest(
+    [
+      ...(live?.shopping ?? []),
+      ...photonAttr.filter(
+        (place) =>
+          place.category === 'mall' ||
+          place.category === 'shopping' ||
+          place.category === 'market' ||
+          /mall|market|shop/i.test(place.name),
+      ),
+      ...local.shopping,
+      ...attractions.filter(
+        (place) =>
+          place.category === 'mall' ||
+          place.category === 'market' ||
+          /mall|market|village|shopping/i.test(place.name),
+      ),
+    ],
+    location,
     'shopping',
+    20_000,
+    40_000,
+    4,
   );
 
   rememberPlaces([...attractions, ...restaurants, ...hotels, ...shopping].slice(0, 80));
@@ -430,14 +469,18 @@ export async function generateTripSuggestion(
       : pool;
 
   const attractionsPool = tailor(
-    sortPlacesByCategoryPopularity(
-      uniqueNamedPlaces([...popularDestinations, ...attractions], resolved.location),
+    preferNearbyBest(
+      [...popularDestinations, ...attractions],
+      resolved.location,
       'attraction',
+      25_000,
+      45_000,
+      10,
     ),
   );
   const restaurantsPool = tailor(restaurants);
   const shoppingPool = tailor(shopping);
-  const hotel = hotels[0] ?? null;
+  const hotel = pickPlanHotel(hotels);
 
   const planDays = buildRealisticItineraryDays({
     days,
@@ -489,8 +532,7 @@ export async function planToMaterializeDays(
       latitude: item.latitude,
       longitude: item.longitude,
       feeLabel: item.feeLabel,
-      dataConfidence:
-        item.kind === 'logistics' ? 'live_data_required' : ('suggested' as const),
+      dataConfidence: 'suggested' as const,
     })),
   }));
 }

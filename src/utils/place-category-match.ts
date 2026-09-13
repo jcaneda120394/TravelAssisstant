@@ -18,7 +18,7 @@ export const CATEGORY_MATCH: Record<PlaceCategory, PlaceCategory[]> = {
   viewpoint: ['viewpoint', 'attraction'],
   zoo: ['zoo', 'attraction'],
   nightlife: ['nightlife', 'restaurant'],
-  beach: ['beach', 'attraction'],
+  beach: ['beach'],
   spa: ['spa'],
   gym: ['gym'],
   hotel: ['hotel'],
@@ -77,7 +77,24 @@ export function placeMatchesCategory(
 ): boolean {
   if (!category || category === 'other') return true;
   const allowed = CATEGORY_MATCH[category] ?? [category];
-  return allowed.includes(place.category);
+  if (allowed.includes(place.category)) return true;
+
+  // Soft name/tag matches for sparse coastal towns (e.g. Barcelona, Sorsogon).
+  const haystack = `${place.name} ${place.address ?? ''} ${(place.tags ?? []).join(' ')}`.toLowerCase();
+  if (category === 'beach') {
+    return /\b(beach|baywalk|seaside|seawall|cove|islet|island|coast|paguriran|rompeolas)\b/i.test(
+      haystack,
+    );
+  }
+  if (category === 'attraction' || category === 'temple' || category === 'viewpoint') {
+    if (category === 'temple' && /\b(church|parish|cathedral|basilica|shrine|ruins)\b/i.test(haystack)) {
+      return true;
+    }
+    if (category === 'viewpoint' && /\b(viewpoint|view deck|sea wall|boulevard|overlook)\b/i.test(haystack)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function filterPlacesByCategory(

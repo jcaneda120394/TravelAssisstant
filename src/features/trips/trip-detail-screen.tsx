@@ -467,11 +467,10 @@ export function TripDetailScreen() {
           </AppText>
           <AppText muted className="mt-1 text-xs">
             {item.kind ?? 'custom'}
-            {item.dataConfidence === 'live_data_required' ? ' · live_data_required' : ''}
           </AppText>
           {item.notes ? (
             <AppText muted className="mt-1 text-sm">
-              {item.notes}
+              {item.notes.replace(/\s*live_data_required[^.]*\.?/gi, '').trim()}
             </AppText>
           ) : null}
           {item.placeId ? (
@@ -507,7 +506,6 @@ export function TripDetailScreen() {
         {segment && index < dayItems.length - 1 ? (
           <AppText muted className="mb-2 text-center text-xs">
             ↓ {segment.summary ?? 'Travel'}
-            {segment.status === 'live_data_required' ? ' · calculate routes later' : ''}
           </AppText>
         ) : index < dayItems.length - 1 && !segment ? (
           <AppText muted className="mb-2 text-center text-xs">

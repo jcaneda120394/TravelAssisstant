@@ -347,7 +347,6 @@ export function TripSuggestionsScreen() {
                       </AppText>
                       <AppText muted className="text-xs">
                         {act.kind}
-                        {act.notes?.includes('live_data_required') ? ' · needs live transport' : ''}
                       </AppText>
                       {aIdx < day.activities.length - 1 && day.activities[aIdx + 1]?.kind !== 'transport' ? (
                         <AppText muted className="my-1 text-center text-xs">

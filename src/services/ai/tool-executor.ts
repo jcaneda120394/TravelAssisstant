@@ -5,7 +5,6 @@ import { useLocationStore } from '@/stores/location-store';
 import type { AIChatRequest, GeoPoint, Place, PlaceCategory, WeatherSnapshot } from '@/types/domain';
 import type { ProviderRegistry } from '@/providers/registry';
 import { DEFAULT_MAP_CENTER } from '@/services/location/location.service';
-import { filterPlacesWithinRadius } from '@/utils/geo';
 
 export type ToolResult = { name: string; result: unknown };
 
@@ -20,13 +19,27 @@ async function nearbyPlaces(params: {
   radiusMeters: number;
   category?: PlaceCategory;
   limit?: number;
+  cityLabel?: string | null;
+  countryCode?: string | null;
 }): Promise<Place[]> {
-  const providers = getProviders();
-  const places = await providers.places.getNearbyPlaces(params);
-  return filterPlacesWithinRadius(places, params.location, params.radiusMeters).slice(
-    0,
-    params.limit ?? places.length,
-  );
+  // Lazy load to avoid circular import with providers → AI → tools.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { getExploreNearbyPlaces } = require('@/services/places/explore-nearby.service') as {
+    getExploreNearbyPlaces: (input: {
+      location: GeoPoint;
+      radiusMeters: number;
+      category?: PlaceCategory;
+      cityLabel?: string | null;
+      limit?: number;
+    }) => Promise<Place[]>;
+  };
+  return getExploreNearbyPlaces({
+    location: params.location,
+    radiusMeters: params.radiusMeters,
+    category: params.category,
+    cityLabel: params.cityLabel,
+    limit: params.limit ?? 12,
+  });
 }
 
 const TOOL_NAMES = [
@@ -144,7 +157,14 @@ function resolveLocation(request: AIChatRequest): {
   else if (/united states|usa|san francisco|new york/.test(countryHint)) countryCode = 'US';
   else if (/korea|seoul/.test(countryHint)) countryCode = 'KR';
   else if (/thailand|bangkok/.test(countryHint)) countryCode = 'TH';
-  else if (/philippine|manila|bulacan|cebu|davao/.test(countryHint)) countryCode = 'PH';
+  else if (/spain|madrid|catalonia/.test(countryHint) && !/sorsogon/.test(countryHint))
+    countryCode = 'ES';
+  else if (/france|paris/.test(countryHint)) countryCode = 'FR';
+  else if (/united arab|dubai|abu dhabi|uae/.test(countryHint)) countryCode = 'AE';
+  else if (/singapore/.test(countryHint)) countryCode = 'SG';
+  else if (/hong kong/.test(countryHint)) countryCode = 'HK';
+  else if (/philippine|manila|bulacan|cebu|davao|sorsogon|legazpi|albay/.test(countryHint))
+    countryCode = 'PH';
 
   return {
     coords,
@@ -175,22 +195,28 @@ async function runTool(name: string, request: AIChatRequest): Promise<unknown> {
     case 'find_nearby_places':
       return nearbyPlaces({
         location: location.coords,
-        radiusMeters: 4000,
-        limit: 8,
+        radiusMeters: 12_000,
+        limit: 10,
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
     case 'find_attractions':
       return nearbyPlaces({
         location: location.coords,
-        radiusMeters: 5000,
+        radiusMeters: 20_000,
         category: 'attraction',
-        limit: 8,
+        limit: 10,
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
     case 'find_food':
       return nearbyPlaces({
         location: location.coords,
-        radiusMeters: 2500,
+        radiusMeters: 10_000,
         category: 'restaurant',
-        limit: 6,
+        limit: 8,
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
     case 'search_places':
       return providers.places.searchPlaces({
@@ -201,9 +227,11 @@ async function runTool(name: string, request: AIChatRequest): Promise<unknown> {
     case 'get_place_details': {
       const nearby = await nearbyPlaces({
         location: location.coords,
-        radiusMeters: 5000,
+        radiusMeters: 15_000,
         category: 'attraction',
-        limit: 1,
+        limit: 8,
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
       return nearby[0] ?? null;
     }
@@ -222,10 +250,8 @@ async function runTool(name: string, request: AIChatRequest): Promise<unknown> {
       return providers.hotels.searchHotels({
         location: location.coords,
         checkIn: new Date().toISOString().slice(0, 10),
-        checkOut: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+        checkOut: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
         adults: 2,
-        children: 0,
-        rooms: 1,
       });
     case 'convert_currency':
       return providers.currency.convert(
@@ -238,32 +264,42 @@ async function runTool(name: string, request: AIChatRequest): Promise<unknown> {
     case 'find_hospital':
       return nearbyPlaces({
         location: location.coords,
-        radiusMeters: 5000,
+        radiusMeters: 12_000,
         category: 'hospital',
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
     case 'find_pharmacy':
       return nearbyPlaces({
         location: location.coords,
-        radiusMeters: 3000,
+        radiusMeters: 8_000,
         category: 'pharmacy',
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
     case 'find_police_station':
       return nearbyPlaces({
         location: location.coords,
-        radiusMeters: 3000,
+        radiusMeters: 8_000,
         category: 'police',
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
     case 'find_embassy':
       return nearbyPlaces({
         location: location.coords,
-        radiusMeters: 10000,
+        radiusMeters: 25_000,
         category: 'embassy',
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
     case 'find_coworking_space':
       return nearbyPlaces({
         location: location.coords,
-        radiusMeters: 5000,
+        radiusMeters: 12_000,
         category: 'coworking',
+        cityLabel: location.label,
+        countryCode: location.countryCode,
       });
     case 'get_trip': {
       const trips = await listTrips(userId);
@@ -432,21 +468,11 @@ export function buildLocationAwareReply(
     ].join('\n');
   }
 
-  if (mode === 'planner' || mode === 'ask' || mode === 'explore') {
-    return [
-      `Ideas near ${locationLabel} (live map + weather tools):`,
-      '',
-      toolSummary,
-      '',
-      'Tip: open Explore or a place card for details and directions. Hours/fares can change — verify on site.',
-    ].join('\n');
-  }
-
   return [
-    `TravelAssistant AI (${mode}) · ${locationLabel}`,
+    `Here’s what I found near ${locationLabel}:`,
     '',
     toolSummary,
     '',
-    'Ask for food, attractions, weather, hotels, or directions near your current city.',
+    'I only search nearby and TravelAssistant topics. Open Explore or a place card for details — hours and fares can change.',
   ].join('\n');
 }

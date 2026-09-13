@@ -78,6 +78,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="translate"
+        options={{
+          title: 'Translate',
+          tabBarIcon: ({ color }) => <TabIcon color={String(color)} name="scan" />,
+        }}
+      />
+      <Tabs.Screen
         name="assistant"
         options={{
           title: 'AI',

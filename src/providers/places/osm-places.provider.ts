@@ -21,6 +21,7 @@ import {
 } from '@/utils/place-name';
 import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
 import { applyOsmPriceAndStars } from '@/utils/place-price-estimate';
+import { filterPlacesWithinRadius } from '@/utils/geo';
 
 type NominatimResult = {
   place_id: number;
@@ -791,12 +792,16 @@ async function nominatimNearby(
     ? `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&namedetails=1` +
       `&limit=${perQueryLimit}&${Object.entries(structured)
         .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-        .join('&')}&viewbox=${box}&bounded=0`
+        .join('&')}&viewbox=${box}&bounded=1`
     : `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&namedetails=1` +
-      `&limit=${perQueryLimit}&q=${encodeURIComponent(phrases[0] ?? category)}&viewbox=${box}&bounded=0`;
+      `&limit=${perQueryLimit}&q=${encodeURIComponent(phrases[0] ?? category)}&viewbox=${box}&bounded=1`;
 
   let collected = await nominatimSearchUrl(primaryUrl, params, category);
-  let inRadius = withinRadius(dedupePlaces(collected), Math.round(radius * 1.25));
+  let inRadius = withinRadius(
+    dedupePlaces(collected),
+    params.location,
+    Math.round(radius * 1.15),
+  );
 
   // Second structured key (e.g. theme_park → attraction) or phrase when thin.
   if (inRadius.length < Math.min(8, limit)) {
@@ -806,46 +811,46 @@ async function nominatimNearby(
         `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&namedetails=1` +
         `&limit=${perQueryLimit}&${Object.entries(secondStructured)
           .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-          .join('&')}&viewbox=${box}&bounded=0`;
+          .join('&')}&viewbox=${box}&bounded=1`;
       collected = [...collected, ...(await nominatimSearchUrl(url, params, category))];
     } else if (phrases[1]) {
       const secondUrl =
         `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&namedetails=1` +
-        `&limit=${perQueryLimit}&q=${encodeURIComponent(phrases[1])}&viewbox=${box}&bounded=0`;
+        `&limit=${perQueryLimit}&q=${encodeURIComponent(phrases[1])}&viewbox=${box}&bounded=1`;
       collected = [...collected, ...(await nominatimSearchUrl(secondUrl, params, category))];
     }
-    inRadius = withinRadius(dedupePlaces(collected), Math.round(radius * 1.5));
+    inRadius = withinRadius(
+      dedupePlaces(collected),
+      params.location,
+      Math.round(radius * 1.25),
+    );
   }
 
-  // Extra attraction phrases (theme park / disney) when still sparse.
+  // Extra attraction phrases when still sparse — still bounded to the viewbox.
   if (category === 'attraction' && inRadius.length < 10) {
     for (const phrase of phrases.slice(2, 4)) {
       const url =
         `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&namedetails=1` +
-        `&limit=${perQueryLimit}&q=${encodeURIComponent(phrase)}&viewbox=${box}&bounded=0`;
+        `&limit=${perQueryLimit}&q=${encodeURIComponent(phrase)}&viewbox=${box}&bounded=1`;
       collected = [...collected, ...(await nominatimSearchUrl(url, params, category))];
     }
-    inRadius = withinRadius(dedupePlaces(collected), Math.round(radius * 1.6));
+    inRadius = withinRadius(
+      dedupePlaces(collected),
+      params.location,
+      Math.round(radius * 1.35),
+    );
   }
 
-  if (inRadius.length > 0) {
-    return inRadius.sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
-  }
-  return withinRadius(dedupePlaces(collected), Math.round(radius * 2.2)).sort(
-    (a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0),
-  );
+  return inRadius.sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
 }
 
-/** Keep only places inside the user-selected radius (50m slack for rounding). */
-function withinRadius(places: Place[], radiusMeters: number): Place[] {
-  const max = radiusMeters + 50;
-  return places.filter((place) => {
-    const distance = place.distanceMeters;
-    if (distance == null) {
-      return false;
-    }
-    return distance <= max;
-  });
+/** Keep only places inside the user-selected radius — always recompute haversine. */
+function withinRadius(
+  places: Place[],
+  origin: GeoPoint,
+  radiusMeters: number,
+): Place[] {
+  return filterPlacesWithinRadius(places, origin, radiusMeters, 80);
 }
 
 export class OsmPlacesProvider implements PlacesProvider {
@@ -857,7 +862,7 @@ export class OsmPlacesProvider implements PlacesProvider {
       `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&extratags=1&namedetails=1` +
       `&limit=${limit}&q=${encodeURIComponent(params.query)}`;
     if (params.location) {
-      url += `&viewbox=${viewboxFor(params.location, 20_000)}&bounded=0`;
+      url += `&viewbox=${viewboxFor(params.location, 20_000)}&bounded=1`;
     }
 
     const photonFallback = async (): Promise<Place[]> => {
@@ -930,6 +935,8 @@ export class OsmPlacesProvider implements PlacesProvider {
     const photonPromise = searchPhotonNearby({
       location: params.location,
       category: primary,
+      cityLabel: params.cityLabel,
+      countryCode: params.countryCode,
       radiusMeters: Math.max(radius, 15_000),
       limit: Math.max(limit, 40),
     }).catch(() => [] as Place[]);
@@ -943,7 +950,8 @@ export class OsmPlacesProvider implements PlacesProvider {
 
       let places = withinRadius(
         dedupePlaces([...overpass, ...nominatim]),
-        Math.round(radius * 1.35),
+        params.location,
+        Math.round(radius * 1.2),
       );
 
       if (params.query) {
@@ -962,9 +970,8 @@ export class OsmPlacesProvider implements PlacesProvider {
         radiusMeters: Math.max(radius, 40_000),
         limit: Math.max(limit, 40),
       });
-      places = dedupePlaces([...catalog, ...places]).filter(
-        (place) => (place.distanceMeters ?? Number.POSITIVE_INFINITY) <= radius + 120,
-      );
+      places = dedupePlaces([...catalog, ...places]);
+      places = withinRadius(places, params.location, radius + 120);
       if (category && category !== 'other') {
         places = filterPlacesByCategory(places, category);
       }
@@ -996,7 +1003,7 @@ export class OsmPlacesProvider implements PlacesProvider {
       if (category && category !== 'other') {
         merged = filterPlacesByCategory(merged, category);
       }
-      merged = merged.slice(0, limit);
+      merged = withinRadius(merged, params.location, radius + 150).slice(0, limit);
       rememberPlaces(merged);
       return merged;
     }
@@ -1016,8 +1023,9 @@ export class OsmPlacesProvider implements PlacesProvider {
     });
     const filtered =
       category && category !== 'other' ? filterPlacesByCategory(catalog, category) : catalog;
-    rememberPlaces(filtered);
-    return filtered;
+    const localCatalog = withinRadius(filtered, params.location, radius + 150);
+    rememberPlaces(localCatalog);
+    return localCatalog;
   }
 
   async getPlaceDetails(placeId: string): Promise<Place | null> {

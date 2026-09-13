@@ -179,7 +179,7 @@ export function ExploreScreen() {
   const query = useQuery({
     queryKey: [
       'nearby',
-      'explore-v3',
+      'explore-v4',
       coords?.latitude,
       coords?.longitude,
       radiusMeters,
@@ -211,7 +211,8 @@ export function ExploreScreen() {
   const places = useMemo(() => {
     const raw = query.data ?? [];
     if (!coords) return [];
-    const inRange = filterPlacesWithinRadius(raw, coords, radiusMeters);
+    // Match the selected distance (small slack for GPS rounding only).
+    const inRange = filterPlacesWithinRadius(raw, coords, radiusMeters, 200);
     return sortPlacesByCategoryPopularity(
       inRange,
       category === 'all' ? undefined : (category as PlaceCategory),

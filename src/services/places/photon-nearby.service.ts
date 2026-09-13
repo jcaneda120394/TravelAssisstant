@@ -393,29 +393,44 @@ function withinExpandingRadius(places: Place[], startRadius: number, limit: numb
 
 /**
  * Worldwide nearby via Photon. Works for any city — reverse-geocodes when label missing.
+ * Uses full destination context (not only the first comma segment) and drops
+ * results whose country clearly conflicts with the traveler's country.
  */
 export async function searchPhotonNearby(params: {
   location: GeoPoint;
   category?: PlaceCategory | 'attraction' | 'restaurant';
   cityLabel?: string | null;
+  countryCode?: string | null;
   radiusMeters?: number;
   limit?: number;
 }): Promise<Place[]> {
   const limit = Math.min(Math.max(params.limit ?? 15, 1), 40);
   const searchCategory = resolveSearchCategory(params.category as PlaceCategory | undefined);
   const fallbackCategory = searchCategory;
+  const radius = params.radiusMeters ?? 15_000;
 
+  const fullLabel = params.cityLabel?.trim() || '';
   let city =
-    params.cityLabel?.split(',')[0]?.trim() ||
-    params.cityLabel?.trim() ||
+    fullLabel.split(',')[0]?.trim() ||
+    fullLabel ||
     '';
+  // Prefer "City, Region" when available so "Barcelona" alone does not mean Spain.
+  const cityWithRegion =
+    fullLabel
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 2)
+      .join(', ') || city;
+
   if (city.length < 2) {
     city = (await reverseCityLabel(params.location)) ?? '';
   }
 
+  const queryCity = cityWithRegion.length >= 3 ? cityWithRegion : city;
   const queryList =
-    city.length >= 2
-      ? queriesFor(searchCategory, city).slice(0, 8)
+    queryCity.length >= 2
+      ? queriesFor(searchCategory, queryCity).slice(0, 8)
       : bareQueries(searchCategory).slice(0, 6);
 
   const settled = await Promise.allSettled(
@@ -426,15 +441,32 @@ export async function searchPhotonNearby(params: {
     result.status === 'fulfilled' ? result.value : [],
   );
 
+  const expectedCountry = (params.countryCode ?? '').toLowerCase();
+  const labelLower = fullLabel.toLowerCase();
+
   const places = dedupePlaces(
     features
+      .filter((feature) => {
+        const props = feature.properties;
+        const featureCountry = (props?.countrycode ?? '').toLowerCase();
+        if (expectedCountry && featureCountry && featureCountry !== expectedCountry) {
+          return false;
+        }
+        if (labelLower.includes('philippines') || expectedCountry === 'ph') {
+          const addr = `${props?.country ?? ''} ${props?.state ?? ''} ${props?.city ?? ''}`.toLowerCase();
+          if (/\b(japan|spain|france|united states|korea|thailand)\b/.test(addr)) {
+            return false;
+          }
+        }
+        return true;
+      })
       .map((feature) => featureToPlace(feature, params.location, fallbackCategory))
       .filter((place): place is Place => place != null),
   );
 
   // Never fall back to wrong categories (e.g. Disneyland under Airport).
   const matched = filterPlacesByCategory(places, searchCategory);
-  return withinExpandingRadius(matched, params.radiusMeters ?? 15_000, limit);
+  return withinExpandingRadius(matched, radius, limit);
 }
 
 /**

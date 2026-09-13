@@ -6,6 +6,10 @@ export type NearbyPlacesParams = {
   category?: PlaceCategory;
   query?: string;
   limit?: number;
+  /** Full destination label for local text search (e.g. "Barcelona, Sorsogon, Philippines"). */
+  cityLabel?: string | null;
+  /** ISO country code when known (e.g. PH) — used to reject wrong-country hits. */
+  countryCode?: string | null;
 };
 
 export type SearchPlacesParams = {

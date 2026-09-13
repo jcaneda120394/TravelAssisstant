@@ -294,7 +294,7 @@ export function TripSuggestionScreen() {
             />
             {genPhase === 'done' ? (
               <AppText muted className="mb-3 text-sm">
-                Plan ready — transport rows marked live_data_required until routes are calculated.
+                Plan ready — built from popular places and restaurants near your destination.
               </AppText>
             ) : null}
             {(plan.popularDestinations?.length ?? 0) > 0 ? (
@@ -367,7 +367,6 @@ export function TripSuggestionScreen() {
                         {item.startTime}–{item.endTime}
                         {' · '}
                         {item.kind.replace('_', ' ')}
-                        {item.kind === 'logistics' ? ' · live_data_required' : ''}
                       </AppText>
                     </View>
                     <View className="p-3">
@@ -386,7 +385,7 @@ export function TripSuggestionScreen() {
                   </View>
                   {index < (dayPlan?.items.length ?? 0) - 1 && item.kind !== 'logistics' ? (
                     <AppText muted className="mb-3 text-center text-xs">
-                      ↓ Travel · live_data_required
+                      ↓ Travel between stops
                     </AppText>
                   ) : null}
                 </View>

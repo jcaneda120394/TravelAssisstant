@@ -236,14 +236,39 @@ function pickRestaurantNear(
   used: Set<string>,
   maxMeters = 3_500,
 ): Place | undefined {
-  const ranked = restaurants
+  const scorePlace = (place: Place, d: number) => {
+    const rating = place.rating ?? 3.8;
+    const reviews = Math.min(place.reviewCount ?? 0, 8_000);
+    // Prefer highly rated places that are actually nearby.
+    return rating * 25 + Math.log10(reviews + 10) * 6 - d / 350;
+  };
+
+  const within = restaurants
     .filter((r) => !used.has(r.id))
-    .map((r) => ({ place: r, d: haversineMeters(near, pointOf(r)) }))
+    .map((r) => {
+      const d = haversineMeters(near, pointOf(r));
+      return { place: r, d, score: scorePlace(r, d) };
+    })
     .filter((x) => x.d <= maxMeters)
-    .sort((a, b) => a.d - b.d);
-  const chosen = ranked[0]?.place ?? restaurants.find((r) => !used.has(r.id));
+    .sort((a, b) => b.score - a.score);
+
+  const expanded = restaurants
+    .filter((r) => !used.has(r.id))
+    .map((r) => {
+      const d = haversineMeters(near, pointOf(r));
+      return { place: r, d, score: scorePlace(r, d) };
+    })
+    .filter((x) => x.d <= Math.max(maxMeters * 2.5, 12_000))
+    .sort((a, b) => b.score - a.score);
+
+  const chosen = within[0]?.place ?? expanded[0]?.place;
   if (chosen) used.add(chosen.id);
   return chosen;
+}
+
+function restaurantBlockTitle(role: string, place?: Place): string {
+  if (place?.name?.trim()) return `${role} · ${place.name.trim()}`;
+  return role;
 }
 
 function pushTransport(
@@ -262,8 +287,8 @@ function pushTransport(
     kind: 'logistics',
     title: `${travelModeLabel(meters)} · ${label}`,
     durationMin: mins,
-    notes: `~${Math.round(meters / 100) / 10} km · ~${mins} min incl. walking/wait buffer. Confirm live route in Directions.`,
-    feeLabel: 'Transit fare varies — check IC card / app',
+    notes: `~${Math.round(meters / 100) / 10} km · ~${mins} min incl. walking/wait buffer. Check the route in Directions.`,
+    feeLabel: 'Transit fare varies',
     feeAmount: 0,
   });
 }
@@ -406,8 +431,8 @@ export function buildRealisticItineraryDays(input: {
         durationMin: 50,
         place: hotel ?? undefined,
         notes:
-          'Airport → hotel. Confirm live train/bus/taxi in Directions. Narita-style airports need longer.',
-        feeLabel: 'Transit / taxi — confirm live',
+          'Airport → hotel. Check train/bus/taxi options in Directions. Far airports need longer.',
+        feeLabel: 'Transit / taxi',
         roleLabel: 'Airport transfer',
       });
       if (hotel) {
@@ -423,37 +448,55 @@ export function buildRealisticItineraryDays(input: {
         });
       }
 
-      // Light nearby cluster only — arrival days stay short.
-      const lightCluster = clusters[clusterCursor++] ?? regular.slice(0, 2);
-      const lightPlaces = lightCluster.slice(0, withKids || input.style === 'relaxed' ? 1 : 2);
+      // Nearby highlights + a well-rated lunch close to the hotel area.
+      const lightCluster = clusters[clusterCursor++] ?? regular.slice(0, 3);
+      const pickLights = (maxMeters: number, limit: number) =>
+        [
+          ...lightCluster.filter((place) => haversineMeters(hotelPoint, pointOf(place)) <= maxMeters),
+          ...regular.filter((place) => haversineMeters(hotelPoint, pointOf(place)) <= maxMeters),
+          ...input.shopping.filter((place) => haversineMeters(hotelPoint, pointOf(place)) <= maxMeters),
+        ]
+          .filter((place, index, all) => all.findIndex((p) => p.id === place.id) === index)
+          .slice(0, limit);
+      const lightLimit = withKids || input.style === 'relaxed' ? 1 : 2;
+      const fallbackLights =
+        pickLights(12_000, lightLimit).length > 0
+          ? pickLights(12_000, lightLimit)
+          : pickLights(35_000, lightLimit);
       let lastPoint = hotelPoint;
-      for (const [i, place] of lightPlaces.entries()) {
+      for (const [i, place] of fallbackLights.entries()) {
         pushTransport(blocks, lastPoint, pointOf(place), `to ${place.name}`);
         const profile = classifyVisit(place);
         const dur = Math.min(visitDurationMinutes(profile, input.style, withKids), 90);
         const fee = estimateRealisticFee('attraction', place, input.currency);
+        const km = (haversineMeters(hotelPoint, pointOf(place)) / 1000).toFixed(1);
         blocks.push({
           kind: 'attraction',
           title: place.name,
           durationMin: dur,
           place,
-          notes: `Light arrival-day stop. ${place.address ?? ''}`.trim(),
+          notes: `Popular nearby stop (~${km} km). ${place.address ?? ''}`.trim(),
           feeAmount: fee.amount,
           feeLabel: fee.feeLabel,
-          roleLabel: i === 0 ? 'Afternoon sight' : 'Nearby stop',
+          roleLabel: i === 0 ? 'Nearby highlight' : 'Nearby stop',
         });
         lastPoint = pointOf(place);
       }
-      const lunch = pickRestaurantNear(input.restaurants, lastPoint, usedRestaurants);
+      const lunch = pickRestaurantNear(input.restaurants, lastPoint, usedRestaurants, 5_000);
       if (lunch) {
         pushTransport(blocks, lastPoint, pointOf(lunch), `to lunch`);
         const fee = estimateRealisticFee('restaurant', lunch, input.currency);
         blocks.push({
           kind: 'restaurant',
-          title: lunch.name,
+          title: restaurantBlockTitle('Lunch', lunch),
           durationMin: visitDurationMinutes('meal', input.style, withKids),
           place: lunch,
-          notes: lunch.address,
+          notes: [
+            lunch.rating != null ? `${lunch.rating}★ nearby restaurant` : 'Well-rated nearby restaurant',
+            lunch.address,
+          ]
+            .filter(Boolean)
+            .join(' · '),
           feeAmount: fee.amount,
           feeLabel: fee.feeLabel,
           roleLabel: 'Lunch',
@@ -483,15 +526,23 @@ export function buildRealisticItineraryDays(input: {
         themeDaysUsed += 1;
         // Sibling parks (e.g. DisneySea) get their own full day later — never same day.
 
+        const parkBreakfast = pickRestaurantNear(
+          input.restaurants,
+          hotelPoint,
+          usedRestaurants,
+          2_500,
+        );
         blocks.push({
           kind: 'restaurant',
-          title: 'Breakfast near hotel',
+          title: restaurantBlockTitle('Breakfast', parkBreakfast),
           durationMin: 45,
-          place: pickRestaurantNear(input.restaurants, hotelPoint, usedRestaurants, 2_000),
-          notes: 'Eat before heading to the park.',
+          place: parkBreakfast,
+          notes: parkBreakfast
+            ? `Eat near the hotel before heading to ${park.name}.`
+            : 'Eat before heading to the park.',
           roleLabel: 'Breakfast',
           ...(() => {
-            const fee = estimateRealisticFee('restaurant', undefined, input.currency);
+            const fee = estimateRealisticFee('restaurant', parkBreakfast, input.currency);
             return { feeAmount: fee.amount, feeLabel: fee.feeLabel };
           })(),
         });
@@ -526,14 +577,23 @@ export function buildRealisticItineraryDays(input: {
     }
 
     if (role === 'departure') {
+      const departureBreakfast = pickRestaurantNear(
+        input.restaurants,
+        hotelPoint,
+        usedRestaurants,
+        2_500,
+      );
       blocks.push({
         kind: 'restaurant',
-        title: 'Breakfast',
+        title: restaurantBlockTitle('Breakfast', departureBreakfast),
         durationMin: 45,
-        place: pickRestaurantNear(input.restaurants, hotelPoint, usedRestaurants, 2_000),
+        place: departureBreakfast,
         roleLabel: 'Breakfast',
+        notes: departureBreakfast
+          ? 'Quick breakfast near the hotel before check-out.'
+          : 'Quick breakfast before check-out.',
         ...(() => {
-          const fee = estimateRealisticFee('restaurant', undefined, input.currency);
+          const fee = estimateRealisticFee('restaurant', departureBreakfast, input.currency);
           return { feeAmount: fee.amount, feeLabel: fee.feeLabel };
         })(),
       });
@@ -572,7 +632,7 @@ export function buildRealisticItineraryDays(input: {
         durationMin: 90,
         notes:
           'Include check-in buffer + security/immigration for international flights (often 2–3h before departure).',
-        feeLabel: 'Transit — confirm live',
+        feeLabel: 'Transit',
         roleLabel: 'Departure',
       });
       return {
@@ -587,15 +647,23 @@ export function buildRealisticItineraryDays(input: {
       .filter((p) => classifyVisit(p) !== 'theme_park')
       .slice(0, pace.maxAttractions);
 
+    const dayBreakfast = pickRestaurantNear(
+      input.restaurants,
+      hotelPoint,
+      usedRestaurants,
+      3_000,
+    );
     blocks.push({
       kind: 'restaurant',
-      title: 'Breakfast',
+      title: restaurantBlockTitle('Breakfast', dayBreakfast),
       durationMin: input.style === 'relaxed' ? 60 : 45,
-      place: pickRestaurantNear(input.restaurants, hotelPoint, usedRestaurants, 2_500),
+      place: dayBreakfast,
       roleLabel: 'Breakfast',
-      notes: 'Start near the hotel before the day’s neighborhood cluster.',
+      notes: dayBreakfast
+        ? `Start at a nearby spot (${dayBreakfast.rating != null ? `${dayBreakfast.rating}★` : 'local favorite'}) before the day’s neighborhood cluster.`
+        : 'Start near the hotel before the day’s neighborhood cluster.',
       ...(() => {
-        const fee = estimateRealisticFee('restaurant', undefined, input.currency);
+        const fee = estimateRealisticFee('restaurant', dayBreakfast, input.currency);
         return { feeAmount: fee.amount, feeLabel: fee.feeLabel };
       })(),
     });
@@ -615,6 +683,7 @@ export function buildRealisticItineraryDays(input: {
         durationMin: visitDurationMinutes(profile, input.style, withKids),
         place,
         notes: [
+          place.rating != null ? `${place.rating}★ popular nearby` : 'Popular nearby stop',
           place.address,
           profile === 'major' ? 'Major stop — protect enough time; do not rush to a far district next.' : null,
           /sky|observation|tower|disney|universal|teamlab|ghibli/i.test(place.name)
@@ -622,7 +691,7 @@ export function buildRealisticItineraryDays(input: {
             : null,
         ]
           .filter(Boolean)
-          .join(' '),
+          .join(' · '),
         feeAmount: fee.amount,
         feeLabel: fee.feeLabel,
         roleLabel: i === 0 ? 'Morning highlight' : 'Nearby morning stop',
@@ -636,10 +705,15 @@ export function buildRealisticItineraryDays(input: {
       const fee = estimateRealisticFee('restaurant', lunch, input.currency);
       blocks.push({
         kind: 'restaurant',
-        title: lunch.name,
+        title: restaurantBlockTitle('Lunch', lunch),
         durationMin: visitDurationMinutes('meal', input.style, withKids),
         place: lunch,
-        notes: 'Lunch near the morning cluster — avoid crossing the city just to eat.',
+        notes: [
+          lunch.rating != null ? `${lunch.rating}★ near the morning stops` : 'Lunch near the morning cluster',
+          lunch.address,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         feeAmount: fee.amount,
         feeLabel: fee.feeLabel,
         roleLabel: 'Lunch',
@@ -656,7 +730,12 @@ export function buildRealisticItineraryDays(input: {
         title: place.name,
         durationMin: visitDurationMinutes(profile, input.style, withKids),
         place,
-        notes: place.address,
+        notes: [
+          place.rating != null ? `${place.rating}★` : null,
+          place.address,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         feeAmount: fee.amount,
         feeLabel: fee.feeLabel,
         roleLabel: i === 0 ? 'Afternoon highlight' : 'Nearby afternoon stop',
@@ -671,9 +750,15 @@ export function buildRealisticItineraryDays(input: {
         const fee = estimateRealisticFee('restaurant', dinner, input.currency);
         blocks.push({
           kind: 'restaurant',
-          title: dinner.name,
+          title: restaurantBlockTitle('Dinner', dinner),
           durationMin: 80,
           place: dinner,
+          notes: [
+            dinner.rating != null ? `${dinner.rating}★ nearby dinner` : 'Well-rated nearby dinner',
+            dinner.address,
+          ]
+            .filter(Boolean)
+            .join(' · '),
           feeAmount: fee.amount,
           feeLabel: fee.feeLabel,
           roleLabel: 'Dinner',

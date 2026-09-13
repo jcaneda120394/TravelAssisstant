@@ -12,6 +12,7 @@ import {
   isFoodCategory,
   isShoppingCategory,
 } from '@/utils/place-category-match';
+import { dropForeignLandmarkNoise } from '@/utils/place-foreign-noise';
 import { sortPlacesByCategoryPopularity } from '@/utils/place-popularity';
 
 const LIVE_BUDGET_MS = 7_000;
@@ -45,28 +46,6 @@ function scrubNoiseTags(place: Place): Place {
   return tags.length === place.tags.length ? place : { ...place, tags };
 }
 
-/** Famous-city tokens that must not appear when the traveler is elsewhere. */
-const FOREIGN_LANDMARK_HINT =
-  /\b(shibuya|dogenzaka|shinjuku|harajuku|asakusa|akihabara|ginza|meiji jingu|tokyo tower|shibuya sky|ichiran shibuya)\b/i;
-
-/**
- * Drop curated/demo rows that still carry another city's landmark names when
- * the active city label is not that city (extra safety beyond haversine).
- */
-function dropForeignLandmarkNoise(
-  places: Place[],
-  cityLabel?: string | null,
-): Place[] {
-  const label = (cityLabel ?? '').toLowerCase();
-  const inTokyoContext = /tokyo|shibuya|shinjuku|harajuku|japan/.test(label);
-  if (inTokyoContext) return places;
-
-  return places.filter((place) => {
-    const haystack = `${place.name} ${place.address ?? ''}`;
-    return !FOREIGN_LANDMARK_HINT.test(haystack);
-  });
-}
-
 function shouldBlendCatalog(category?: PlaceCategory): boolean {
   return (
     !category ||
@@ -77,36 +56,54 @@ function shouldBlendCatalog(category?: PlaceCategory): boolean {
   );
 }
 
-/**
- * Explore nearby: merge live OSM + Photon + curated landmarks, then rank by
- * popularity within the selected category (not only distance).
- * Coordinates are always re-checked against the selected radius.
- */
-export async function getExploreNearbyPlaces(params: {
+function rankNearby(
+  places: Place[],
+  origin: GeoPoint,
+  radiusMeters: number,
+  category: PlaceCategory | undefined,
+  cityLabel: string | null | undefined,
+  companions: CompanionPrefs | null | undefined,
+  limit: number,
+): Place[] {
+  let merged = dedupe(places).map(scrubNoiseTags);
+  if (!env.useMockProviders) {
+    merged = merged.filter((place) => place.provider !== 'mock');
+  }
+  merged = filterPlacesWithinRadius(merged, origin, radiusMeters);
+  merged = dropForeignLandmarkNoise(merged, cityLabel);
+  merged = filterPlacesByCategory(merged, category);
+
+  const ranked = sortPlacesByCategoryPopularity(merged, category);
+  const tailored = companionFilterActive(companions)
+    ? applyCompanionFilter(ranked, companions)
+    : ranked;
+  return tailored.slice(0, limit);
+}
+
+async function fetchExplorePool(params: {
   location: GeoPoint;
   category?: PlaceCategory;
   cityLabel?: string | null;
   radiusMeters: number;
-  limit?: number;
-  companions?: CompanionPrefs | null;
+  limit: number;
 }): Promise<Place[]> {
-  const limit = Math.min(Math.max(params.limit ?? 80, 20), 120);
-  const radius = Math.min(Math.max(params.radiusMeters, 500), MAX_RADIUS_METERS);
+  const { location, category, cityLabel, radiusMeters, limit } = params;
 
   const photonPromise = searchPhotonNearby({
-    location: params.location,
-    category: params.category,
-    cityLabel: params.cityLabel,
-    radiusMeters: radius,
+    location,
+    category,
+    cityLabel,
+    radiusMeters,
     limit: Math.max(limit, 40),
   }).catch(() => [] as Place[]);
 
   const livePromise = providers.places
     .getNearbyPlaces({
-      location: params.location,
-      radiusMeters: radius,
-      category: params.category,
+      location,
+      radiusMeters,
+      category,
       limit: Math.max(limit, 60),
+      cityLabel,
     })
     .catch(() => [] as Place[]);
 
@@ -117,32 +114,69 @@ export async function getExploreNearbyPlaces(params: {
 
   const lateLive = live.length ? live : await livePromise;
 
-  const catalog = shouldBlendCatalog(params.category)
+  // Catalog uses a slightly wider soft radius so sparse towns still fill.
+  const catalog = shouldBlendCatalog(category)
     ? searchCatalogNearby({
-        location: params.location,
-        category: params.category ?? 'attraction',
-        radiusMeters: radius,
+        location,
+        category: category ?? 'attraction',
+        radiusMeters: Math.max(radiusMeters, 40_000),
         limit: Math.max(40, Math.floor(limit / 2)),
       })
     : [];
 
-  let merged = dedupe([...catalog, ...lateLive, ...photon]).map(scrubNoiseTags);
-  // Never leak Tokyo/demo POIs into live mode.
-  if (!env.useMockProviders) {
-    merged = merged.filter((place) => place.provider !== 'mock');
+  return [...catalog, ...lateLive, ...photon];
+}
+
+/**
+ * Explore nearby: merge live OSM + Photon + curated landmarks, then rank by
+ * popularity within the selected category (not only distance).
+ * Sparse towns auto-expand distance until enough local hits appear.
+ */
+export async function getExploreNearbyPlaces(params: {
+  location: GeoPoint;
+  category?: PlaceCategory;
+  cityLabel?: string | null;
+  radiusMeters: number;
+  limit?: number;
+  companions?: CompanionPrefs | null;
+}): Promise<Place[]> {
+  const limit = Math.min(Math.max(params.limit ?? 80, 20), 120);
+  const requested = Math.min(Math.max(params.radiusMeters, 500), MAX_RADIUS_METERS);
+  const radii = Array.from(
+    new Set([
+      requested,
+      Math.min(MAX_RADIUS_METERS, Math.max(requested, 40_000)),
+      Math.min(MAX_RADIUS_METERS, Math.max(requested, 80_000)),
+    ]),
+  ).sort((a, b) => a - b);
+
+  let best: Place[] = [];
+  for (const radius of radii) {
+    const pool = await fetchExplorePool({
+      location: params.location,
+      category: params.category,
+      cityLabel: params.cityLabel,
+      radiusMeters: radius,
+      limit,
+    });
+    const ranked = rankNearby(
+      pool,
+      params.location,
+      radius,
+      params.category,
+      params.cityLabel,
+      params.companions,
+      limit,
+    );
+    if (ranked.length >= Math.min(6, limit)) {
+      rememberPlaces(ranked);
+      return ranked;
+    }
+    if (ranked.length > best.length) {
+      best = ranked;
+    }
   }
-  merged = filterPlacesWithinRadius(merged, params.location, radius);
-  // Drop anything whose name/address clearly belongs to another famous city far away.
-  merged = dropForeignLandmarkNoise(merged, params.cityLabel);
-  merged = filterPlacesByCategory(merged, params.category);
 
-  const ranked = sortPlacesByCategoryPopularity(merged, params.category);
-
-  const tailored = companionFilterActive(params.companions)
-    ? applyCompanionFilter(ranked, params.companions)
-    : ranked;
-
-  const result = tailored.slice(0, limit);
-  rememberPlaces(result);
-  return result;
+  rememberPlaces(best);
+  return best;
 }

@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Alert, Platform } from 'react-native';
 import { z } from 'zod';
@@ -12,12 +11,7 @@ import { ScrollView, View } from '@/components/ui/primitives';
 import { env } from '@/config/env';
 import { AuthBackToHomeBar, goToGuestHome } from '@/features/auth/auth-back-to-home';
 import { getErrorMessage, toAppError } from '@/lib/errors/app-error';
-import {
-  signInWithApple,
-  signInWithEmail,
-  signInWithGoogle,
-  signOut,
-} from '@/services/auth/auth.service';
+import { signInWithEmail, signOut } from '@/services/auth/auth.service';
 import { ensureProfile, fetchPreferences } from '@/services/profile/profile.service';
 import { useAuthStore } from '@/stores/auth-store';
 import { emailPasswordSchema } from '@/types/auth';
@@ -45,7 +39,6 @@ async function hydrateAfterAuth(user: {
 
 export function LoginScreen() {
   const router = useRouter();
-  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const {
     control,
     handleSubmit,
@@ -75,34 +68,6 @@ export function LoginScreen() {
       }
     }
   });
-
-  const onGoogle = async () => {
-    try {
-      setOauthLoading('google');
-      const user = await signInWithGoogle();
-      if (user) {
-        await hydrateAfterAuth(user);
-      }
-    } catch (error) {
-      Alert.alert('Google Sign-In', getErrorMessage(error));
-    } finally {
-      setOauthLoading(null);
-    }
-  };
-
-  const onApple = async () => {
-    try {
-      setOauthLoading('apple');
-      const user = await signInWithApple();
-      if (user) {
-        await hydrateAfterAuth(user);
-      }
-    } catch (error) {
-      Alert.alert('Apple Sign-In', getErrorMessage(error));
-    } finally {
-      setOauthLoading(null);
-    }
-  };
 
   return (
     <Screen>
@@ -166,22 +131,6 @@ export function LoginScreen() {
         </Card>
 
         <View className="mb-4 gap-3">
-          <Button
-            label="Continue with Google"
-            variant="secondary"
-            loading={oauthLoading === 'google'}
-            onPress={() => void onGoogle()}
-            testID="login-google"
-          />
-          {Platform.OS === 'ios' ? (
-            <Button
-              label="Continue with Apple"
-              variant="secondary"
-              loading={oauthLoading === 'apple'}
-              onPress={() => void onApple()}
-              testID="login-apple"
-            />
-          ) : null}
           <Button
             label="Back to Home"
             variant="secondary"

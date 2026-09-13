@@ -169,6 +169,60 @@ export const LOCAL_DESTINATIONS: DestinationSuggestion[] = [
     countryCode: 'PH',
   },
   {
+    id: 'local-sorsogon-city',
+    label: 'Sorsogon City, Sorsogon, Philippines',
+    shortName: 'Sorsogon City',
+    kind: 'city',
+    latitude: 12.9742,
+    longitude: 124.0048,
+    countryCode: 'PH',
+  },
+  {
+    id: 'local-barcelona-sorsogon',
+    label: 'Barcelona, Sorsogon, Philippines',
+    shortName: 'Barcelona',
+    kind: 'city',
+    latitude: 12.8692,
+    longitude: 124.1418,
+    countryCode: 'PH',
+  },
+  {
+    id: 'local-gubat',
+    label: 'Gubat, Sorsogon, Philippines',
+    shortName: 'Gubat',
+    kind: 'city',
+    latitude: 12.9185,
+    longitude: 124.123,
+    countryCode: 'PH',
+  },
+  {
+    id: 'local-donsol',
+    label: 'Donsol, Sorsogon, Philippines',
+    shortName: 'Donsol',
+    kind: 'city',
+    latitude: 12.9082,
+    longitude: 123.5978,
+    countryCode: 'PH',
+  },
+  {
+    id: 'local-bulusan',
+    label: 'Bulusan, Sorsogon, Philippines',
+    shortName: 'Bulusan',
+    kind: 'city',
+    latitude: 12.7518,
+    longitude: 124.1565,
+    countryCode: 'PH',
+  },
+  {
+    id: 'local-legazpi',
+    label: 'Legazpi, Albay, Philippines',
+    shortName: 'Legazpi',
+    kind: 'city',
+    latitude: 13.1391,
+    longitude: 123.7438,
+    countryCode: 'PH',
+  },
+  {
     id: 'local-tokyo',
     label: 'Tokyo, Japan',
     shortName: 'Tokyo',
@@ -333,6 +387,18 @@ function searchLocalDestinations(query: string): DestinationSuggestion[] {
 
   return LOCAL_DESTINATIONS.filter((item) => {
     const hay = normalizeQuery(`${item.shortName} ${item.label}`);
+    // Ambiguous short names (Barcelona, Springfield…) must match an extra token
+    // from the full label unless the query already includes country/region context.
+    const ambiguous =
+      item.shortName.toLowerCase() === 'barcelona' ||
+      normalizeQuery(item.shortName).split(' ').length === 1;
+    if (ambiguous && tokens.length === 1 && normalizeQuery(item.shortName) === tokens[0]) {
+      // Bare "Barcelona" — only keep if label is uniquely that shortName worldwide;
+      // prefer requiring region/country for known homonyms.
+      if (item.id.includes('barcelona-sorsogon') || item.id.includes('barcelona')) {
+        return false;
+      }
+    }
     return tokens.every((token) => hay.includes(token));
   }).slice(0, 8);
 }

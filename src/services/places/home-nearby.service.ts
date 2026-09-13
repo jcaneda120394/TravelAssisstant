@@ -6,6 +6,7 @@ import type { GeoPoint, Place } from '@/types/domain';
 import type { CompanionPrefs } from '@/utils/companion-suitability';
 import { applyCompanionFilter, companionFilterActive } from '@/utils/companion-suitability';
 import { filterPlacesWithinRadius } from '@/utils/geo';
+import { dropForeignLandmarkNoise } from '@/utils/place-foreign-noise';
 import { topPopularPlaces } from '@/utils/place-popularity';
 
 const DEFAULT_LIMIT = 15;
@@ -27,11 +28,15 @@ function finish(
   radiusMeters: number,
   limit: number,
   companions?: CompanionPrefs | null,
+  cityLabel?: string | null,
 ): Place[] {
   const withoutMocks = env.useMockProviders
     ? places
     : places.filter((place) => place.provider !== 'mock');
-  const localOnly = filterPlacesWithinRadius(withoutMocks, origin, radiusMeters);
+  const localOnly = dropForeignLandmarkNoise(
+    filterPlacesWithinRadius(withoutMocks, origin, radiusMeters),
+    cityLabel,
+  );
   const seen = new Set<string>();
   const deduped = localOnly.filter((place) => {
     const key = `${place.name.toLowerCase()}|${place.latitude.toFixed(3)}|${place.longitude.toFixed(3)}`;
@@ -46,10 +51,61 @@ function finish(
   return ranked;
 }
 
+async function fetchHomePool(params: {
+  location: GeoPoint;
+  category: 'attraction' | 'restaurant';
+  cityLabel?: string | null;
+  radiusMeters: number;
+  limit: number;
+}): Promise<Place[]> {
+  const { location, category, cityLabel, radiusMeters, limit } = params;
+
+  const photonPromise = searchPhotonNearby({
+    location,
+    category,
+    cityLabel,
+    radiusMeters,
+    limit: Math.max(limit + 6, 24),
+  }).catch(() => [] as Place[]);
+
+  const catalog = searchCatalogNearby({
+    location,
+    category,
+    radiusMeters,
+    limit: Math.max(limit + 10, 30),
+  });
+
+  try {
+    const nearby = await raceWithBudget(
+      providers.places.getNearbyPlaces({
+        location,
+        radiusMeters,
+        category,
+        limit: Math.max(limit + 6, 24),
+        cityLabel,
+      }),
+      LIVE_BUDGET_MS,
+    );
+    if (nearby && nearby.length > 0) {
+      return [...catalog, ...nearby];
+    }
+  } catch {
+    // Fall through.
+  }
+
+  const photon = await photonPromise;
+  if (photon.length > 0) {
+    return [...catalog, ...photon];
+  }
+
+  return catalog;
+}
+
 /**
  * Home lists for any city worldwide:
  * OSM (budgeted) → Photon → curated catalog → popularity rank.
  * Every result is distance-checked against the user's coordinates.
+ * Sparse cities (e.g. Sorsogon) expand the search radius until enough local hits appear.
  */
 export async function getHomeNearbyPlaces(params: {
   location: GeoPoint;
@@ -60,44 +116,36 @@ export async function getHomeNearbyPlaces(params: {
   companions?: CompanionPrefs | null;
 }): Promise<Place[]> {
   const limit = params.limit ?? DEFAULT_LIMIT;
-  const radius = params.radiusMeters;
+  const radii = [
+    params.radiusMeters,
+    Math.max(params.radiusMeters, 35_000),
+    Math.max(params.radiusMeters, 80_000),
+  ];
 
-  const photonPromise = searchPhotonNearby({
-    location: params.location,
-    category: params.category,
-    cityLabel: params.cityLabel,
-    radiusMeters: radius,
-    limit: Math.max(limit + 6, 24),
-  }).catch(() => [] as Place[]);
-
-  const catalog = searchCatalogNearby({
-    location: params.location,
-    category: params.category,
-    radiusMeters: radius,
-    limit: Math.max(limit + 10, 30),
-  });
-
-  try {
-    const nearby = await raceWithBudget(
-      providers.places.getNearbyPlaces({
-        location: params.location,
-        radiusMeters: radius,
-        category: params.category,
-        limit: Math.max(limit + 6, 24),
-      }),
-      LIVE_BUDGET_MS,
+  let best: Place[] = [];
+  for (const radius of radii) {
+    const pool = await fetchHomePool({
+      location: params.location,
+      category: params.category,
+      cityLabel: params.cityLabel,
+      radiusMeters: radius,
+      limit,
+    });
+    const ranked = finish(
+      pool,
+      params.location,
+      radius,
+      limit,
+      params.companions,
+      params.cityLabel,
     );
-    if (nearby && nearby.length > 0) {
-      return finish([...catalog, ...nearby], params.location, radius, limit, params.companions);
+    if (ranked.length >= Math.min(4, limit)) {
+      return ranked;
     }
-  } catch {
-    // Fall through.
+    if (ranked.length > best.length) {
+      best = ranked;
+    }
   }
 
-  const photon = await photonPromise;
-  if (photon.length > 0) {
-    return finish([...catalog, ...photon], params.location, radius, limit, params.companions);
-  }
-
-  return finish(catalog, params.location, radius, limit, params.companions);
+  return best;
 }

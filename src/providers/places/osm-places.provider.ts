@@ -1090,7 +1090,10 @@ export class OsmPlacesProvider implements PlacesProvider {
       if (category && category !== 'other') {
         merged = filterPlacesByCategory(merged, category);
       }
-      merged = withinRadius(merged, params.location, radius + 150).slice(0, limit);
+      // Keep Photon/catalog hits inside the search ring we actually queried (≥15km),
+      // not a tiny caller radius that would wipe Tokyo hubs down to 0.
+      const keepRadius = Math.max(radius, 15_000) + 150;
+      merged = withinRadius(merged, params.location, keepRadius).slice(0, limit);
       rememberPlaces(merged);
       return merged;
     }

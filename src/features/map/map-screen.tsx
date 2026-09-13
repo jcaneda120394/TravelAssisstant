@@ -15,12 +15,15 @@ import { theme } from '@/config/theme';
 import { useAppColorScheme } from '@/hooks/use-app-color-scheme';
 import { useResponsiveLayout } from '@/hooks/use-responsive-layout';
 import { rememberPlace } from '@/services/places/place-cache';
+import { getExploreNearbyPlaces } from '@/services/places/explore-nearby.service';
 
 const ZOOM_MIN = 5;
 const ZOOM_MAX = 20;
 const ZOOM_STEP = 1.5;
-const DEFAULT_ZOOM = 14;
+const DEFAULT_ZOOM = 12;
 const MAP_ATTRACTIONS_LIMIT = 20;
+/** Match Explore’s practical ring — 4km was too tight for city hubs / catalog landmarks. */
+const MAP_RADIUS_METERS = 25_000;
 
 export function MapScreen() {
   const router = useRouter();
@@ -46,19 +49,17 @@ export function MapScreen() {
   );
 
   const placesQuery = useQuery({
-    queryKey: ['map-places', coords?.latitude, coords?.longitude],
+    queryKey: ['map-places', 'v2-explore', coords?.latitude, coords?.longitude, label],
     enabled: Boolean(coords),
     staleTime: 3 * 60_000,
-    queryFn: async () => {
-      const places = await providers.places.getNearbyPlaces({
+    queryFn: () =>
+      getExploreNearbyPlaces({
         location: coords!,
-        radiusMeters: 4000,
         category: 'attraction',
+        cityLabel: label,
+        radiusMeters: MAP_RADIUS_METERS,
         limit: MAP_ATTRACTIONS_LIMIT,
-      });
-      const { filterPlacesWithinRadius } = await import('@/utils/geo');
-      return filterPlacesWithinRadius(places, coords!, 4000);
-    },
+      }),
   });
 
   const attractions = useMemo(
@@ -216,15 +217,17 @@ export function MapScreen() {
             title="Attractions near me"
             subtitle={
               coords
-                ? placesQuery.isLoading
-                  ? 'Loading up to 20 attractions…'
+                ? placesQuery.isLoading || placesQuery.isFetching
+                  ? 'Loading attractions nearby…'
                   : `${attractions.length} of ${MAP_ATTRACTIONS_LIMIT} attractions near you`
                 : 'Enable location to load attractions'
             }
           />
         </View>
 
-        {coords && placesQuery.isLoading && attractions.length === 0 ? (
+        {coords &&
+        (placesQuery.isLoading || placesQuery.isFetching) &&
+        attractions.length === 0 ? (
           <View className="mb-4 gap-3">
             <Skeleton height={84} />
             <Skeleton height={84} />
@@ -232,11 +235,24 @@ export function MapScreen() {
           </View>
         ) : null}
 
-        {coords && !placesQuery.isLoading && attractions.length === 0 ? (
+        {coords &&
+        !placesQuery.isLoading &&
+        !placesQuery.isFetching &&
+        attractions.length === 0 ? (
           <Card className="mb-4">
-            <AppText muted>
+            <AppText muted className="mb-3">
               No attractions found nearby. Try Explore with a wider distance.
             </AppText>
+            <Button
+              label="Open Explore"
+              variant="secondary"
+              onPress={() => {
+                router.replace({
+                  pathname: '/(tabs)/explore',
+                  params: { category: 'attraction' },
+                });
+              }}
+            />
           </Card>
         ) : null}
 

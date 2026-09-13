@@ -31,7 +31,6 @@ import { getHomeNearbyPlaces } from '@/services/places/home-nearby.service';
 import { listTrips } from '@/services/trips/trips.service';
 import {
   looksLikeSanFrancisco,
-  formatCompactLocationLabel,
 } from '@/services/location/location.service';
 import { getDestinationTravelGradient } from '@/utils/destination-theme';
 
@@ -70,7 +69,7 @@ export function HomeScreen() {
   const queryClient = useQueryClient();
   const { profile, preferences, user } = useAuth();
   const { currency, setCurrency } = useDisplayCurrency();
-  const { coords, label, city, country, mode, hasLocation, locate, isLocating, status, error } =
+  const { coords, label, country, mode, hasLocation, locate, isLocating, status, error } =
     useEnsureLocation({
       auto: true,
       // Don't background-refresh GPS on Home — it races Change city and freezes mobile web.
@@ -193,17 +192,6 @@ export function HomeScreen() {
 
   const nextTrip = tripsQuery.data?.[0];
   const firstName = profile?.full_name?.split(' ')[0];
-  const shortPlace =
-    formatCompactLocationLabel(label) ||
-    (city && country ? `${city}, ${country}` : city || country) ||
-    null;
-  const locationLine = hasLocation
-    ? `${shortPlace ?? 'Current location'}${
-        weatherQuery.data?.temperatureC != null ? ` · ${weatherQuery.data.temperatureC}°C` : ''
-      }`
-    : isLocating
-      ? 'Getting your location…'
-      : 'Choose a city to personalize nearby places';
 
   return (
     <Screen testID="screen-home" unsafe>
@@ -258,14 +246,6 @@ export function HomeScreen() {
             </AppText>
             <AppText inverse className="mt-2 text-[15px] leading-6 text-white/85">
               Discover places around you.
-            </AppText>
-
-            <AppText
-              inverse
-              className="mt-4 text-sm font-sans-medium leading-5 text-white"
-              numberOfLines={2}
-            >
-              {locationLine}
             </AppText>
 
             <View
